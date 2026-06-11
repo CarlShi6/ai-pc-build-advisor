@@ -41,11 +41,11 @@ export function ChatPanel({ className }: { className?: string }) {
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 w-full flex-col overflow-hidden border-l border-border bg-background/95 backdrop-blur-sm lg:w-[380px] xl:w-[400px]",
+        "flex h-full min-h-0 w-full flex-col overflow-hidden border-t border-border bg-background/95 backdrop-blur-sm lg:w-[390px] lg:border-l lg:border-t-0 xl:w-[410px]",
         className,
       )}
     >
-      <div className="border-b border-border px-5 py-4">
+      <div className="shrink-0 border-b border-border px-5 py-4">
         <div className="flex items-center gap-2 text-primary">
           <div className="flex size-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
             <MessageSquareText className="size-4" />
@@ -96,7 +96,7 @@ export function ChatPanel({ className }: { className?: string }) {
           e.preventDefault();
           send(input);
         }}
-        className="shrink-0 border-t border-border bg-card/70 p-5"
+        className="shrink-0 border-t border-border bg-card/85 p-5 backdrop-blur-sm"
       >
         <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <Sparkles className="size-3.5 text-primary" />

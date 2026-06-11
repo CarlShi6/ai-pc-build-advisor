@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   AlertTriangle,
+  ArrowRightLeft,
   CheckCircle2,
   ClipboardList,
   LoaderCircle,
@@ -93,6 +94,18 @@ function getFixButtonLabel(part: Part | null) {
   }
 
   return `Replace with ${part.displayName}`;
+}
+
+function getFixNowDescription(category: string | null) {
+  if (category === "psu") {
+    return "Open PSU alternatives with wattage, headroom, and recommendation notes.";
+  }
+
+  if (!category) {
+    return "This warning still needs a manual compatibility review.";
+  }
+
+  return "Open compatible alternatives for this warning and replace the affected part.";
 }
 
 function ConsultPage() {
@@ -262,39 +275,44 @@ function ConsultPage() {
       Boolean(recommendedPart) && !isReplacingPart && warning.id.includes("psu");
 
     return (
-      <div className="mt-4 flex flex-wrap gap-2">
-        {category ? (
+      <div className="mt-4 grid gap-2 lg:grid-cols-[minmax(0,1fr)_auto]">
+        <button
+          type="button"
+          className="flex w-full items-center justify-between rounded-2xl border border-primary/20 bg-primary/10 px-4 py-3 text-left transition-colors hover:bg-primary/15 disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={!category}
+          onClick={() => void handleFixWarning(warning)}
+        >
+          <div>
+            <div className="flex items-center gap-2 text-sm font-semibold text-primary">
+              <Wrench className="size-4" />
+              Fix Now
+            </div>
+            <p className="mt-1 text-sm text-muted-foreground">{getFixNowDescription(category)}</p>
+          </div>
+          <ArrowRightLeft className="size-4 shrink-0 text-primary" />
+        </button>
+
+        {directFixAllowed ? (
           <Button
             size="sm"
-            className="rounded-lg"
-            onClick={() => void handleFixWarning(warning)}
+            variant="secondary"
+            className="h-auto rounded-lg px-4 py-3"
+            onClick={() =>
+              recommendedPart
+                ? void handleReplacePart(
+                    recommendedPart,
+                    `Applied recommended fix: ${recommendedPart.displayName}.`,
+                  )
+                : undefined
+            }
           >
-            <Wrench className="mr-1 size-3.5" />
-            Fix Now
+            {getFixButtonLabel(recommendedPart)}
           </Button>
         ) : (
-          <Button size="sm" className="rounded-lg" disabled>
-            <Wrench className="mr-1 size-3.5" />
-            Manual review needed
+          <Button size="sm" variant="secondary" className="h-auto rounded-lg px-4 py-3" disabled>
+            {recommendedPart ? getFixButtonLabel(recommendedPart) : "Manual review needed"}
           </Button>
         )}
-
-        <Button
-          size="sm"
-          variant="secondary"
-          className="rounded-lg"
-          disabled={!directFixAllowed}
-          onClick={() =>
-            recommendedPart
-              ? void handleReplacePart(
-                  recommendedPart,
-                  `Applied recommended fix: ${recommendedPart.displayName}.`,
-                )
-              : undefined
-          }
-        >
-          {getFixButtonLabel(recommendedPart)}
-        </Button>
       </div>
     );
   }
@@ -303,8 +321,8 @@ function ConsultPage() {
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <TopBar />
 
-      <main className="flex h-[calc(100vh-4rem)] min-h-0 flex-col overflow-hidden lg:flex-row">
-        <section className="min-h-0 min-w-0 flex-1 overflow-y-auto bg-card/30">
+      <main className="grid h-[calc(100vh-4rem)] min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_410px]">
+        <section className="min-h-0 min-w-0 overflow-y-auto bg-card/30">
           <div className="mx-auto max-w-6xl space-y-6 px-6 py-6 md:px-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -376,7 +394,7 @@ function ConsultPage() {
                         {build.compatibilityWarnings.map((warning) => (
                           <div
                             key={warning.id}
-                            className="rounded-2xl border border-border bg-background/60 p-4"
+                            className="rounded-2xl border border-border bg-background/60 p-4 transition-colors hover:border-primary/20"
                           >
                             <div className="flex items-start gap-3">
                               <AlertTriangle
@@ -389,7 +407,7 @@ function ConsultPage() {
                               <div className="flex-1">
                                 <div className="flex flex-wrap items-center gap-2">
                                   <p className="font-medium">{warning.message}</p>
-                                  {warning.id.includes("psu") && (
+                                  {getWarningTargetCategory(warning) && (
                                     <Badge className="bg-primary/15 text-primary">Fix Now</Badge>
                                   )}
                                 </div>
@@ -526,6 +544,7 @@ function ConsultPage() {
           parts={compareParts}
           open={isDrawerOpen}
           isLoading={isLoadingCompare}
+          isReplacing={isReplacingPart}
           errorMessage={compareError}
           recommendedReplacementId={recommendedReplacementId}
           onOpenChange={handleDrawerOpenChange}

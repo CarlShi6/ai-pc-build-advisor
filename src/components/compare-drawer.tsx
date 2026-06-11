@@ -48,6 +48,7 @@ export function CompareDrawer({
   parts,
   open,
   isLoading,
+  isReplacing,
   errorMessage,
   recommendedReplacementId,
   onOpenChange,
@@ -58,6 +59,7 @@ export function CompareDrawer({
   parts: Part[];
   open: boolean;
   isLoading?: boolean;
+  isReplacing?: boolean;
   errorMessage?: string | null;
   recommendedReplacementId?: string | null;
   onOpenChange: (open: boolean) => void;
@@ -159,6 +161,12 @@ export function CompareDrawer({
               </Badge>
             </div>
 
+            {recommendedReplacementId && (
+              <div className="rounded-2xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
+                A recommended fix is highlighted below because it resolves the currently selected compatibility issue.
+              </div>
+            )}
+
             {isLoading ? (
               <div className="flex min-h-48 items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-8 text-sm text-muted-foreground">
                 <LoaderCircle className="mr-2 size-4 animate-spin" />
@@ -178,113 +186,123 @@ export function CompareDrawer({
               </div>
             ) : (
               <div className="grid gap-4 xl:grid-cols-2">
-                {parts.map((part) => {
-                const candidateBuild = buildCandidate(build, part);
-                const isSelected = part.id === selectedPart.id;
-                const delta = part.price - selectedPart.price;
-                const notes = getCompatibilityNotesForPart(candidateBuild, part);
-                const isRecommendedFix = part.id === recommendedReplacementId;
+                {alternatives.map((part) => {
+                  const candidateBuild = buildCandidate(build, part);
+                  const delta = part.price - selectedPart.price;
+                  const notes = getCompatibilityNotesForPart(candidateBuild, part);
+                  const isRecommendedFix = part.id === recommendedReplacementId;
 
-                return (
-                  <article
-                    key={part.id}
-                    className={cn(
-                      "flex h-full flex-col rounded-2xl border p-5 transition-colors",
-                      isSelected
-                        ? "border-primary/40 bg-primary/[0.06]"
-                        : "border-border bg-card hover:border-primary/30",
-                    )}
-                  >
-                    <div className="flex flex-wrap items-start justify-between gap-3">
-                      <div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <h4 className="text-lg font-bold">{part.displayName}</h4>
-                          {isSelected && (
-                            <Badge className="rounded-md border border-primary/30 bg-primary/15 text-primary">
-                              <Sparkles className="mr-1 size-3" /> Current pick
-                            </Badge>
-                          )}
-                          {isRecommendedFix && !isSelected && (
-                            <Badge className="rounded-md border border-success/30 bg-success/15 text-success">
-                              Recommended fix
-                            </Badge>
-                          )}
-                        </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          {part.recommendationReason ?? "Alternative configured in the local mock catalog."}
-                        </p>
-                      </div>
-                      <div className="text-right">
-                        <p className="font-mono text-2xl font-bold">{formatMoney(part.price)}</p>
-                        <p className={cn("text-xs", delta <= 0 ? "text-success" : "text-warning")}>
-                          {delta === 0 ? "No price change" : delta < 0 ? `${formatMoney(Math.abs(delta))} cheaper` : `${formatMoney(delta)} more`}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap gap-2">
-                      {getPartSummarySpecs(part).map((spec) => (
-                        <span key={spec} className="rounded-md border border-border bg-background/60 px-2.5 py-1 text-xs">
-                          {spec}
-                        </span>
-                      ))}
-                    </div>
-
-                    <div className="mt-4 grid gap-3 md:grid-cols-2">
-                      <InfoRow label="Power requirement" value={getPartPowerRequirement(part)} />
-                      <InfoRow
-                        label="Compatibility status"
-                        value={
-                          candidateBuild.compatibilityStatus === "pass"
-                            ? "Pass"
-                            : candidateBuild.compatibilityStatus === "warning"
-                              ? "Warning"
-                              : "Fail"
-                        }
-                        valueClass={
-                          candidateBuild.compatibilityStatus === "pass"
-                            ? "text-success"
-                            : candidateBuild.compatibilityStatus === "warning"
-                              ? "text-warning"
-                              : "text-destructive"
-                        }
-                      />
-                    </div>
-
-                    <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
-                      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Compatibility notes</p>
-                      <div className="mt-2 space-y-2">
-                        {notes.map((note) => (
-                          <p key={note} className="text-sm text-muted-foreground">
-                            {note}
+                  return (
+                    <article
+                      key={part.id}
+                      className={cn(
+                        "flex h-full flex-col rounded-2xl border p-5 transition-colors",
+                        isRecommendedFix
+                          ? "border-success/40 bg-success/[0.06]"
+                          : "border-border bg-card hover:border-primary/30",
+                      )}
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="text-lg font-bold">{part.displayName}</h4>
+                            {isRecommendedFix && (
+                              <Badge className="rounded-md border border-success/30 bg-success/15 text-success">
+                                <Sparkles className="mr-1 size-3" /> Recommended fix
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {part.recommendationReason ?? "Alternative configured in the local mock catalog."}
                           </p>
+                        </div>
+                        <div className="text-right">
+                          <p className="font-mono text-2xl font-bold">{formatMoney(part.price)}</p>
+                          <p className={cn("text-xs", delta <= 0 ? "text-success" : "text-warning")}>
+                            {delta === 0
+                              ? "No price change"
+                              : delta < 0
+                              ? `${formatMoney(Math.abs(delta))} cheaper`
+                              : `${formatMoney(delta)} more`}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        {getPartSummarySpecs(part).map((spec) => (
+                          <span key={spec} className="rounded-md border border-border bg-background/60 px-2.5 py-1 text-xs">
+                            {spec}
+                          </span>
                         ))}
                       </div>
-                      {candidateBuild.compatibilityWarnings.length > 0 && (
-                        <div className="mt-3 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
-                          <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                          <span>
-                            {candidateBuild.compatibilityWarnings.length} compatibility item
-                            {candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} would remain after this swap.
-                          </span>
-                        </div>
-                      )}
-                    </div>
 
-                    <Button
-                      className="mt-4 rounded-xl"
-                      variant={isSelected ? "secondary" : isRecommendedFix ? "default" : "secondary"}
-                      disabled={isSelected}
-                      onClick={() => onReplace(part)}
-                    >
-                      {isSelected
-                        ? "Currently selected"
-                        : isRecommendedFix
-                          ? `Replace with this ${sectionTitle}`
-                          : "Replace with this part"}
-                    </Button>
-                  </article>
-                );
+                      <div className="mt-4 grid gap-3 md:grid-cols-2">
+                        <InfoRow
+                          label="Price difference"
+                          value={
+                            delta === 0
+                              ? "No change"
+                              : delta < 0
+                                ? `-${formatMoney(Math.abs(delta))}`
+                                : `+${formatMoney(delta)}`
+                          }
+                          valueClass={delta <= 0 ? "text-success" : "text-warning"}
+                        />
+                        <InfoRow label="Power requirement" value={getPartPowerRequirement(part)} />
+                        <InfoRow
+                          label="Compatibility status"
+                          value={
+                            candidateBuild.compatibilityStatus === "pass"
+                              ? "Pass"
+                              : candidateBuild.compatibilityStatus === "warning"
+                                ? "Warning"
+                                : "Fail"
+                          }
+                          valueClass={
+                            candidateBuild.compatibilityStatus === "pass"
+                              ? "text-success"
+                              : candidateBuild.compatibilityStatus === "warning"
+                                ? "text-warning"
+                                : "text-destructive"
+                          }
+                        />
+                        <InfoRow label="Build total after swap" value={formatMoney(candidateBuild.totalPrice)} />
+                      </div>
+
+                      <div className="mt-4 rounded-2xl border border-border bg-background/60 p-4">
+                        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Compatibility notes</p>
+                        <div className="mt-2 space-y-2">
+                          {notes.map((note) => (
+                            <p key={note} className="text-sm text-muted-foreground">
+                              {note}
+                            </p>
+                          ))}
+                        </div>
+                        {candidateBuild.compatibilityWarnings.length > 0 && (
+                          <div className="mt-3 flex items-start gap-2 rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+                            <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                            <span>
+                              {candidateBuild.compatibilityWarnings.length} compatibility item
+                              {candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} would remain after this swap.
+                            </span>
+                          </div>
+                        )}
+                      </div>
+
+                      <Button
+                        className="mt-4 rounded-xl"
+                        variant={isRecommendedFix ? "default" : "secondary"}
+                        disabled={Boolean(isReplacing)}
+                        onClick={() => onReplace(part)}
+                      >
+                        {isReplacing
+                          ? "Replacing part..."
+                          : isRecommendedFix
+                            ? "Replace with this recommended part"
+                            : "Replace with this part"}
+                      </Button>
+                    </article>
+                  );
                 })}
               </div>
             )}

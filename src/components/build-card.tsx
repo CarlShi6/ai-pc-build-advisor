@@ -31,6 +31,15 @@ type BuildCardRow = {
   specs: string[];
 };
 
+type BuildCardProps = {
+  build?: Build;
+  parts?: LegacyBuildPart[];
+  focusedCategory?: string;
+  onFocus?: (category: string) => void;
+  onCompare?: (category: string) => void;
+  compact?: boolean;
+};
+
 function formatMoney(value: number) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
@@ -83,11 +92,21 @@ export function PerfStat({
 export function BuildCard({
   build,
   parts = SAMPLE_BUILD,
-}: {
-  build?: Build;
-  parts?: LegacyBuildPart[];
-}) {
-  return <BuildCardInner build={build} parts={parts} />;
+  focusedCategory,
+  onFocus,
+  onCompare,
+  compact = false,
+}: BuildCardProps) {
+  return (
+    <BuildCardInner
+      build={build}
+      parts={parts}
+      focusedCategory={focusedCategory}
+      onFocus={onFocus}
+      onCompare={onCompare}
+      compact={compact}
+    />
+  );
 }
 
 export function BuildCardInner({
@@ -97,14 +116,7 @@ export function BuildCardInner({
   onFocus,
   onCompare,
   compact = false,
-}: {
-  build?: Build;
-  parts?: LegacyBuildPart[];
-  focusedCategory?: string;
-  onFocus?: (category: string) => void;
-  onCompare?: (category: string) => void;
-  compact?: boolean;
-}) {
+}: BuildCardProps) {
   const rows = normalizeRows(build, parts);
   const total = build?.totalPrice ?? rows.reduce((sum, part) => sum + part.price, 0);
   const status = build?.compatibilityStatus ?? "pass";
@@ -176,81 +188,86 @@ export function BuildCardInner({
             <span>{statusMeta.label}</span>
           </div>
         </div>
-        <table className="w-full text-left">
-          <thead>
-            <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="px-6 py-4 font-medium">Category</th>
-              <th className="px-6 py-4 font-medium">Part Name</th>
-              <th className="px-6 py-4 text-right font-medium">Price</th>
-              {(onFocus || onCompare) && <th className="px-6 py-4 text-right font-medium">Actions</th>}
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border text-sm">
-            {rows.map((part) => (
-              <tr
-                key={part.id}
-                onClick={() => onFocus?.(part.category)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    onFocus?.(part.category);
-                  }
-                }}
-                role={onFocus ? "button" : undefined}
-                tabIndex={onFocus ? 0 : undefined}
-                className={cn(
-                  "group transition-colors",
-                  onFocus && "cursor-pointer hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                  focusedCategory === part.category &&
-                    "bg-primary/10 outline outline-1 -outline-offset-1 outline-primary/50",
-                )}
-              >
-                <td className="px-6 py-4 font-mono text-xs">
-                  <span
-                    className={cn(
-                      "rounded-md px-2 py-0.5",
-                      focusedCategory === part.category ? "bg-primary/20 text-primary" : "text-muted-foreground",
-                    )}
-                  >
-                    {part.categoryLabel}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span>{part.name}</span>
-                      {focusedCategory === part.category && (
-                        <Badge className="rounded-md bg-primary/15 text-[10px] text-primary">
-                          <Eye className="mr-1 size-3" /> Currently Viewing
-                        </Badge>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[860px] text-left">
+            <thead>
+              <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="px-6 py-4 font-medium">Category</th>
+                <th className="px-6 py-4 font-medium">Part Name</th>
+                <th className="px-6 py-4 text-right font-medium">Price</th>
+                {(onFocus || onCompare) && <th className="px-6 py-4 text-right font-medium">Actions</th>}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border text-sm">
+              {rows.map((part) => (
+                <tr
+                  key={part.id}
+                  onClick={() => onFocus?.(part.category)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      onFocus?.(part.category);
+                    }
+                  }}
+                  role={onFocus ? "button" : undefined}
+                  tabIndex={onFocus ? 0 : undefined}
+                  aria-label={`Compare or swap ${part.categoryLabel}`}
+                  className={cn(
+                    "group transition-colors",
+                    onFocus &&
+                      "cursor-pointer hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                    focusedCategory === part.category &&
+                      "bg-primary/10 outline outline-1 -outline-offset-1 outline-primary/50",
+                  )}
+                >
+                  <td className="px-6 py-4 font-mono text-xs">
+                    <span
+                      className={cn(
+                        "rounded-md px-2 py-0.5",
+                        focusedCategory === part.category ? "bg-primary/20 text-primary" : "text-muted-foreground",
                       )}
+                    >
+                      {part.categoryLabel}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-2">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span>{part.name}</span>
+                        {focusedCategory === part.category && (
+                          <Badge className="rounded-md bg-primary/15 text-[10px] text-primary">
+                            <Eye className="mr-1 size-3" /> Currently Viewing
+                          </Badge>
+                        )}
+                      </div>
                       {(onFocus || onCompare) && (
-                        <span className="text-xs font-medium text-primary/80">
-                          Click to compare or swap
-                        </span>
+                        <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                          <ArrowRightLeft className="size-3" />
+                          Compare or swap this {part.categoryLabel.toLowerCase()}
+                        </div>
+                      )}
+                      {part.specs.length > 0 && (
+                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                          {part.specs.map((spec) => (
+                            <span key={spec} className="rounded-md border border-border bg-background/60 px-2 py-1">
+                              {spec}
+                            </span>
+                          ))}
+                        </div>
                       )}
                     </div>
-                    {part.specs.length > 0 && (
-                      <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                        {part.specs.map((spec) => (
-                          <span key={spec} className="rounded-md border border-border bg-background/60 px-2 py-1">
-                            {spec}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-right font-mono">{formatMoney(part.price)}</td>
-                {(onFocus || onCompare) && (
-                  <td className="px-6 py-4 text-right">
-                    <RowActions category={part.category} onCompare={onCompare} onFocus={onFocus} />
                   </td>
-                )}
-              </tr>
-            ))}
-          </tbody>
-        </table>
+                  <td className="px-6 py-4 text-right font-mono">{formatMoney(part.price)}</td>
+                  {(onFocus || onCompare) && (
+                    <td className="px-6 py-4 text-right">
+                      <RowActions category={part.category} categoryLabel={part.categoryLabel} onCompare={onCompare} onFocus={onFocus} />
+                    </td>
+                  )}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {!compact && (
@@ -295,23 +312,25 @@ export function BuildCardInner({
 
 function RowActions({
   category,
+  categoryLabel,
   onCompare,
   onFocus,
 }: {
   category: string;
+  categoryLabel: string;
   onCompare?: (category: string) => void;
   onFocus?: (category: string) => void;
 }) {
   const isPrimary =
     category === "gpu" || category === "cpu" || category === "GPU" || category === "CPU";
-  const compareLabel = isPrimary ? "Compare / Swap" : "Swap options";
+  const compareLabel = isPrimary ? "Compare / Swap" : "Swap";
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
       <Button
         size="sm"
         variant={isPrimary ? "default" : "secondary"}
-        className="h-8 rounded-md px-3 text-xs"
+        className="h-9 rounded-md px-3 text-xs font-semibold"
         onClick={(event) => {
           event.stopPropagation();
           (onCompare ?? onFocus)?.(category);
@@ -325,7 +344,7 @@ function RowActions({
         {compareLabel}
       </Button>
       <span className="hidden items-center gap-1 text-xs text-muted-foreground xl:inline-flex">
-        <ArrowRightLeft className="size-3" /> Opens compare drawer
+        <ArrowRightLeft className="size-3" /> Open {categoryLabel.toLowerCase()} drawer
       </span>
     </div>
   );
