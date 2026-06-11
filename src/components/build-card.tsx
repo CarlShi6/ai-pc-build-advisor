@@ -1,5 +1,5 @@
 import { categoryLabels } from "@/data/seedParts";
-import { getPartSummarySpecs } from "@/lib/mockApi";
+import { getPartSummarySpecs } from "@/lib/build-advisor";
 import { cn } from "@/lib/utils";
 import type { Build } from "@/types/build";
 import { Badge } from "@/components/ui/badge";

@@ -11,9 +11,8 @@ import {
   getPartsByCategory,
   getRecommendedBuild,
   getRecommendedReplacementForWarning,
-  getStoreEmployeeSummary,
   replaceBuildPart,
-} from "@/lib/mockApi";
+} from "@/lib/apiClient";
 import type {
   Build,
   CartPreviewItem,
@@ -113,22 +112,26 @@ function ConsultPage() {
   const [buildError, setBuildError] = useState<string | null>(null);
   const [cartPreview, setCartPreview] = useState<CartPreviewItem[]>([]);
   const [employeeSummary, setEmployeeSummary] = useState<StoreEmployeeSummary | null>(null);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
   const [compareCategory, setCompareCategory] = useState<string | null>(null);
   const [compareParts, setCompareParts] = useState<Part[]>([]);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [recommendedReplacementId, setRecommendedReplacementId] = useState<string | null>(null);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [isLoadingBuild, setIsLoadingBuild] = useState(true);
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isLoadingCompare, setIsLoadingCompare] = useState(false);
   const [isReplacingPart, setIsReplacingPart] = useState(false);
-  const [toast, setToast] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
 
   useEffect(() => {
     let active = true;
 
     async function loadBuild() {
       setIsLoadingBuild(true);
+      setIsLoadingDetails(false);
       setBuildError(null);
+      setDetailsError(null);
 
       try {
         const recommendedBuild = await getRecommendedBuild({
@@ -141,12 +144,37 @@ function ConsultPage() {
         }
 
         setBuild(recommendedBuild);
+        setIsLoadingBuild(false);
+        setIsLoadingDetails(true);
+
+        try {
+          const preview = await getCartPreview(recommendedBuild);
+
+          if (!active) {
+            return;
+          }
+
+          setCartPreview(preview.items);
+          setEmployeeSummary(preview.employeeSummary);
+        } catch {
+          if (!active) {
+            return;
+          }
+
+          setDetailsError(
+            "The pre-cart preview and employee summary could not be loaded from the internal API.",
+          );
+        } finally {
+          if (active) {
+            setIsLoadingDetails(false);
+          }
+        }
       } catch {
         if (!active) {
           return;
         }
 
-        setBuildError("The mock recommendation could not be loaded. Please refresh and try again.");
+        setBuildError("The internal recommendation API could not be loaded. Please refresh and try again.");
       } finally {
         if (active) {
           setIsLoadingBuild(false);
@@ -160,31 +188,6 @@ function ConsultPage() {
       active = false;
     };
   }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    async function refreshDerivedData() {
-      if (!build) {
-        return;
-      }
-
-      const preview = await getCartPreview(build);
-
-      if (!active) {
-        return;
-      }
-
-      setCartPreview(preview);
-      setEmployeeSummary(getStoreEmployeeSummary(build, preview));
-    }
-
-    void refreshDerivedData();
-
-    return () => {
-      active = false;
-    };
-  }, [build]);
 
   useEffect(() => {
     if (!toast) {
@@ -224,7 +227,7 @@ function ConsultPage() {
       setCompareParts(comparedParts);
     } catch {
       setCompareError(
-        `The ${normalizedCategory.toUpperCase()} alternatives could not be loaded from local mock data.`,
+        `The ${normalizedCategory.toUpperCase()} alternatives could not be loaded from the internal API.`,
       );
     } finally {
       setIsLoadingCompare(false);
@@ -237,12 +240,27 @@ function ConsultPage() {
     }
 
     setIsReplacingPart(true);
+    setDetailsError(null);
 
     try {
-      const nextBuild = await replaceBuildPart(build, part);
-      setBuild(nextBuild);
+      const nextState = await replaceBuildPart(build, part);
+      setBuild(nextState.build);
+      setCartPreview(nextState.cartPreview);
+      setEmployeeSummary(nextState.employeeSummary);
       handleDrawerOpenChange(false);
-      setToast(successMessage ?? `Replaced ${categoryLabels[part.category]} with ${part.displayName}.`);
+      setToast({
+        message:
+          successMessage ?? `Replaced ${categoryLabels[part.category]} with ${part.displayName}.`,
+        tone: "success",
+      });
+    } catch {
+      setDetailsError(
+        "The selected part could not be applied through the internal API. Please try again.",
+      );
+      setToast({
+        message: `Could not replace ${categoryLabels[part.category]} right now. Please try again.`,
+        tone: "error",
+      });
     } finally {
       setIsReplacingPart(false);
     }
@@ -257,7 +275,10 @@ function ConsultPage() {
     const recommendedPart = getRecommendedReplacementForWarning(build, warning);
 
     if (!category) {
-      setToast("This warning does not have an automatic compare target yet.");
+      setToast({
+        message: "This warning does not have an automatic compare target yet.",
+        tone: "error",
+      });
       return;
     }
 
@@ -358,6 +379,12 @@ function ConsultPage() {
                   onCompare={(category) => void openCompare(category)}
                 />
 
+                {detailsError && (
+                  <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+                    {detailsError}
+                  </div>
+                )}
+
                 <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
                   <section className="rounded-2xl border border-border bg-card p-6">
                     <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
@@ -426,9 +453,17 @@ function ConsultPage() {
                   </section>
 
                   <section className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
-                    <div className="mb-4 flex items-center gap-2">
-                      <Store className="size-4 text-primary" />
-                      <h2 className="text-xl font-bold text-primary">Store Employee Summary</h2>
+                    <div className="mb-4 flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-2">
+                        <Store className="size-4 text-primary" />
+                        <h2 className="text-xl font-bold text-primary">Store Employee Summary</h2>
+                      </div>
+                      {isLoadingDetails && (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs text-muted-foreground">
+                          <LoaderCircle className="size-3.5 animate-spin" />
+                          Refreshing
+                        </div>
+                      )}
                     </div>
 
                     {employeeSummary ? (
@@ -458,7 +493,9 @@ function ConsultPage() {
                       </div>
                     ) : (
                       <div className="rounded-2xl border border-primary/15 bg-background/60 p-4 text-sm text-muted-foreground">
-                        Employee summary will appear after the build finishes loading.
+                        {isLoadingDetails
+                          ? "Refreshing the store employee summary..."
+                          : "Employee summary will appear after the build finishes loading."}
                       </div>
                     )}
                   </section>
@@ -475,13 +512,26 @@ function ConsultPage() {
                         Mock store handoff list only. No checkout or live retailer integration yet.
                       </p>
                     </div>
-                    <Badge variant="secondary" className="rounded-md">
-                      {cartPreview.length} items
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      {isLoadingDetails && (
+                        <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
+                          <LoaderCircle className="size-3.5 animate-spin" />
+                          Syncing
+                        </div>
+                      )}
+                      <Badge variant="secondary" className="rounded-md">
+                        {cartPreview.length} items
+                      </Badge>
+                    </div>
                   </div>
 
                   <div className="overflow-hidden rounded-2xl border border-border">
-                    {cartPreview.length === 0 ? (
+                    {isLoadingDetails && cartPreview.length === 0 ? (
+                      <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
+                        <LoaderCircle className="size-4 animate-spin" />
+                        Loading pre-cart preview
+                      </div>
+                    ) : cartPreview.length === 0 ? (
                       <div className="p-5 text-sm text-muted-foreground">
                         Pre-cart items will populate as soon as the mock build is ready.
                       </div>
@@ -554,9 +604,19 @@ function ConsultPage() {
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
-          <div className="pointer-events-auto flex items-center gap-3 rounded-xl border border-primary/30 bg-card/95 px-4 py-3 text-sm shadow-glow backdrop-blur">
-            <CheckCircle2 className="size-4 text-primary" />
-            <span>{toast}</span>
+          <div
+            className={`pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-3 text-sm shadow-glow backdrop-blur ${
+              toast.tone === "error"
+                ? "border border-destructive/30 bg-destructive/10 text-destructive"
+                : "border border-primary/30 bg-card/95"
+            }`}
+          >
+            {toast.tone === "error" ? (
+              <AlertTriangle className="size-4" />
+            ) : (
+              <CheckCircle2 className="size-4 text-primary" />
+            )}
+            <span>{toast.message}</span>
             <Button variant="ghost" size="sm" className="rounded-md" onClick={() => setToast(null)}>
               Dismiss
             </Button>

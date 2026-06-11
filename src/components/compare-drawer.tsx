@@ -1,10 +1,10 @@
 import { categoryLabels } from "@/data/seedParts";
-import { calculateBuildTotal, deriveCompatibilityStatus, evaluateCompatibility } from "@/lib/compatibility";
 import {
   getCompatibilityNotesForPart,
   getPartPowerRequirement,
   getPartSummarySpecs,
-} from "@/lib/mockApi";
+} from "@/lib/build-advisor";
+import { calculateBuildTotal, deriveCompatibilityStatus, evaluateCompatibility } from "@/lib/compatibility";
 import { cn } from "@/lib/utils";
 import type { Build } from "@/types/build";
 import type { Part } from "@/types/parts";
