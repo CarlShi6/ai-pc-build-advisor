@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { BuildCard } from "@/components/build-card";
-import { ChatPanel } from "@/components/chat-panel";
+import { ChatPanel, type ChatMessage } from "@/components/chat-panel";
 import { CompareDrawer } from "@/components/compare-drawer";
 import { TopBar } from "@/components/top-bar";
 import { categoryLabels } from "@/data/seedParts";
@@ -13,11 +13,16 @@ import {
   getRecommendedReplacementForWarning,
   replaceBuildPart,
 } from "@/lib/apiClient";
+import { hasUsefulNeedInfo, mergeCustomerNeeds, parseCustomerNeeds } from "@/lib/needParser";
 import type {
-  Build,
-  CartPreviewItem,
-  CompatibilityWarning,
-  StoreEmployeeSummary,
+  CustomerNeeds,
+  RecommendedBuildInput,
+} from "@/types/api";
+import type {
+  Build as BuildModel,
+  CartPreviewItem as CartPreviewItemModel,
+  CompatibilityWarning as CompatibilityWarningModel,
+  StoreEmployeeSummary as StoreEmployeeSummaryModel,
 } from "@/types/build";
 import type { Part } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
@@ -33,6 +38,27 @@ import {
   Store,
   Wrench,
 } from "lucide-react";
+
+const DEFAULT_RECOMMENDATION_INPUT: RecommendedBuildInput = {
+  budget: 2500,
+  targetUseCase: ["4K video editing", "casual gaming"],
+};
+
+const QUICK_REPLIES = [
+  "2K gaming",
+  "Video editing",
+  "Budget $2500",
+  "Black case",
+  "Beginner",
+];
+
+const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
+  {
+    id: "assistant-welcome",
+    role: "assistant",
+    text: "Tell me the customer's budget, main workload, preferred look, or Intel / AMD / NVIDIA preference and I'll refresh the build on the left.",
+  },
+];
 
 export const Route = createFileRoute("/consult")({
   head: () => ({
@@ -51,7 +77,7 @@ function normalizeCategory(category: string) {
   return category.toLowerCase();
 }
 
-function getWarningTargetCategory(warning: CompatibilityWarning) {
+function getWarningTargetCategory(warning: CompatibilityWarningModel) {
   if (
     warning.id === "psu-headroom" ||
     warning.id === "psu-headroom-tight" ||
@@ -107,11 +133,101 @@ function getFixNowDescription(category: string | null) {
   return "Open compatible alternatives for this warning and replace the affected part.";
 }
 
+function createMessageId() {
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+}
+
+function formatNeedsList(values: string[] | undefined) {
+  return values && values.length > 0 ? values.join(" + ") : "Still collecting";
+}
+
+function formatAppearancePreference(value: CustomerNeeds["appearancePreference"]) {
+  if (!value) {
+    return "Still collecting";
+  }
+
+  if (value === "rgb") {
+    return "RGB lighting";
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatExperienceLevel(value: CustomerNeeds["experienceLevel"]) {
+  if (!value) {
+    return "Still collecting";
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function formatBrandPreference(needs: CustomerNeeds) {
+  const labels = [
+    needs.cpuBrandPreference ? needs.cpuBrandPreference.toUpperCase() : null,
+    needs.gpuBrandPreference ? needs.gpuBrandPreference.toUpperCase() : null,
+  ].filter(Boolean);
+
+  return labels.length > 0 ? labels.join(" / ") : "Still collecting";
+}
+
+function buildAssistantReply({
+  build,
+  matchedFields,
+  needs,
+}: {
+  build?: BuildModel | null;
+  matchedFields: string[];
+  needs: CustomerNeeds;
+}) {
+  if (matchedFields.length === 0) {
+    return "I can help once I have a little more to work with. Try a budget, a workload like gaming or video editing, a preferred look, or an Intel / AMD / NVIDIA preference.";
+  }
+
+  const responseBits: string[] = [];
+
+  if (needs.budget) {
+    responseBits.push(`budget around $${needs.budget.toLocaleString()}`);
+  }
+
+  if (needs.targetUseCase && needs.targetUseCase.length > 0) {
+    responseBits.push(needs.targetUseCase.join(" + ").toLowerCase());
+  }
+
+  if (needs.appearancePreference) {
+    responseBits.push(`${needs.appearancePreference} styling`);
+  }
+
+  if (needs.experienceLevel) {
+    responseBits.push(`${needs.experienceLevel} experience level`);
+  }
+
+  if (needs.cpuBrandPreference || needs.gpuBrandPreference) {
+    responseBits.push(
+      [needs.cpuBrandPreference?.toUpperCase(), needs.gpuBrandPreference?.toUpperCase()]
+        .filter(Boolean)
+        .join(" / "),
+    );
+  }
+
+  const cpu = build?.parts.find((part) => part.category === "cpu");
+  const gpu = build?.parts.find((part) => part.category === "gpu");
+  const followUp =
+    !needs.budget
+      ? "A budget range would help tighten the rest of the parts."
+      : !needs.targetUseCase || needs.targetUseCase.length === 0
+        ? "Tell me the main workload next so I can tune the GPU and CPU balance."
+        : !needs.experienceLevel
+          ? "If you want, tell me whether the customer is a beginner or more advanced and I'll tune how aggressive the recommendation should be."
+          : "You can still use Compare / Swap on any part if the customer wants alternatives.";
+
+  return `Noted ${responseBits.join(", ")}. I refreshed the recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. ${followUp}`;
+}
+
 function ConsultPage() {
-  const [build, setBuild] = useState<Build | null>(null);
+  const [build, setBuild] = useState<BuildModel | null>(null);
   const [buildError, setBuildError] = useState<string | null>(null);
-  const [cartPreview, setCartPreview] = useState<CartPreviewItem[]>([]);
-  const [employeeSummary, setEmployeeSummary] = useState<StoreEmployeeSummary | null>(null);
+  const [cartPreview, setCartPreview] = useState<CartPreviewItemModel[]>([]);
+  const [employeeSummary, setEmployeeSummary] = useState<StoreEmployeeSummaryModel | null>(null);
   const [detailsError, setDetailsError] = useState<string | null>(null);
   const [compareCategory, setCompareCategory] = useState<string | null>(null);
   const [compareParts, setCompareParts] = useState<Part[]>([]);
@@ -122,6 +238,10 @@ function ConsultPage() {
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isLoadingCompare, setIsLoadingCompare] = useState(false);
   const [isReplacingPart, setIsReplacingPart] = useState(false);
+  const [isGeneratingRecommendation, setIsGeneratingRecommendation] = useState(false);
+  const [customerNeeds, setCustomerNeeds] = useState<CustomerNeeds>({});
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
+  const [chatInput, setChatInput] = useState("");
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
 
   useEffect(() => {
@@ -134,10 +254,7 @@ function ConsultPage() {
       setDetailsError(null);
 
       try {
-        const recommendedBuild = await getRecommendedBuild({
-          budget: 2500,
-          targetUseCase: ["4K video editing", "casual gaming"],
-        });
+        const recommendedBuild = await getRecommendedBuild(DEFAULT_RECOMMENDATION_INPUT);
 
         if (!active) {
           return;
@@ -234,6 +351,17 @@ function ConsultPage() {
     }
   }
 
+  async function refreshBuildAndDetails(nextInput?: RecommendedBuildInput) {
+    const recommendedBuild = await getRecommendedBuild(nextInput);
+    const preview = await getCartPreview(recommendedBuild);
+
+    return {
+      build: recommendedBuild,
+      cartPreview: preview.items,
+      employeeSummary: preview.employeeSummary,
+    };
+  }
+
   async function handleReplacePart(part: Part, successMessage?: string) {
     if (!build) {
       return;
@@ -266,7 +394,7 @@ function ConsultPage() {
     }
   }
 
-  async function handleFixWarning(warning: CompatibilityWarning) {
+  async function handleFixWarning(warning: CompatibilityWarningModel) {
     if (!build) {
       return;
     }
@@ -285,7 +413,84 @@ function ConsultPage() {
     await openCompare(category, recommendedPart?.id ?? null);
   }
 
-  function renderWarningActions(warning: CompatibilityWarning) {
+  async function handleChatSend(rawMessage: string) {
+    const message = rawMessage.trim();
+
+    if (!message || isGeneratingRecommendation) {
+      return;
+    }
+
+    const userMessage: ChatMessage = {
+      id: createMessageId(),
+      role: "user",
+      text: message,
+    };
+
+    setChatMessages((current) => [...current, userMessage]);
+    setChatInput("");
+
+    const parsed = parseCustomerNeeds(message);
+    const mergedNeeds = mergeCustomerNeeds(customerNeeds, parsed.parsedNeeds);
+
+    setCustomerNeeds(mergedNeeds);
+
+    if (!hasUsefulNeedInfo(parsed)) {
+      setChatMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "assistant",
+          text: buildAssistantReply({ matchedFields: parsed.matchedFields, needs: mergedNeeds }),
+        },
+      ]);
+      return;
+    }
+
+      setIsGeneratingRecommendation(true);
+      setIsLoadingDetails(true);
+      setDetailsError(null);
+
+    try {
+      const nextState = await refreshBuildAndDetails(mergedNeeds);
+      setBuild(nextState.build);
+      setCartPreview(nextState.cartPreview);
+      setEmployeeSummary(nextState.employeeSummary);
+      handleDrawerOpenChange(false);
+      setChatMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "assistant",
+          text: buildAssistantReply({
+            build: nextState.build,
+            matchedFields: parsed.matchedFields,
+            needs: mergedNeeds,
+          }),
+        },
+      ]);
+    } catch {
+      setDetailsError(
+        "The recommendation could not be refreshed from the internal API. The previous build is still shown.",
+      );
+      setToast({
+        message: "Could not refresh the build recommendation right now. Please try again.",
+        tone: "error",
+      });
+      setChatMessages((current) => [
+        ...current,
+        {
+          id: createMessageId(),
+          role: "assistant",
+          text: "I parsed the request, but the internal recommendation API did not refresh the build this time. Please try sending the request again.",
+        },
+      ]);
+    } finally {
+      setIsGeneratingRecommendation(false);
+      setIsLoadingDetails(false);
+    }
+  }
+
+  function renderWarningActions(warning: CompatibilityWarningModel) {
     if (!build) {
       return null;
     }
@@ -372,6 +577,47 @@ function ConsultPage() {
               </div>
             ) : build ? (
               <>
+                <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                  <div className="mb-4 flex items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Sparkles className="size-4 text-primary" />
+                        <h2 className="text-lg font-bold text-primary">Customer Needs</h2>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Collected from the live consultation chat on the right.
+                      </p>
+                    </div>
+                    {isGeneratingRecommendation && (
+                      <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs text-muted-foreground">
+                        <LoaderCircle className="size-3.5 animate-spin" />
+                        Recommending
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+                    <NeedsCard
+                      label="Budget"
+                      value={
+                        customerNeeds.budget
+                          ? `$${customerNeeds.budget.toLocaleString()}`
+                          : "Still collecting"
+                      }
+                    />
+                    <NeedsCard label="Use case" value={formatNeedsList(customerNeeds.targetUseCase)} />
+                    <NeedsCard
+                      label="Appearance"
+                      value={formatAppearancePreference(customerNeeds.appearancePreference)}
+                    />
+                    <NeedsCard
+                      label="Experience"
+                      value={formatExperienceLevel(customerNeeds.experienceLevel)}
+                    />
+                    <NeedsCard label="Brand preference" value={formatBrandPreference(customerNeeds)} />
+                  </div>
+                </section>
+
                 <BuildCard
                   build={build}
                   focusedCategory={compareCategory ?? undefined}
@@ -584,7 +830,15 @@ function ConsultPage() {
           </div>
         </section>
 
-        <ChatPanel className="shrink-0" />
+        <ChatPanel
+          className="shrink-0"
+          input={chatInput}
+          isGenerating={isGeneratingRecommendation}
+          messages={chatMessages}
+          quickReplies={QUICK_REPLIES}
+          onInputChange={setChatInput}
+          onSend={(value) => void handleChatSend(value)}
+        />
       </main>
 
       {build && (
@@ -623,6 +877,15 @@ function ConsultPage() {
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function NeedsCard({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-2xl border border-primary/15 bg-background/60 p-4">
+      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-sm leading-relaxed">{value}</p>
     </div>
   );
 }
