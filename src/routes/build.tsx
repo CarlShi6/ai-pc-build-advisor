@@ -32,7 +32,7 @@ const FOCUS_DATA: Record<string, FocusPart> = {
     tagline: "Best balance of 4K editing throughput and high-FPS gaming at $1,000.",
     priorities: ["High FPS", "CUDA acceleration", "16GB VRAM", "Quiet under load"],
     whyItMatters:
-      "The GPU drives every frame your customer will see — for 4K timelines and gaming it's the single biggest performance lever.",
+      "The GPU drives every frame you will see, and for 4K timelines or gaming it is the single biggest performance lever.",
   },
   CPU: {
     category: "CPU",
@@ -161,7 +161,7 @@ function BuildPage() {
         <div className="flex justify-end">
           <Button asChild size="lg" className="rounded-xl shadow-glow">
             <Link to="/cart">
-              Continue to cart execution <ArrowRight className="ml-2 size-4" />
+              View purchase references <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>
         </div>

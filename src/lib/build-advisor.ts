@@ -60,6 +60,8 @@ function buildFromParts(parts: Part[], input?: RecommendedBuildInput): Build {
     parts,
     compatibilityStatus: "pass",
     compatibilityWarnings: [],
+    recommendationSummary:
+      "Balanced mock recommendation based on budget, use case, compatibility, and upgrade flexibility.",
   };
 
   const compatibilityWarnings = evaluateCompatibility(buildDraft);
@@ -213,7 +215,7 @@ function getAvailabilityNote(availability?: PartAvailability) {
     return "Out of stock in this mock dataset.";
   }
 
-  return "Ready for store-assisted pre-cart handoff.";
+  return "Use this mock purchase reference when checking current retailer listings.";
 }
 
 export function getCartPreviewItems(build: Build): CartPreviewItem[] {
@@ -225,6 +227,7 @@ export function getCartPreviewItems(build: Build): CartPreviewItem[] {
     quantity: 1,
     productUrl: part.productUrl,
     searchUrl: part.searchUrl,
+    availability: part.availability,
     note: getAvailabilityNote(part.availability),
   }));
 }
@@ -360,6 +363,78 @@ export function getPartPowerRequirement(part: Part) {
   return "N/A";
 }
 
+export function getCategoryComparisonFields(category: PartCategory) {
+  switch (category) {
+    case "cpu":
+      return [
+        { key: "cores", label: "Cores" },
+        { key: "threads", label: "Threads" },
+        { key: "socket", label: "Socket" },
+        { key: "gamingScore", label: "Gaming score" },
+        { key: "productivityScore", label: "Productivity score" },
+        { key: "tdpW", label: "Power draw", suffix: "W" },
+      ];
+    case "gpu":
+      return [
+        { key: "chipset", label: "Chipset" },
+        { key: "vramGb", label: "VRAM", suffix: "GB" },
+        { key: "gaming1440pScore", label: "1440p score" },
+        { key: "gaming4kScore", label: "4K score" },
+        { key: "powerDrawW", label: "Power draw", suffix: "W" },
+        { key: "lengthMm", label: "Card length", suffix: "mm" },
+        { key: "color", label: "Color" },
+      ];
+    case "motherboard":
+      return [
+        { key: "socket", label: "Socket" },
+        { key: "chipset", label: "Chipset" },
+        { key: "formFactor", label: "Form factor" },
+        { key: "wifi", label: "Wi-Fi" },
+        { key: "pcieGen", label: "PCIe" },
+        { key: "memorySupport", label: "Memory support" },
+      ];
+    case "ram":
+      return [
+        { key: "capacityGb", label: "Capacity", suffix: "GB" },
+        { key: "ramType", label: "DDR type" },
+        { key: "speedMt", label: "Speed", suffix: " MT/s" },
+        { key: "latency", label: "Latency" },
+        { key: "color", label: "Color" },
+      ];
+    case "ssd":
+      return [
+        { key: "capacityTb", label: "Capacity", suffix: "TB" },
+        { key: "interface", label: "Interface" },
+        { key: "readMb", label: "Read speed", suffix: " MB/s" },
+        { key: "writeMb", label: "Write speed", suffix: " MB/s" },
+      ];
+    case "psu":
+      return [
+        { key: "wattageW", label: "Wattage", suffix: "W" },
+        { key: "efficiency", label: "Efficiency" },
+        { key: "modular", label: "Modular" },
+        { key: "nativeGpuConnector", label: "Native 12VHPWR / 12V-2x6" },
+      ];
+    case "case":
+      return [
+        { key: "formFactorSupport", label: "Form factor support" },
+        { key: "gpuClearanceMm", label: "GPU clearance", suffix: "mm" },
+        { key: "radiatorSupportMm", label: "Radiator support", suffix: "mm" },
+        { key: "color", label: "Color" },
+      ];
+    case "cooler":
+      return [
+        { key: "coolerType", label: "Cooler type" },
+        { key: "heightMm", label: "Air cooler height", suffix: "mm" },
+        { key: "radiatorMm", label: "Radiator size", suffix: "mm" },
+        { key: "socketSupport", label: "Socket support" },
+        { key: "noiseLevel", label: "Noise level" },
+      ];
+    default:
+      return [];
+  }
+}
+
 export function getCompatibilityNotesForPart(build: Build, part: Part) {
   const matchingWarnings = build.compatibilityWarnings.filter((warning) =>
     warning.affectedPartIds.includes(part.id),
@@ -388,22 +463,22 @@ export function getStoreEmployeeSummary(
 
   return {
     customerGoal: build.targetUseCase.join(" + "),
-    recommendedBuildLogic: `${cpu?.displayName ?? "Selected CPU"} plus ${gpu?.displayName ?? "selected GPU"} delivers the strongest balance for this mock recommendation.`,
+    recommendedBuildLogic: `${cpu?.displayName ?? "Selected CPU"} plus ${gpu?.displayName ?? "selected GPU"} is balanced around your budget, performance target, and compatibility checks.`,
     keySellingPoints: [
       cpu?.recommendationReason ?? "Balanced CPU choice",
       gpu?.recommendationReason ?? "Balanced GPU choice",
-      `${categoryLabels.ram} and ${categoryLabels.ssd} were chosen to keep creator workflows responsive.`,
+      `${categoryLabels.ram} and ${categoryLabels.ssd} were chosen to keep games, creative apps, and daily multitasking responsive.`,
     ],
     cheaperAlternative: cheaperGpu
       ? `${cheaperGpu.displayName} saves about $${Math.round((gpu?.price ?? 0) - cheaperGpu.price)} on the graphics budget.`
       : "The selected parts are already near the value floor in this mock dataset.",
     upsellOption: upsellGpu
-      ? `${upsellGpu.displayName} is the clearest upsell if the customer wants more graphics headroom.`
-      : "No higher-tier upsell is configured in the current mock dataset.",
+      ? `${upsellGpu.displayName} is the clearest upgrade if you want more graphics headroom.`
+      : "No higher-tier upgrade is configured in the current mock dataset.",
     compatibilityStatus:
       build.compatibilityStatus === "pass"
         ? "All checks passed."
         : `${build.compatibilityWarnings.length} compatibility item(s) need attention.`,
-    preCartStatus: `${preCartReadyCount}/${cartItems.length} items are ready for pre-cart handoff.`,
+    preCartStatus: `${preCartReadyCount}/${cartItems.length} items have usable mock purchase references.`,
   };
 }

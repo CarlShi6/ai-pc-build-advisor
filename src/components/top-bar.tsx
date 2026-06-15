@@ -3,7 +3,7 @@ import { cn } from "@/lib/utils";
 
 const MODES = [
   { label: "Configuration", to: "/consult" as const },
-  { label: "Cart Execution", to: "/cart" as const },
+  { label: "Purchase References", to: "/cart" as const },
 ];
 
 export function TopBar() {
@@ -44,11 +44,11 @@ export function TopBar() {
           to="/dashboard"
           className="hidden text-xs text-muted-foreground hover:text-foreground sm:block"
         >
-          Dashboard
+          Saved Builds
         </Link>
         <div className="hidden text-right sm:block">
-          <p className="text-xs text-muted-foreground">Employee ID</p>
-          <p className="font-mono text-sm">#ST-9421</p>
+          <p className="text-xs text-muted-foreground">Advisor Mode</p>
+          <p className="font-mono text-sm">B2C MVP</p>
         </div>
         <div className="size-10 rounded-full border border-border bg-secondary" />
       </div>

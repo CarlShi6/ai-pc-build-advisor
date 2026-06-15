@@ -1,29 +1,30 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { TopBar } from "@/components/top-bar";
 import { Badge } from "@/components/ui/badge";
-import { ArrowUpRight, DollarSign, ShoppingBag, Users } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { ArrowUpRight, Cpu, GitCompare, ShoppingBag, Sparkles } from "lucide-react";
 
 export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
-      { title: "Store Dashboard — AI装机助手" },
-      { name: "description", content: "Store employee dashboard with sales and consultation metrics." },
+      { title: "Saved Builds - AI PC Build Advisor" },
+      { name: "description", content: "Saved mock PC build recommendations and comparison activity." },
     ],
   }),
   component: DashboardPage,
 });
 
 const STATS = [
-  { label: "Sales Today", value: "$18,420", change: "+12.4%", icon: DollarSign },
-  { label: "Consultations", value: "47", change: "+6", icon: Users },
-  { label: "Orders Placed", value: "9", change: "+2", icon: ShoppingBag },
+  { label: "Saved Builds", value: "4", change: "+1", icon: Cpu },
+  { label: "Parts Compared", value: "18", change: "+6", icon: GitCompare },
+  { label: "Reference Lists", value: "3", change: "+2", icon: ShoppingBag },
 ];
 
 const RECENT = [
-  { id: "OD-22341", customer: "Wang J.", build: "Production Master Pro", total: "$2,783", status: "READY" },
-  { id: "OD-22340", customer: "Liu M.", build: "Streamer Starter", total: "$1,420", status: "PENDING" },
-  { id: "OD-22339", customer: "Chen H.", build: "Esports Lite", total: "$980", status: "READY" },
-  { id: "OD-22338", customer: "Zhao K.", build: "Workstation X", total: "$4,210", status: "ASSEMBLING" },
+  { id: "PC-22341", build: "Production Master Pro", useCase: "4K editing + gaming", total: "$2,783", status: "Ready" },
+  { id: "PC-22340", build: "Streamer Starter", useCase: "Streaming + 1440p", total: "$1,420", status: "Review" },
+  { id: "PC-22339", build: "Esports Lite", useCase: "High-FPS esports", total: "$980", status: "Ready" },
+  { id: "PC-22338", build: "Workstation X", useCase: "AI + rendering", total: "$4,210", status: "Compare" },
 ];
 
 function DashboardPage() {
@@ -31,12 +32,19 @@ function DashboardPage() {
     <div className="min-h-screen bg-background text-foreground">
       <TopBar />
       <main className="mx-auto max-w-6xl space-y-8 px-6 py-10">
-        <div>
-          <Badge className="mb-2 rounded-sm bg-primary/10 text-primary">Employee #ST-9421</Badge>
-          <h1 className="text-3xl font-bold tracking-tight">Store Dashboard</h1>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Today's consultations, orders, and sales performance at a glance.
-          </p>
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <Badge className="mb-2 rounded-sm bg-primary/10 text-primary">
+              <Sparkles className="mr-1 size-3" /> Buyer workspace
+            </Badge>
+            <h1 className="text-3xl font-bold tracking-tight">Saved Builds</h1>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Review saved recommendations, comparison activity, and mock purchase references.
+            </p>
+          </div>
+          <Button asChild className="rounded-xl shadow-glow">
+            <Link to="/consult">Open Advisor</Link>
+          </Button>
         </div>
 
         <div className="grid gap-4 md:grid-cols-3">
@@ -59,35 +67,35 @@ function DashboardPage() {
         </div>
 
         <div className="overflow-hidden rounded-2xl border border-border bg-card">
-          <div className="border-b border-border p-4 font-semibold">Recent Orders</div>
+          <div className="border-b border-border p-4 font-semibold">Recent Build Drafts</div>
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
-                <th className="px-6 py-3 font-medium">Order</th>
-                <th className="px-6 py-3 font-medium">Customer</th>
+                <th className="px-6 py-3 font-medium">Build Ref</th>
                 <th className="px-6 py-3 font-medium">Build</th>
+                <th className="px-6 py-3 font-medium">Use Case</th>
                 <th className="px-6 py-3 font-medium">Total</th>
                 <th className="px-6 py-3 text-right font-medium">Status</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {RECENT.map((r) => (
-                <tr key={r.id}>
-                  <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{r.id}</td>
-                  <td className="px-6 py-4">{r.customer}</td>
-                  <td className="px-6 py-4">{r.build}</td>
-                  <td className="px-6 py-4 font-mono">{r.total}</td>
+              {RECENT.map((row) => (
+                <tr key={row.id}>
+                  <td className="px-6 py-4 font-mono text-xs text-muted-foreground">{row.id}</td>
+                  <td className="px-6 py-4">{row.build}</td>
+                  <td className="px-6 py-4">{row.useCase}</td>
+                  <td className="px-6 py-4 font-mono">{row.total}</td>
                   <td className="px-6 py-4 text-right">
                     <Badge
                       className={
-                        r.status === "READY"
+                        row.status === "Ready"
                           ? "bg-success/15 text-success"
-                          : r.status === "PENDING"
+                          : row.status === "Review"
                             ? "bg-warning/15 text-warning"
                             : "bg-primary/15 text-primary"
                       }
                     >
-                      {r.status}
+                      {row.status}
                     </Badge>
                   </td>
                 </tr>

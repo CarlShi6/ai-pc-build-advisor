@@ -51,7 +51,7 @@ export function ChatPanel({
           </div>
           <div>
             <p className="text-sm font-semibold">AI Consultation Assistant</p>
-            <p className="text-xs text-muted-foreground">Collect needs, explain tradeoffs, and guide the sale.</p>
+            <p className="text-xs text-muted-foreground">Collect needs, explain tradeoffs, and tune your build.</p>
           </div>
         </div>
       </div>

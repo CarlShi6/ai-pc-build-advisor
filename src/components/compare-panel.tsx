@@ -115,7 +115,7 @@ function CompareBody({
               />
               <SummaryItem
                 icon={<Lightbulb className="size-4 text-primary" />}
-                label="Customer Goal"
+                label="Build Goal"
                 value={goal}
               />
               <SummaryItem
@@ -198,19 +198,19 @@ function CompareBody({
         subtitle="Green = better · Orange = worse · Gray = similar · Blue = currently selected."
       />
 
-      {/* Beginner + employee notes */}
+      {/* Buyer notes */}
       <div className="grid gap-4 md:grid-cols-2">
         <div className="rounded-2xl border border-border bg-card p-5">
           <div className="mb-3 flex items-center gap-2">
             <Lightbulb className="size-4 text-primary" />
-            <h3 className="text-sm font-bold">How to explain this to a beginner customer</h3>
+            <h3 className="text-sm font-bold">Beginner-friendly explanation</h3>
           </div>
           <p className="text-sm leading-relaxed text-muted-foreground">{selected.beginnerNote}</p>
         </div>
         <div className="rounded-2xl border border-primary/30 bg-primary/5 p-5">
           <div className="mb-3 flex items-center gap-2">
             <Star className="size-4 text-primary" />
-            <h3 className="text-sm font-bold text-primary">Employee sales note</h3>
+            <h3 className="text-sm font-bold text-primary">Recommendation note</h3>
           </div>
           <p className="text-sm leading-relaxed text-muted-foreground">{selected.salesNote}</p>
         </div>

@@ -88,7 +88,7 @@ export function evaluateCompatibility(build: Build): CompatibilityWarning[] {
         severity: "warning",
         message: `${psu.displayName} is compatible, but power headroom is tighter than ideal for future upgrades.`,
         affectedPartIds: [psu.id],
-        suggestedFix: "Consider a 1000W PSU if the customer may upgrade the GPU later.",
+        suggestedFix: "Consider a 1000W PSU if you may upgrade the GPU later.",
       });
     }
   }

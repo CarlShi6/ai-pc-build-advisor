@@ -72,7 +72,7 @@ export function ComparisonTable({
   selectedId,
   onSelect,
   title = "Parameter Comparison",
-  subtitle = "Side-by-side GPU options to help the customer pick the right card.",
+  subtitle = "Side-by-side GPU options to help you pick the right card.",
 }: {
   options?: ComparableOption[];
   metrics?: Metric[];
@@ -128,11 +128,11 @@ export function ComparisonTable({
           <Row key={m.key} metric={m} options={options} selectedId={selectedId} />
         ))}
 
-        {/* Sales / beginner notes */}
+        {/* Buyer notes */}
         <div className="bg-card p-5">
-          <p className="text-sm font-semibold">Sales note for employee</p>
+          <p className="text-sm font-semibold">Buyer-friendly notes</p>
           <p className="mt-1 text-xs text-muted-foreground">
-            How to position each option for a beginner customer.
+            Plain-language guidance for each option.
           </p>
         </div>
         {options.map((o) => (
