@@ -17,6 +17,7 @@ export interface Build {
   parts: Part[];
   compatibilityStatus: "pass" | "warning" | "fail";
   compatibilityWarnings: CompatibilityWarning[];
+  recommendationSummary?: string;
 }
 
 export interface CartPreviewItem {
@@ -27,10 +28,11 @@ export interface CartPreviewItem {
   quantity: number;
   productUrl?: string;
   searchUrl?: string;
+  availability?: "in_stock" | "low_stock" | "out_of_stock" | "unknown";
   note?: string;
 }
 
-export interface StoreEmployeeSummary {
+export interface BuyerSummary {
   customerGoal: string;
   recommendedBuildLogic: string;
   keySellingPoints: string[];
@@ -39,3 +41,5 @@ export interface StoreEmployeeSummary {
   compatibilityStatus: string;
   preCartStatus: string;
 }
+
+export type StoreEmployeeSummary = BuyerSummary;

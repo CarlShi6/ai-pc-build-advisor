@@ -35,7 +35,7 @@ import {
   LoaderCircle,
   ShieldCheck,
   Sparkles,
-  Store,
+  ShoppingBag,
   Wrench,
 } from "lucide-react";
 
@@ -56,7 +56,7 @@ const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   {
     id: "assistant-welcome",
     role: "assistant",
-    text: "Tell me the customer's budget, main workload, preferred look, or Intel / AMD / NVIDIA preference and I'll refresh the build on the left.",
+    text: "Tell me your budget, main workload, preferred look, or Intel / AMD / NVIDIA preference and I'll refresh the build on the left.",
   },
 ];
 
@@ -215,10 +215,10 @@ function buildAssistantReply({
     !needs.budget
       ? "A budget range would help tighten the rest of the parts."
       : !needs.targetUseCase || needs.targetUseCase.length === 0
-        ? "Tell me the main workload next so I can tune the GPU and CPU balance."
+          ? "Tell me the main workload next so I can tune the GPU and CPU balance."
         : !needs.experienceLevel
-          ? "If you want, tell me whether the customer is a beginner or more advanced and I'll tune how aggressive the recommendation should be."
-          : "You can still use Compare / Swap on any part if the customer wants alternatives.";
+          ? "If you want, tell me whether you're a beginner or more advanced and I'll tune how aggressive the recommendation should be."
+          : "You can still open the Part Compare Drawer on any part to review alternatives.";
 
   return `Noted ${responseBits.join(", ")}. I refreshed the recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. ${followUp}`;
 }
@@ -278,9 +278,7 @@ function ConsultPage() {
             return;
           }
 
-          setDetailsError(
-            "The pre-cart preview and employee summary could not be loaded from the internal API.",
-          );
+          setDetailsError("The purchase references and recommendation summary could not be loaded from the mock API.");
         } finally {
           if (active) {
             setIsLoadingDetails(false);
@@ -553,12 +551,12 @@ function ConsultPage() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <Badge className="mb-3 rounded-md border border-primary/30 bg-primary/10 text-primary">
-                  <Sparkles className="mr-1 size-3" /> Interaction + layout milestone
+                  <Sparkles className="mr-1 size-3" /> AI-ready build advisor
                 </Badge>
                 <h1 className="text-3xl font-bold tracking-tight">Live Build Recommendation</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  The Lovable design stays intact while the compare, replacement, warning-fix, and
-                  summary flows now update from local mock data.
+                  Compare parts, replace components, and watch pricing, compatibility, and purchase
+                  references update from local mock data.
                 </p>
               </div>
 
@@ -582,10 +580,10 @@ function ConsultPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <Sparkles className="size-4 text-primary" />
-                        <h2 className="text-lg font-bold text-primary">Customer Needs</h2>
+                        <h2 className="text-lg font-bold text-primary">Your Build Needs</h2>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Collected from the live consultation chat on the right.
+                        Collected from the guided advisor chat on the right.
                       </p>
                     </div>
                     {isGeneratingRecommendation && (
@@ -640,7 +638,7 @@ function ConsultPage() {
                           <h2 className="text-xl font-bold">Compatibility Warnings</h2>
                         </div>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Every warning card now includes a direct fix path when local mock data can support it.
+                          Every warning stays visible and includes a fix path when local mock data can support it.
                         </p>
                       </div>
                       <Badge
@@ -701,8 +699,8 @@ function ConsultPage() {
                   <section className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
-                        <Store className="size-4 text-primary" />
-                        <h2 className="text-xl font-bold text-primary">Store Employee Summary</h2>
+                        <ShoppingBag className="size-4 text-primary" />
+                        <h2 className="text-xl font-bold text-primary">Recommendation Summary</h2>
                       </div>
                       {isLoadingDetails && (
                         <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs text-muted-foreground">
@@ -714,7 +712,7 @@ function ConsultPage() {
 
                     {employeeSummary ? (
                       <div className="space-y-4 text-sm">
-                        <SummaryBlock label="Customer goal" value={employeeSummary.customerGoal} />
+                        <SummaryBlock label="Build goal" value={employeeSummary.customerGoal} />
                         <SummaryBlock
                           label="Recommendation logic"
                           value={employeeSummary.recommendedBuildLogic}
@@ -727,21 +725,21 @@ function ConsultPage() {
                           label="Cheaper alternative"
                           value={employeeSummary.cheaperAlternative}
                         />
-                        <SummaryBlock label="Upsell option" value={employeeSummary.upsellOption} />
+                        <SummaryBlock label="Upgrade option" value={employeeSummary.upsellOption} />
                         <SummaryBlock
                           label="Compatibility status"
                           value={employeeSummary.compatibilityStatus}
                         />
                         <SummaryBlock
-                          label="Pre-cart status"
+                          label="Purchase reference status"
                           value={employeeSummary.preCartStatus}
                         />
                       </div>
                     ) : (
                       <div className="rounded-2xl border border-primary/15 bg-background/60 p-4 text-sm text-muted-foreground">
                         {isLoadingDetails
-                          ? "Refreshing the store employee summary..."
-                          : "Employee summary will appear after the build finishes loading."}
+                          ? "Refreshing the recommendation summary..."
+                          : "Recommendation summary will appear after the build finishes loading."}
                       </div>
                     )}
                   </section>
@@ -752,10 +750,10 @@ function ConsultPage() {
                     <div>
                       <div className="flex items-center gap-2">
                         <ClipboardList className="size-4 text-primary" />
-                        <h2 className="text-xl font-bold">Pre-Cart Preview</h2>
+                        <h2 className="text-xl font-bold">Purchase Reference List</h2>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Mock store handoff list only. No checkout or live retailer integration yet.
+                        Mock retailer references only. No checkout, payment, or live stock integration yet.
                       </p>
                     </div>
                     <div className="flex items-center gap-2">
@@ -775,11 +773,11 @@ function ConsultPage() {
                     {isLoadingDetails && cartPreview.length === 0 ? (
                       <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
                         <LoaderCircle className="size-4 animate-spin" />
-                        Loading pre-cart preview
+                        Loading purchase references
                       </div>
                     ) : cartPreview.length === 0 ? (
                       <div className="p-5 text-sm text-muted-foreground">
-                        Pre-cart items will populate as soon as the mock build is ready.
+                        Purchase references will populate as soon as the mock build is ready.
                       </div>
                     ) : (
                       <table className="w-full text-left text-sm">

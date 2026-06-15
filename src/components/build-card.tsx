@@ -211,7 +211,7 @@ export function BuildCardInner({
                   }}
                   role={onFocus ? "button" : undefined}
                   tabIndex={onFocus ? 0 : undefined}
-                  aria-label={`Compare or swap ${part.categoryLabel}`}
+                  aria-label={`Compare or replace ${part.categoryLabel}`}
                   className={cn(
                     "group transition-colors",
                     onFocus &&
@@ -243,7 +243,7 @@ export function BuildCardInner({
                       {(onFocus || onCompare) && (
                         <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                           <ArrowRightLeft className="size-3" />
-                          Compare or swap this {part.categoryLabel.toLowerCase()}
+                          Compare or replace this {part.categoryLabel.toLowerCase()}
                         </div>
                       )}
                       {part.specs.length > 0 && (
@@ -274,11 +274,11 @@ export function BuildCardInner({
         <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
           <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-center">
             <div>
-              <h4 className="text-lg font-bold text-primary">Employee Sales Insight</h4>
+              <h4 className="text-lg font-bold text-primary">Build Insight</h4>
               <p className="mt-1 text-sm text-muted-foreground">
                 {build
-                  ? "This build now updates from mock data, so swaps will flow through pricing, warnings, and the pre-cart handoff."
-                  : "Suggest the 3-year extended warranty - high attach rate on premium GPUs."}
+                  ? "This build updates from mock data, so replacements flow through pricing, warnings, and purchase references."
+                  : "Compare a lower-cost GPU or a stronger PSU before finalizing the parts list."}
               </p>
             </div>
             <div className="flex gap-8">
@@ -301,7 +301,7 @@ export function BuildCardInner({
               Save Draft
             </Button>
             <Button className="flex-1 rounded-xl py-6 font-semibold shadow-glow">
-              Proceed to Cart
+              View Purchase References
             </Button>
           </div>
         </div>
@@ -323,7 +323,7 @@ function RowActions({
 }) {
   const isPrimary =
     category === "gpu" || category === "cpu" || category === "GPU" || category === "CPU";
-  const compareLabel = isPrimary ? "Compare / Swap" : "Swap";
+  const compareLabel = isPrimary ? "Compare / Replace" : "Replace";
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">

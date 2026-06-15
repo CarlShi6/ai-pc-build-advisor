@@ -116,7 +116,7 @@ function ComparePage() {
                 />
                 <SummaryItem
                   icon={<Cpu className="size-4 text-primary" />}
-                  label="Customer Goal"
+                  label="Build Goal"
                   value="4K video editing + casual gaming"
                 />
                 <SummaryItem
@@ -194,41 +194,41 @@ function ComparePage() {
           subtitle="Each row scores the three GPUs against each other. Green = better, orange = worse, gray = similar."
         />
 
-        {/* Beginner + employee explanation */}
+        {/* Buyer explanation */}
         <section className="grid gap-4 md:grid-cols-2">
           <div className="rounded-2xl border border-border bg-card p-6">
             <div className="mb-3 flex items-center gap-2">
               <Lightbulb className="size-4 text-primary" />
-              <h3 className="text-base font-bold">How to explain this to a beginner customer</h3>
+              <h3 className="text-base font-bold">Beginner-friendly explanation</h3>
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">
               The <span className="font-semibold text-foreground">RTX 4080 Super</span> is
               recommended because it gives strong 4K editing and gaming performance without the
               huge price jump of the RTX 4090. The{" "}
               <span className="font-semibold text-foreground">RTX 4070 Ti Super</span> is a
-              better-value choice if the customer wants to save money.
+              better-value choice if you want to save money.
             </p>
           </div>
           <div className="rounded-2xl border border-primary/30 bg-primary/5 p-6">
             <div className="mb-3 flex items-center gap-2">
               <Star className="size-4 text-primary" />
-              <h3 className="text-base font-bold text-primary">Employee sales note</h3>
+              <h3 className="text-base font-bold text-primary">Recommendation note</h3>
             </div>
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex gap-2">
                 <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
-                Recommend <span className="font-semibold text-foreground">RTX 4080 Super</span> as
+                Keep <span className="font-semibold text-foreground">RTX 4080 Super</span> as
                 the balanced option.
               </li>
               <li className="flex gap-2">
                 <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
-                Offer <span className="font-semibold text-foreground">RTX 4070 Ti Super</span> if
-                the customer wants to lower budget.
+                Choose <span className="font-semibold text-foreground">RTX 4070 Ti Super</span> if
+                you want to lower the budget.
               </li>
               <li className="flex gap-2">
                 <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
-                Only recommend <span className="font-semibold text-foreground">RTX 4090</span> if
-                the customer specifically asks for maximum performance.
+                Pick <span className="font-semibold text-foreground">RTX 4090</span> only if you
+                specifically want maximum performance.
               </li>
             </ul>
           </div>
@@ -237,7 +237,7 @@ function ComparePage() {
         <div className="flex justify-end">
           <Button asChild size="lg" className="rounded-xl shadow-glow">
             <Link to="/cart">
-              Continue to cart execution <ArrowRight className="ml-2 size-4" />
+              View purchase references <ArrowRight className="ml-2 size-4" />
             </Link>
           </Button>
         </div>
