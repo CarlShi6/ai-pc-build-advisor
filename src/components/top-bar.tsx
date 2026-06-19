@@ -6,7 +6,7 @@ const MODES = [
   { label: "Purchase References", to: "/cart" as const },
 ];
 
-export function TopBar() {
+export function TopBar({ onSavedBuildsClick }: { onSavedBuildsClick?: () => void }) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
@@ -40,12 +40,22 @@ export function TopBar() {
       </nav>
 
       <div className="flex items-center gap-4">
-        <Link
-          to="/dashboard"
-          className="hidden text-xs text-muted-foreground hover:text-foreground sm:block"
-        >
-          Saved Builds
-        </Link>
+        {onSavedBuildsClick ? (
+          <button
+            type="button"
+            className="hidden text-xs text-muted-foreground hover:text-foreground sm:block"
+            onClick={onSavedBuildsClick}
+          >
+            Saved Builds
+          </button>
+        ) : (
+          <Link
+            to="/dashboard"
+            className="hidden text-xs text-muted-foreground hover:text-foreground sm:block"
+          >
+            Saved Builds
+          </Link>
+        )}
         <div className="hidden text-right sm:block">
           <p className="text-xs text-muted-foreground">Advisor Mode</p>
           <p className="font-mono text-sm">B2C MVP</p>

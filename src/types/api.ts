@@ -2,6 +2,8 @@ import type {
   Build,
   CartPreviewItem,
   CompatibilityWarning,
+  SavedBuild,
+  SavedBuildSummary,
   StoreEmployeeSummary,
 } from "@/types/build";
 import type { Part, PartAvailability } from "@/types/parts";
@@ -118,6 +120,35 @@ export interface ResetMonetizationResponse {
   entitlement: Entitlement;
   usage: UsageStatus;
   message: string;
+}
+
+export interface SavedBuildsResponse {
+  builds: SavedBuildSummary[];
+  limit: number;
+}
+
+export interface SaveBuildRequest {
+  id?: string;
+  name: string;
+  build: Build;
+  buildNeeds: CustomerNeeds;
+}
+
+export interface SaveBuildResponse {
+  savedBuild: SavedBuild;
+  summary: SavedBuildSummary;
+  builds: SavedBuildSummary[];
+  limit: number;
+}
+
+export interface SavedBuildResponse {
+  savedBuild: SavedBuild;
+}
+
+export interface DeleteSavedBuildResponse {
+  success: boolean;
+  builds: SavedBuildSummary[];
+  limit: number;
 }
 
 export type AdvisorRequestPayload = AdvisorApiRequest;

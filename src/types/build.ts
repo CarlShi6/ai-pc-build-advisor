@@ -1,5 +1,6 @@
 import type { AffiliateLink } from "@/types/monetization";
 import type { Part } from "@/types/parts";
+import type { CustomerNeeds } from "@/types/api";
 
 export interface CompatibilityWarning {
   id: string;
@@ -48,3 +49,29 @@ export interface BuyerSummary {
 
 export type StoreEmployeeSummary = BuyerSummary;
 export type BuyerRecommendationSummary = BuyerSummary;
+
+export interface SavedBuild {
+  id: string;
+  name: string;
+  build: Build;
+  buildNeeds: CustomerNeeds;
+  createdAt: string;
+  updatedAt: string;
+  totalPrice: number;
+  compatibilityStatus: Build["compatibilityStatus"];
+  ownedParts: number;
+  targetUseCase: string[];
+}
+
+export interface SavedBuildSummary {
+  id: string;
+  name: string;
+  createdAt: string;
+  updatedAt: string;
+  totalPrice: number;
+  compatibilityStatus: Build["compatibilityStatus"];
+  ownedParts: number;
+  targetUseCase: string[];
+  cpuName?: string;
+  gpuName?: string;
+}

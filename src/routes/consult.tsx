@@ -11,9 +11,12 @@ import { UsageBadge } from "@/components/UsageBadge";
 import { categoryLabels } from "@/data/seedParts";
 import {
   askAdvisor,
+  deleteSavedBuild,
   getEntitlementStatus,
   getCartPreview,
   getCompareParts,
+  getSavedBuild,
+  getSavedBuilds,
   getPartsByCategory,
   getRecommendedBuild,
   getRecommendedReplacementForWarning,
@@ -21,7 +24,9 @@ import {
   consumeReplacementUsage,
   resetMockMonetizationState,
   replaceBuildPart,
+  saveCurrentBuild,
   trackAffiliateClick,
+  ApiClientError,
 } from "@/lib/apiClient";
 import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
 import { mergeCustomerNeeds } from "@/lib/needParser";
@@ -34,6 +39,7 @@ import type {
   Build as BuildModel,
   CartPreviewItem as CartPreviewItemModel,
   CompatibilityWarning as CompatibilityWarningModel,
+  SavedBuildSummary,
   StoreEmployeeSummary as StoreEmployeeSummaryModel,
 } from "@/types/build";
 import type { Entitlement, UsageStatus } from "@/types/monetization";
@@ -46,10 +52,16 @@ import {
   ChevronDown,
   CheckCircle2,
   ClipboardList,
+  Copy,
+  Download,
+  FileJson,
+  FolderOpen,
   LoaderCircle,
+  Save,
   ShieldCheck,
   Sparkles,
   ShoppingBag,
+  Trash2,
   Wrench,
 } from "lucide-react";
 
@@ -248,6 +260,74 @@ function buildAssistantReply({
   return `Noted ${responseBits.join(", ")}. I refreshed the recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. ${followUp}`;
 }
 
+function formatMoney(value: number) {
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(
+    new Date(value),
+  );
+}
+
+function formatCompatibilityStatus(status: BuildModel["compatibilityStatus"]) {
+  if (status === "pass") {
+    return "Ready";
+  }
+
+  return "Needs review";
+}
+
+function createBuildExportText({
+  build,
+  buildNeeds,
+  cartPreview,
+}: {
+  build: BuildModel;
+  buildNeeds: CustomerNeeds;
+  cartPreview: CartPreviewItemModel[];
+}) {
+  const lines = [
+    `# ${build.name}`,
+    "",
+    `Estimated total: ${formatMoney(build.totalPrice)}`,
+    `Compatibility: ${formatCompatibilityStatus(build.compatibilityStatus)}`,
+    `Target use case: ${build.targetUseCase.join(" + ") || "Not specified"}`,
+    `Budget: ${buildNeeds.budget ? formatMoney(buildNeeds.budget) : "Still collecting"}`,
+    `Appearance: ${formatAppearancePreference(buildNeeds.appearancePreference)}`,
+    `Experience: ${formatExperienceLevel(buildNeeds.experienceLevel)}`,
+    `Brand preference: ${formatBrandPreference(buildNeeds)}`,
+    "",
+    "## Parts",
+    ...build.parts.map((part) => {
+      const price = part.owned ? "$0 - Already owned" : formatMoney(part.price);
+      return `- ${part.category.toUpperCase()}: ${part.displayName} (${price})`;
+    }),
+    "",
+    "## Purchase References",
+    ...cartPreview.map((item) => {
+      const price = item.estimatedPrice === 0 ? "$0" : formatMoney(item.estimatedPrice);
+      return `- ${item.displayName}: ${price} at ${item.retailer}. ${item.note ?? ""}`.trim();
+    }),
+    "",
+    "Some links may earn us a commission at no extra cost to you.",
+  ];
+
+  return lines.join("\n");
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function ConsultPage() {
   const [build, setBuild] = useState<BuildModel | null>(null);
   const [buildError, setBuildError] = useState<string | null>(null);
@@ -275,8 +355,15 @@ function ConsultPage() {
   const [advisorUpdatedFields, setAdvisorUpdatedFields] = useState<Set<keyof CustomerNeeds>>(new Set());
   const [openOwnedPartForm, setOpenOwnedPartForm] = useState(false);
   const [ownedPartHint, setOwnedPartHint] = useState<string | null>(null);
+  const [savedBuilds, setSavedBuilds] = useState<SavedBuildSummary[]>([]);
+  const [savedBuildLimit, setSavedBuildLimit] = useState(1);
+  const [isSavedBuildsOpen, setIsSavedBuildsOpen] = useState(false);
+  const [isLoadingSavedBuilds, setIsLoadingSavedBuilds] = useState(false);
+  const [isSavingBuild, setIsSavingBuild] = useState(false);
+  const [saveBuildName, setSaveBuildName] = useState("");
   const plan = getPlanForEntitlement(entitlement);
   const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
+  const hasFullExport = canUseFeature(plan, "build_export");
 
   useEffect(() => {
     let active = true;
@@ -343,6 +430,12 @@ function ConsultPage() {
   }, []);
 
   useEffect(() => {
+    if (build && !saveBuildName.trim()) {
+      setSaveBuildName(build.name);
+    }
+  }, [build, saveBuildName]);
+
+  useEffect(() => {
     if (!toast) {
       return;
     }
@@ -402,6 +495,153 @@ function ConsultPage() {
         tone: "error",
       });
     }
+  }
+
+  async function refreshSavedBuilds() {
+    setIsLoadingSavedBuilds(true);
+
+    try {
+      const result = await getSavedBuilds();
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+    } catch {
+      setToast({ message: "Could not load saved builds right now.", tone: "error" });
+    } finally {
+      setIsLoadingSavedBuilds(false);
+    }
+  }
+
+  function handleOpenSavedBuilds() {
+    setIsSavedBuildsOpen(true);
+    void refreshSavedBuilds();
+  }
+
+  async function handleSaveBuild(id?: string, overrideName?: string) {
+    if (!build) {
+      return;
+    }
+
+    const name = (overrideName ?? saveBuildName).trim() || build.name;
+    setIsSavingBuild(true);
+
+    try {
+      const result = await saveCurrentBuild({
+        id,
+        name,
+        build,
+        buildNeeds: customerNeeds,
+      });
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+      setSaveBuildName(result.savedBuild.name);
+      setToast({ message: `"${result.savedBuild.name}" saved.`, tone: "success" });
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 403) {
+        setShowUsageUpgrade(true);
+        setToast({
+          message: error.message,
+          tone: "error",
+        });
+      } else {
+        setToast({ message: "Could not save this build right now.", tone: "error" });
+      }
+    } finally {
+      setIsSavingBuild(false);
+    }
+  }
+
+  async function handleLoadSavedBuild(id: string) {
+    setIsLoadingSavedBuilds(true);
+
+    try {
+      const savedBuild = await getSavedBuild(id);
+      const preview = await getCartPreview(savedBuild.build);
+      setBuild(savedBuild.build);
+      setCustomerNeeds(savedBuild.buildNeeds);
+      setCartPreview(preview.items);
+      setEmployeeSummary(preview.employeeSummary);
+      setSaveBuildName(savedBuild.name);
+      setIsSavedBuildsOpen(false);
+      handleDrawerOpenChange(false);
+      setToast({ message: `"${savedBuild.name}" loaded.`, tone: "success" });
+    } catch {
+      setToast({ message: "Could not load that saved build.", tone: "error" });
+    } finally {
+      setIsLoadingSavedBuilds(false);
+    }
+  }
+
+  async function handleDeleteSavedBuild(id: string) {
+    try {
+      const result = await deleteSavedBuild(id);
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+      setToast({ message: "Saved build deleted.", tone: "success" });
+    } catch {
+      setToast({ message: "Could not delete that saved build.", tone: "error" });
+    }
+  }
+
+  async function handleRenameSavedBuild(summary: SavedBuildSummary) {
+    const nextName = window.prompt("Rename saved build", summary.name)?.trim();
+
+    if (!nextName || nextName === summary.name) {
+      return;
+    }
+
+    try {
+      const savedBuild = await getSavedBuild(summary.id);
+      const result = await saveCurrentBuild({
+        id: savedBuild.id,
+        name: nextName,
+        build: savedBuild.build,
+        buildNeeds: savedBuild.buildNeeds,
+      });
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+      setToast({ message: "Saved build renamed.", tone: "success" });
+    } catch {
+      setToast({ message: "Could not rename that saved build.", tone: "error" });
+    }
+  }
+
+  async function handleCopyExport() {
+    if (!build) {
+      return;
+    }
+
+    const content = createBuildExportText({ build, buildNeeds: customerNeeds, cartPreview });
+
+    try {
+      await navigator.clipboard.writeText(content);
+      setToast({ message: "Build summary copied.", tone: "success" });
+    } catch {
+      setToast({ message: "Clipboard copy was blocked by the browser.", tone: "error" });
+    }
+  }
+
+  function handleDownloadJson() {
+    if (!build) {
+      return;
+    }
+
+    downloadTextFile(
+      `${build.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "pc-build"}.json`,
+      JSON.stringify({ build, buildNeeds: customerNeeds, purchaseReferences: cartPreview }, null, 2),
+      "application/json",
+    );
+  }
+
+  function handleDownloadMarkdown() {
+    if (!build) {
+      return;
+    }
+
+    downloadTextFile(
+      `${build.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "pc-build"}.md`,
+      createBuildExportText({ build, buildNeeds: customerNeeds, cartPreview }),
+      "text/markdown",
+    );
   }
 
   async function openCompare(category: string, nextRecommendedReplacementId?: string | null) {
@@ -750,7 +990,7 @@ function ConsultPage() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      <TopBar />
+      <TopBar onSavedBuildsClick={handleOpenSavedBuilds} />
 
       <main className="grid h-[calc(100vh-4rem)] min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_410px]">
         <section className="min-h-0 min-w-0 overflow-y-auto bg-card/30">
@@ -1006,8 +1246,27 @@ function ConsultPage() {
                         Mock retailer references only. No checkout, payment, or live stock integration yet.
                       </p>
                     </div>
-                    <AffiliateDisclosure />
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AffiliateDisclosure />
+                      <input
+                        value={saveBuildName}
+                        onChange={(event) => setSaveBuildName(event.target.value)}
+                        className="h-9 w-48 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+                        placeholder="Build name"
+                      />
+                      <Button
+                        size="sm"
+                        className="rounded-md"
+                        disabled={isSavingBuild}
+                        onClick={() => void handleSaveBuild()}
+                      >
+                        {isSavingBuild ? (
+                          <LoaderCircle className="mr-2 size-4 animate-spin" />
+                        ) : (
+                          <Save className="mr-2 size-4" />
+                        )}
+                        Save Build
+                      </Button>
                       {isLoadingDetails && (
                         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
                           <LoaderCircle className="size-3.5 animate-spin" />
@@ -1075,6 +1334,54 @@ function ConsultPage() {
                           </tr>
                         </tbody>
                       </table>
+                    )}
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Download className="size-4 text-primary" />
+                        <h2 className="text-xl font-bold">Export Build Plan</h2>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Preview is available for everyone. Full export is included with Build Pro.
+                      </p>
+                    </div>
+                    {hasFullExport && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="secondary" className="rounded-md" onClick={() => void handleCopyExport()}>
+                          <Copy className="mr-2 size-4" />
+                          Copy
+                        </Button>
+                        <Button size="sm" variant="secondary" className="rounded-md" onClick={handleDownloadJson}>
+                          <FileJson className="mr-2 size-4" />
+                          JSON
+                        </Button>
+                        <Button size="sm" className="rounded-md" onClick={handleDownloadMarkdown}>
+                          <Download className="mr-2 size-4" />
+                          Markdown
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                    <pre className="max-h-72 overflow-auto rounded-xl border border-border bg-background/70 p-4 text-xs leading-relaxed text-muted-foreground">
+                      {createBuildExportText({ build, buildNeeds: customerNeeds, cartPreview })}
+                    </pre>
+                    {hasFullExport ? (
+                      <div className="rounded-xl border border-success/20 bg-success/10 p-4 text-sm text-success">
+                        <CheckCircle2 className="mb-3 size-5" />
+                        Build Pro export is active. Copy the summary or download JSON/Markdown for your purchase planning.
+                      </div>
+                    ) : (
+                      <ProFeatureLock
+                        feature="build_export"
+                        label="Full export"
+                        onUpgraded={() => void refreshMonetizationState()}
+                      />
                     )}
                   </div>
                 </section>
@@ -1169,6 +1476,21 @@ function ConsultPage() {
         />
       )}
 
+      {isSavedBuildsOpen && (
+        <SavedBuildsPanel
+          builds={savedBuilds}
+          limit={savedBuildLimit}
+          isLoading={isLoadingSavedBuilds}
+          plan={plan}
+          onClose={() => setIsSavedBuildsOpen(false)}
+          onRefresh={() => void refreshSavedBuilds()}
+          onLoad={(id) => void handleLoadSavedBuild(id)}
+          onRename={(summary) => void handleRenameSavedBuild(summary)}
+          onDelete={(id) => void handleDeleteSavedBuild(id)}
+          onUpgraded={() => void refreshMonetizationState()}
+        />
+      )}
+
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
           <div
@@ -1206,6 +1528,141 @@ function NeedsCard({ label, value, updated }: { label: string; value: string; up
         )}
       </div>
       <p className="mt-2 text-sm leading-relaxed">{value}</p>
+    </div>
+  );
+}
+
+function SavedBuildsPanel({
+  builds,
+  limit,
+  isLoading,
+  plan,
+  onClose,
+  onRefresh,
+  onLoad,
+  onRename,
+  onDelete,
+  onUpgraded,
+}: {
+  builds: SavedBuildSummary[];
+  limit: number;
+  isLoading: boolean;
+  plan: "free" | "build_pro";
+  onClose: () => void;
+  onRefresh: () => void;
+  onLoad: (id: string) => void;
+  onRename: (summary: SavedBuildSummary) => void;
+  onDelete: (id: string) => void;
+  onUpgraded: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm">
+      <div className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-border bg-background shadow-2xl">
+        <div className="shrink-0 border-b border-border p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-primary">
+                <FolderOpen className="size-5" />
+                <h2 className="text-xl font-bold">Saved Builds</h2>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {builds.length} of {limit} saved locally for this mock session.
+              </p>
+            </div>
+            <Button size="sm" variant="secondary" className="rounded-md" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <Badge className="rounded-md border border-primary/20 bg-primary/10 text-primary">
+              {plan === "build_pro" ? "Build Pro: 10 saves" : "Free: 1 save"}
+            </Badge>
+            <Button size="sm" variant="ghost" className="rounded-md" onClick={onRefresh}>
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+          {isLoading ? (
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+              <LoaderCircle className="size-4 animate-spin" />
+              Loading saved builds
+            </div>
+          ) : builds.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-sm text-muted-foreground">
+              Save the current build to keep a purchase-ready snapshot here.
+            </div>
+          ) : (
+            builds.map((savedBuild) => (
+              <article key={savedBuild.id} className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate font-semibold">{savedBuild.name}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Saved {formatDate(savedBuild.createdAt)} · Updated {formatDate(savedBuild.updatedAt)}
+                    </p>
+                  </div>
+                  <Badge
+                    className={
+                      savedBuild.compatibilityStatus === "pass"
+                        ? "bg-success/15 text-success"
+                        : "bg-warning/15 text-warning"
+                    }
+                  >
+                    {formatCompatibilityStatus(savedBuild.compatibilityStatus)}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 grid gap-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Total</span>
+                    <span className="font-mono font-semibold">{formatMoney(savedBuild.totalPrice)}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">CPU</span>
+                    <span className="text-right">{savedBuild.cpuName ?? "Not saved"}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">GPU</span>
+                    <span className="text-right">{savedBuild.gpuName ?? "Not saved"}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Owned parts</span>
+                    <span>{savedBuild.ownedParts}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {savedBuild.targetUseCase.join(" + ") || "No use case saved"}
+                  </p>
+                </div>
+
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <Button size="sm" variant="secondary" className="rounded-md" onClick={() => onRename(savedBuild)}>
+                    Rename
+                  </Button>
+                  <Button size="sm" variant="secondary" className="rounded-md" onClick={() => onLoad(savedBuild.id)}>
+                    Load build
+                  </Button>
+                  <Button size="sm" variant="ghost" className="rounded-md text-destructive" onClick={() => onDelete(savedBuild.id)}>
+                    <Trash2 className="mr-2 size-4" />
+                    Delete
+                  </Button>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+
+        {plan === "free" && (
+          <div className="shrink-0 border-t border-border p-5">
+            <ProFeatureLock
+              feature="build_export"
+              label="Save up to 10 builds"
+              onUpgraded={onUpgraded}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

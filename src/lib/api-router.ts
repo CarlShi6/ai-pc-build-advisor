@@ -23,15 +23,21 @@ import type {
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
   ComparePartsResponse,
+  DeleteSavedBuildResponse,
   EntitlementStatusResponse,
   OffersResponse,
   PartsResponse,
   RecommendBuildResponse,
   RecommendedBuildInput,
   ResetMonetizationResponse,
+  SaveBuildRequest,
+  SaveBuildResponse,
+  SavedBuildResponse,
+  SavedBuildsResponse,
   UsageStatusResponse,
 } from "@/types/api";
 import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
+import type { Build, SavedBuild, SavedBuildSummary } from "@/types/build";
 
 class ApiRouteError extends Error {
   status: number;
@@ -52,6 +58,7 @@ type MockMonetizationState = {
   aiQuestionsUsedForBuild: number;
   replacementsUsedForBuild: number;
   affiliateClicks: AffiliateClickEvent[];
+  savedBuilds: SavedBuild[];
 };
 
 const mockState: MockMonetizationState = {
@@ -65,6 +72,7 @@ const mockState: MockMonetizationState = {
   aiQuestionsUsedForBuild: 0,
   replacementsUsedForBuild: 0,
   affiliateClicks: [],
+  savedBuilds: [],
 };
 
 function createFreeEntitlement(): Entitlement {
@@ -86,6 +94,55 @@ function resetMockMonetizationState() {
 
 function getCurrentPlan(): PlanType {
   return mockState.entitlement.active ? mockState.entitlement.plan : "free";
+}
+
+function getSavedBuildLimit() {
+  return getCurrentPlan() === "build_pro" ? 10 : 1;
+}
+
+function createSavedBuildSummary(savedBuild: SavedBuild): SavedBuildSummary {
+  return {
+    id: savedBuild.id,
+    name: savedBuild.name,
+    createdAt: savedBuild.createdAt,
+    updatedAt: savedBuild.updatedAt,
+    totalPrice: savedBuild.totalPrice,
+    compatibilityStatus: savedBuild.compatibilityStatus,
+    ownedParts: savedBuild.ownedParts,
+    targetUseCase: savedBuild.targetUseCase,
+    cpuName: savedBuild.build.parts.find((part) => part.category === "cpu")?.displayName,
+    gpuName: savedBuild.build.parts.find((part) => part.category === "gpu")?.displayName,
+  };
+}
+
+function getSavedBuildSummaries() {
+  return [...mockState.savedBuilds]
+    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
+    .map(createSavedBuildSummary);
+}
+
+function createSavedBuild({
+  id,
+  name,
+  build,
+  buildNeeds,
+}: SaveBuildRequest): SavedBuild {
+  const now = new Date().toISOString();
+  const existing = id ? mockState.savedBuilds.find((item) => item.id === id) : undefined;
+  const safeBuild = recalculateBuild(build);
+
+  return {
+    id: existing?.id ?? `saved-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    name: name.trim() || safeBuild.name,
+    build: safeBuild,
+    buildNeeds,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+    totalPrice: safeBuild.totalPrice,
+    compatibilityStatus: safeBuild.compatibilityStatus,
+    ownedParts: safeBuild.parts.filter((part) => part.owned).length,
+    targetUseCase: safeBuild.targetUseCase,
+  };
 }
 
 function getUsageStatus(): UsageStatus {
@@ -288,6 +345,87 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         warnings: nextBuild.compatibilityWarnings,
       };
       return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/builds/saved") {
+      if (request.method !== "GET") {
+        return methodNotAllowed(["GET"]);
+      }
+
+      const payload: SavedBuildsResponse = {
+        builds: getSavedBuildSummaries(),
+        limit: getSavedBuildLimit(),
+      };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/builds/save") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const input = await readJson<SaveBuildRequest>(request);
+
+      if (!input.build || !input.name?.trim()) {
+        throw new ApiRouteError(400, "Saving a build requires a name and build.");
+      }
+
+      const existingIndex = input.id
+        ? mockState.savedBuilds.findIndex((savedBuild) => savedBuild.id === input.id)
+        : -1;
+      const limit = getSavedBuildLimit();
+
+      if (existingIndex === -1 && mockState.savedBuilds.length >= limit) {
+        throw new ApiRouteError(
+          403,
+          getCurrentPlan() === "build_pro"
+            ? "You can save up to 10 builds with Build Pro."
+            : "Free users can save 1 build. Unlock Build Pro to save up to 10 builds.",
+        );
+      }
+
+      const savedBuild = createSavedBuild(input);
+
+      if (existingIndex >= 0) {
+        mockState.savedBuilds[existingIndex] = savedBuild;
+      } else {
+        mockState.savedBuilds.unshift(savedBuild);
+      }
+
+      const payload: SaveBuildResponse = {
+        savedBuild,
+        summary: createSavedBuildSummary(savedBuild),
+        builds: getSavedBuildSummaries(),
+        limit,
+      };
+      return jsonResponse(payload);
+    }
+
+    const savedBuildMatch = pathname.match(/^\/api\/builds\/([^/]+)$/);
+    if (savedBuildMatch) {
+      const id = decodeURIComponent(savedBuildMatch[1]);
+      const savedBuild = mockState.savedBuilds.find((item) => item.id === id);
+
+      if (request.method === "GET") {
+        if (!savedBuild) {
+          throw new ApiRouteError(404, "Saved build not found.");
+        }
+
+        const payload: SavedBuildResponse = { savedBuild };
+        return jsonResponse(payload);
+      }
+
+      if (request.method === "DELETE") {
+        mockState.savedBuilds = mockState.savedBuilds.filter((item) => item.id !== id);
+        const payload: DeleteSavedBuildResponse = {
+          success: true,
+          builds: getSavedBuildSummaries(),
+          limit: getSavedBuildLimit(),
+        };
+        return jsonResponse(payload);
+      }
+
+      return methodNotAllowed(["GET", "DELETE"]);
     }
 
     if (pathname === "/api/ai/advisor") {

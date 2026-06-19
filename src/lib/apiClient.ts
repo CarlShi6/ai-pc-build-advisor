@@ -17,8 +17,13 @@ import type {
   ResetMonetizationResponse,
   AdvisorRequestPayload,
   AdvisorResponsePayload,
+  DeleteSavedBuildResponse,
+  SaveBuildRequest,
+  SaveBuildResponse,
+  SavedBuildResponse,
+  SavedBuildsResponse,
 } from "@/types/api";
-import type { Build, StoreEmployeeSummary } from "@/types/build";
+import type { Build, SavedBuild, SavedBuildSummary, StoreEmployeeSummary } from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, UsageStatus } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 
@@ -198,6 +203,41 @@ export async function askAdvisor(
     method: "POST",
     body: JSON.stringify(payload),
   });
+}
+
+export async function getSavedBuilds(): Promise<{ builds: SavedBuildSummary[]; limit: number }> {
+  return requestJson<SavedBuildsResponse>("/api/builds/saved");
+}
+
+export async function saveCurrentBuild(
+  payload: SaveBuildRequest,
+): Promise<SaveBuildResponse> {
+  return requestJson<SaveBuildResponse>("/api/builds/save", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSavedBuild(id: string): Promise<SavedBuild> {
+  const response = await requestJson<SavedBuildResponse>(
+    `/api/builds/${encodeURIComponent(id)}`,
+  );
+
+  return response.savedBuild;
+}
+
+export async function deleteSavedBuild(
+  id: string,
+): Promise<{ builds: SavedBuildSummary[]; limit: number }> {
+  const response = await requestJson<DeleteSavedBuildResponse>(
+    `/api/builds/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+
+  return {
+    builds: response.builds,
+    limit: response.limit,
+  };
 }
 
 export async function replaceBuildPart(
