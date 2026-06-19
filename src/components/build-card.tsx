@@ -169,7 +169,7 @@ export function BuildCardInner({
       {!compact && (
         <div className="grid grid-cols-3 gap-4">
           <PerfStat label="Budget Use" value={`${Math.round((total / (build?.budget ?? 2800)) * 100)}%`} pct={Math.min(Math.round((total / (build?.budget ?? 2800)) * 100), 100)} />
-          <PerfStat label="Compatibility" value={status === "pass" ? "Ready" : status === "warning" ? "Review" : "Fix Now"} pct={status === "pass" ? 100 : status === "warning" ? 72 : 38} tone={status === "fail" ? "primary" : "success"} />
+          <PerfStat label="Compatibility" value={status === "pass" ? "Ready" : status === "warning" ? "Review" : "Needs review"} pct={status === "pass" ? 100 : status === "warning" ? 72 : 38} tone={status === "fail" ? "primary" : "success"} />
           <PerfStat label="Parts Selected" value={`${rows.length}`} pct={Math.min(rows.length * 12, 100)} />
         </div>
       )}

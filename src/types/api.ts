@@ -11,6 +11,7 @@ import type {
   Entitlement,
   UsageStatus,
 } from "@/types/monetization";
+import type { AdvisorApiRequest, AdvisorApiResponse } from "@/lib/ai/types";
 
 export type AppearancePreference = "black" | "white" | "rgb";
 export type ExperienceLevel = "beginner" | "intermediate" | "expert";
@@ -95,6 +96,12 @@ export interface ConsumeUsageResponse {
   message?: string;
 }
 
+export interface ConsumeReplacementResponse {
+  usage: UsageStatus;
+  consumed: boolean;
+  message?: string;
+}
+
 export type CheckoutResponse = CheckoutResult;
 
 export interface AffiliateClickRequest {
@@ -112,3 +119,7 @@ export interface ResetMonetizationResponse {
   usage: UsageStatus;
   message: string;
 }
+
+export type AdvisorRequestPayload = AdvisorApiRequest;
+
+export type AdvisorResponsePayload = AdvisorApiResponse;

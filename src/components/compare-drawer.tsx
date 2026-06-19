@@ -9,7 +9,7 @@ import { canUseFeature } from "@/lib/monetization";
 import { trackAffiliateClick } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import type { Build } from "@/types/build";
-import type { AffiliateLink, PlanType } from "@/types/monetization";
+import type { AffiliateLink, PlanType, UsageStatus } from "@/types/monetization";
 import type { Part, PartCategory } from "@/types/parts";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -47,6 +47,17 @@ const CATEGORY_ICONS: Partial<Record<PartCategory, string>> = {
   psu: "PSU",
   case: "CASE",
   cooler: "FAN",
+};
+
+const CATEGORY_VISUALS: Partial<Record<PartCategory, string>> = {
+  cpu: "from-sky-500/20 via-primary/10 to-cyan-500/10",
+  gpu: "from-emerald-500/20 via-primary/10 to-lime-500/10",
+  motherboard: "from-violet-500/20 via-primary/10 to-fuchsia-500/10",
+  ram: "from-amber-500/20 via-primary/10 to-yellow-500/10",
+  ssd: "from-teal-500/20 via-primary/10 to-cyan-500/10",
+  psu: "from-rose-500/20 via-primary/10 to-orange-500/10",
+  case: "from-slate-500/20 via-primary/10 to-zinc-500/10",
+  cooler: "from-blue-500/20 via-primary/10 to-indigo-500/10",
 };
 
 function formatMoney(value: number) {
@@ -111,6 +122,100 @@ function getValueRating(part: Part) {
   return Math.max(1, Math.min(100, Math.round((250 / part.price) * 40)));
 }
 
+function getNumberSpec(part: Part, keys: string[]) {
+  for (const key of keys) {
+    const value = part.specs[key];
+
+    if (typeof value === "number") {
+      return value;
+    }
+  }
+
+  return null;
+}
+
+function getDisplayPrice(part: Part) {
+  return part.owned ? 0 : part.price;
+}
+
+function formatSignedNumber(value: number) {
+  return value > 0 ? `+${value}` : `${value}`;
+}
+
+function getComparisonDeltaBadges(build: Build, part: Part, selectedPart: Part) {
+  const badges: Array<{ label: string; tone: "success" | "warning" | "neutral" }> = [];
+  const priceDelta = getDisplayPrice(part) - getDisplayPrice(selectedPart);
+  const gamingDelta =
+    getNumberSpec(part, ["gaming4kScore", "gaming1440pScore", "gamingScore"]) ??
+    null;
+  const selectedGaming =
+    getNumberSpec(selectedPart, ["gaming4kScore", "gaming1440pScore", "gamingScore"]) ??
+    null;
+  const productivityDelta = getNumberSpec(part, ["productivityScore"]);
+  const selectedProductivity = getNumberSpec(selectedPart, ["productivityScore"]);
+  const powerDelta = getNumberSpec(part, ["powerDrawW", "tdpW", "wattageW"]);
+  const selectedPower = getNumberSpec(selectedPart, ["powerDrawW", "tdpW", "wattageW"]);
+  const capacityDelta = getNumberSpec(part, ["vramGb", "capacityGb", "capacityTb"]);
+  const selectedCapacity = getNumberSpec(selectedPart, ["vramGb", "capacityGb", "capacityTb"]);
+  const partColor = String(part.color ?? part.specs.color ?? "");
+  const selectedColor = String(selectedPart.color ?? selectedPart.specs.color ?? "");
+
+  if (part.id === selectedPart.id) {
+    badges.push({ label: "Current baseline", tone: "neutral" });
+  } else if (priceDelta < 0) {
+    badges.push({ label: `Cheaper by ${formatMoney(Math.abs(priceDelta))}`, tone: "success" });
+  } else if (priceDelta > 0) {
+    badges.push({ label: `Adds ${formatMoney(priceDelta)}`, tone: "warning" });
+  } else {
+    badges.push({ label: "Same price", tone: "neutral" });
+  }
+
+  if (gamingDelta !== null && selectedGaming !== null && gamingDelta !== selectedGaming) {
+    badges.push({
+      label: `Gaming ${formatSignedNumber(gamingDelta - selectedGaming)}`,
+      tone: gamingDelta >= selectedGaming ? "success" : "warning",
+    });
+  }
+
+  if (productivityDelta !== null && selectedProductivity !== null && productivityDelta !== selectedProductivity) {
+    badges.push({
+      label: `Productivity ${formatSignedNumber(productivityDelta - selectedProductivity)}`,
+      tone: productivityDelta >= selectedProductivity ? "success" : "warning",
+    });
+  }
+
+  if (powerDelta !== null && selectedPower !== null && powerDelta !== selectedPower) {
+    badges.push({
+      label: `Power ${formatSignedNumber(powerDelta - selectedPower)}W`,
+      tone: powerDelta <= selectedPower ? "success" : "warning",
+    });
+  }
+
+  if (capacityDelta !== null && selectedCapacity !== null && capacityDelta !== selectedCapacity) {
+    badges.push({
+      label: `Capacity ${formatSignedNumber(capacityDelta - selectedCapacity)}`,
+      tone: capacityDelta >= selectedCapacity ? "success" : "warning",
+    });
+  }
+
+  if (partColor && selectedColor) {
+    badges.push({
+      label:
+        partColor.toLowerCase() === selectedColor.toLowerCase()
+          ? `Color match: ${partColor}`
+          : `Color differs: ${partColor}`,
+      tone: partColor.toLowerCase() === selectedColor.toLowerCase() ? "success" : "neutral",
+    });
+  }
+
+  badges.push({
+    label: `Total ${formatMoney(buildCandidate(build, part).totalPrice)}`,
+    tone: "neutral",
+  });
+
+  return badges.slice(0, 6);
+}
+
 function sortParts(parts: Part[], selectedPart: Part, mode: string) {
   return [...parts].sort((left, right) => {
     if (left.id === selectedPart.id) {
@@ -171,6 +276,7 @@ export function CompareDrawer({
   onOpenChange,
   onReplace,
   plan = "free",
+  usageStatus,
   onUpgraded,
 }: {
   build: Build | null;
@@ -184,6 +290,7 @@ export function CompareDrawer({
   onOpenChange: (open: boolean) => void;
   onReplace: (part: Part) => void;
   plan?: PlanType;
+  usageStatus?: UsageStatus | null;
   onUpgraded?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<ExplorerTab>("recommended");
@@ -191,6 +298,8 @@ export function CompareDrawer({
   const [sortMode, setSortMode] = useState("value");
   const [searchQuery, setSearchQuery] = useState("");
   const [previewPart, setPreviewPart] = useState<Part | null>(null);
+  const [customParts, setCustomParts] = useState<Part[]>([]);
+  const [showCustomPartForm, setShowCustomPartForm] = useState(false);
 
   const selectedPart = build?.parts.find((part) => part.category === category);
   const sectionTitle = selectedPart ? categoryLabels[selectedPart.category] : "Part";
@@ -201,12 +310,16 @@ export function CompareDrawer({
     }
 
     const byId = new Map<string, Part>();
-    [selectedPart, ...parts.filter((part) => part.category === selectedPart.category)].forEach((part) => {
+    [
+      selectedPart,
+      ...parts.filter((part) => part.category === selectedPart.category),
+      ...customParts.filter((part) => part.category === selectedPart.category),
+    ].forEach((part) => {
       byId.set(part.id, part);
     });
 
     return sortParts(Array.from(byId.values()), selectedPart, sortMode);
-  }, [parts, selectedPart, sortMode]);
+  }, [customParts, parts, selectedPart, sortMode]);
 
   useEffect(() => {
     if (!open || !selectedPart) {
@@ -216,6 +329,7 @@ export function CompareDrawer({
     setActiveTab("recommended");
     setSearchQuery("");
     setPreviewPart(null);
+    setShowCustomPartForm(false);
     setSelectedIds([selectedPart.id]);
   }, [open, selectedPart]);
 
@@ -240,6 +354,7 @@ export function CompareDrawer({
   ];
   const displayedTab =
     activeTab === "compare" && selectedCompareParts.length < 2 ? "recommended" : activeTab;
+  const canReplacePart = usageStatus?.canReplacePart ?? true;
 
   function toggleComparePart(part: Part) {
     setSelectedIds((current) => {
@@ -361,15 +476,38 @@ export function CompareDrawer({
               />
             ) : displayedTab === "search" ? (
               <section className="space-y-4">
-                <div className="relative">
-                  <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                  <input
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    className="w-full rounded-2xl border border-border bg-card py-4 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/25"
-                    placeholder="Search brand, model, name, socket, wattage, VRAM, RAM type..."
-                  />
+                <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+                  <div className="relative">
+                    <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      className="w-full rounded-2xl border border-border bg-card py-4 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/25"
+                      placeholder="Search brand, model, name, socket, wattage, VRAM, RAM type..."
+                    />
+                  </div>
+                  <Button
+                    variant="secondary"
+                    className="rounded-xl"
+                    onClick={() => setShowCustomPartForm((current) => !current)}
+                  >
+                    Add part I already own
+                  </Button>
                 </div>
+
+                {showCustomPartForm && (
+                  <CustomPartForm
+                    category={selectedPart.category}
+                    selectedPart={selectedPart}
+                    initialName={searchQuery}
+                    onAdd={(part) => {
+                      setCustomParts((current) => [part, ...current]);
+                      setSearchQuery(part.displayName);
+                      setShowCustomPartForm(false);
+                    }}
+                  />
+                )}
+
                 <PartCardGrid
                   build={build}
                   parts={searchedParts}
@@ -380,6 +518,7 @@ export function CompareDrawer({
                   onPreviewSwap={setPreviewPart}
                   emptyMessage="No local mock parts match that search."
                   isSearchEmpty={searchQuery.trim().length > 0}
+                  onAddCustom={() => setShowCustomPartForm(true)}
                 />
               </section>
             ) : (
@@ -404,6 +543,7 @@ export function CompareDrawer({
               isReplacing={isReplacing}
               onCancel={() => setPreviewPart(null)}
               onConfirm={confirmPreviewSwap}
+              canReplacePart={canReplacePart}
               onUpgraded={onUpgraded}
             />
           )}
@@ -486,6 +626,7 @@ function PartCardGrid({
   onPreviewSwap,
   emptyMessage = "No parts are available in this category yet.",
   isSearchEmpty = false,
+  onAddCustom,
 }: {
   build: Build;
   parts: Part[];
@@ -496,15 +637,26 @@ function PartCardGrid({
   onPreviewSwap: (part: Part) => void;
   emptyMessage?: string;
   isSearchEmpty?: boolean;
+  onAddCustom?: () => void;
 }) {
   if (parts.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
         <p>{emptyMessage}</p>
         {isSearchEmpty && (
-          <p className="mt-2">
-            Try Intel, Ryzen, 7800X3D, RTX, ASUS.
-          </p>
+          <div className="mt-3 space-y-3">
+            <p>Try Intel, Ryzen, 7800X3D, RTX, ASUS.</p>
+            <div className="flex flex-wrap gap-2">
+              {onAddCustom && (
+                <Button size="sm" className="rounded-md" onClick={onAddCustom}>
+                  Add this as a custom part
+                </Button>
+              )}
+              <Badge variant="secondary" className="rounded-md">
+                External retailer search coming later
+              </Badge>
+            </div>
+          </div>
         )}
       </div>
     );
@@ -549,8 +701,9 @@ function PartCard({
   onPreviewSwap: () => void;
 }) {
   const isCurrent = part.id === selectedPart.id;
-  const delta = part.price - selectedPart.price;
+  const delta = getDisplayPrice(part) - getDisplayPrice(selectedPart);
   const candidateBuild = buildCandidate(build, part);
+  const deltaBadges = getComparisonDeltaBadges(build, part, selectedPart).slice(0, 3);
 
   return (
     <article
@@ -565,6 +718,7 @@ function PartCard({
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap gap-2">
             {isCurrent && <Badge className="rounded-md bg-primary/15 text-primary">Current</Badge>}
+            {part.owned && <Badge className="rounded-md bg-success/15 text-success">Already owned</Badge>}
             {isRecommendedFix && (
               <Badge className="rounded-md border border-success/30 bg-success/15 text-success">
                 <Sparkles className="mr-1 size-3" /> Review
@@ -573,9 +727,13 @@ function PartCard({
             <CompatibilityBadge build={candidateBuild} />
           </div>
           <h4 className="font-bold leading-snug">{part.displayName}</h4>
-          <p className="mt-2 font-mono text-xl font-bold">{formatMoney(part.price)}</p>
+          <p className="mt-2 font-mono text-xl font-bold">
+            {part.owned ? "$0" : formatMoney(part.price)}
+          </p>
           <p className={cn("mt-1 text-xs", delta <= 0 ? "text-success" : "text-warning")}>
-            {isCurrent
+            {part.owned
+              ? "Already owned"
+              : isCurrent
               ? "Current baseline"
               : delta < 0
                 ? `${formatMoney(Math.abs(delta))} cheaper`
@@ -589,6 +747,12 @@ function PartCard({
           <span key={spec} className="rounded-md border border-border bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
             {spec}
           </span>
+        ))}
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-1.5">
+        {deltaBadges.map((badge) => (
+          <DeltaBadge key={badge.label} {...badge} />
         ))}
       </div>
 
@@ -621,6 +785,100 @@ function PartCard({
         </div>
       </div>
     </article>
+  );
+}
+
+function CustomPartForm({
+  category,
+  selectedPart,
+  initialName,
+  onAdd,
+}: {
+  category: PartCategory;
+  selectedPart: Part;
+  initialName: string;
+  onAdd: (part: Part) => void;
+}) {
+  const [brand, setBrand] = useState("");
+  const [model, setModel] = useState(initialName);
+  const [color, setColor] = useState(typeof selectedPart.specs.color === "string" ? selectedPart.specs.color : "");
+  const [notes, setNotes] = useState("");
+
+  function handleAdd() {
+    const cleanBrand = brand.trim() || "Owned";
+    const cleanModel = model.trim() || `${categoryLabels[category]} part`;
+    const id = `owned-${category}-${Date.now()}`;
+    const specs = {
+      ...selectedPart.specs,
+      color: color.trim() || selectedPart.specs.color || "Unknown",
+      notes: notes.trim() || "User-provided local part.",
+    };
+
+    onAdd({
+      id,
+      category,
+      brand: cleanBrand,
+      model: cleanModel,
+      displayName: `${cleanBrand} ${cleanModel}`,
+      price: 0,
+      source: "user_owned",
+      owned: true,
+      userProvided: true,
+      color: typeof specs.color === "string" ? specs.color : undefined,
+      availability: "unknown",
+      specs,
+      compatibilityTags: [...selectedPart.compatibilityTags, "user-owned"],
+      recommendationReason:
+        "User-owned part added locally. Specs are estimated from the current category baseline.",
+    });
+  }
+
+  return (
+    <div className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+      <div className="mb-3">
+        <h3 className="text-sm font-semibold text-primary">Add part I already own</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Local-only for now. It counts as $0 but still uses specs for compatibility checks.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-4">
+        <input
+          value={categoryLabels[category]}
+          disabled
+          className="rounded-xl border border-border bg-secondary/60 px-3 py-2 text-sm text-muted-foreground outline-none"
+          aria-label="Category"
+        />
+        <input
+          value={brand}
+          onChange={(event) => setBrand(event.target.value)}
+          className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+          placeholder="Brand, e.g. Intel"
+        />
+        <input
+          value={model}
+          onChange={(event) => setModel(event.target.value)}
+          className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+          placeholder="Model"
+        />
+        <input
+          value={color}
+          onChange={(event) => setColor(event.target.value)}
+          className="rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+          placeholder="Color or notes"
+        />
+      </div>
+      <textarea
+        value={notes}
+        onChange={(event) => setNotes(event.target.value)}
+        className="mt-3 min-h-20 w-full rounded-xl border border-border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+        placeholder="Estimated specs or notes, e.g. already installed, includes cooler, white model..."
+      />
+      <div className="mt-3 flex justify-end">
+        <Button className="rounded-xl" onClick={handleAdd}>
+          Add owned part
+        </Button>
+      </div>
+    </div>
   );
 }
 
@@ -702,7 +960,14 @@ function ComparisonTable({
                       <span className="normal-case tracking-normal text-foreground">{part.displayName}</span>
                       {part.id === selectedPart.id && <Badge className="rounded-md bg-primary/15 text-primary">Current</Badge>}
                     </div>
-                    <p className="font-mono text-lg font-bold text-primary">{formatMoney(part.price)}</p>
+                    <p className="font-mono text-lg font-bold text-primary">
+                      {part.owned ? "$0 · Already owned" : formatMoney(part.price)}
+                    </p>
+                    <div className="flex flex-wrap gap-1">
+                      {getComparisonDeltaBadges(build, part, selectedPart).slice(0, 3).map((badge) => (
+                        <DeltaBadge key={badge.label} {...badge} />
+                      ))}
+                    </div>
                   </div>
                 </th>
               ))}
@@ -710,16 +975,15 @@ function ComparisonTable({
           </thead>
           <tbody className="divide-y divide-border">
             <tr>
-              <td className="px-4 py-3 text-muted-foreground">Price difference</td>
+              <td className="px-4 py-3 text-muted-foreground">Beginner deltas</td>
               {parts.map((part) => {
-                const delta = part.price - selectedPart.price;
                 return (
-                  <td key={part.id} className={cn("px-4 py-3 font-medium", delta <= 0 ? "text-success" : "text-warning")}>
-                    {part.id === selectedPart.id
-                      ? "Baseline"
-                      : delta < 0
-                        ? `-${formatMoney(Math.abs(delta))}`
-                        : `+${formatMoney(delta)}`}
+                  <td key={part.id} className="px-4 py-3">
+                    <div className="flex flex-wrap gap-1.5">
+                      {getComparisonDeltaBadges(build, part, selectedPart).map((badge) => (
+                        <DeltaBadge key={badge.label} {...badge} />
+                      ))}
+                    </div>
                   </td>
                 );
               })}
@@ -863,12 +1127,34 @@ function AdvancedRow({
   );
 }
 
+function DeltaBadge({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "success" | "warning" | "neutral";
+}) {
+  return (
+    <span
+      className={cn(
+        "rounded-md border px-2 py-0.5 text-[11px] font-medium",
+        tone === "success" && "border-success/25 bg-success/10 text-success",
+        tone === "warning" && "border-warning/25 bg-warning/10 text-warning",
+        tone === "neutral" && "border-border bg-background/70 text-muted-foreground",
+      )}
+    >
+      {label}
+    </span>
+  );
+}
+
 function PreviewSwapPanel({
   build,
   currentPart,
   previewPart,
   plan,
   isReplacing,
+  canReplacePart,
   onCancel,
   onConfirm,
   onUpgraded,
@@ -878,12 +1164,13 @@ function PreviewSwapPanel({
   previewPart: Part;
   plan: PlanType;
   isReplacing?: boolean;
+  canReplacePart: boolean;
   onCancel: () => void;
   onConfirm: () => void;
   onUpgraded?: () => void;
 }) {
   const candidateBuild = buildCandidate(build, previewPart);
-  const delta = previewPart.price - currentPart.price;
+  const delta = getDisplayPrice(previewPart) - getDisplayPrice(currentPart);
   const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
   const affiliateLink = previewPart.affiliateLinks?.[0];
 
@@ -920,7 +1207,11 @@ function PreviewSwapPanel({
       </div>
 
       <div className="mt-4 grid gap-3 lg:grid-cols-4">
-        <InfoRow label="Price change" value={delta < 0 ? `-${formatMoney(Math.abs(delta))}` : `+${formatMoney(delta)}`} valueClass={delta <= 0 ? "text-success" : "text-warning"} />
+        <InfoRow
+          label="Price change"
+          value={previewPart.owned ? "$0 · Already owned" : delta < 0 ? `-${formatMoney(Math.abs(delta))}` : `+${formatMoney(delta)}`}
+          valueClass={delta <= 0 ? "text-success" : "text-warning"}
+        />
         <InfoRow label="New build total" value={formatMoney(candidateBuild.totalPrice)} />
         <div className="rounded-xl border border-border bg-background/60 px-3 py-3">
           <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Compatibility</p>
@@ -948,6 +1239,16 @@ function PreviewSwapPanel({
         )}
       </div>
 
+      {!canReplacePart && (
+        <div className="mt-4">
+          <ProFeatureLock
+            feature="unlimited_swaps"
+            label="Hardware replacement limit reached"
+            onUpgraded={onUpgraded}
+          />
+        </div>
+      )}
+
       {candidateBuild.compatibilityWarnings.length > 0 && (
         <div className="mt-4 space-y-2">
           {candidateBuild.compatibilityWarnings.slice(0, 3).map((warning) => (
@@ -974,7 +1275,7 @@ function PreviewSwapPanel({
         <Button variant="secondary" className="rounded-xl" onClick={onCancel}>
           Keep current part
         </Button>
-        <Button className="rounded-xl shadow-glow" disabled={isReplacing} onClick={onConfirm}>
+        <Button className="rounded-xl shadow-glow" disabled={isReplacing || !canReplacePart} onClick={onConfirm}>
           {isReplacing ? (
             <>
               <LoaderCircle className="mr-2 size-4 animate-spin" /> Replacing
@@ -1042,7 +1343,8 @@ function PartVisual({ part, featured = false }: { part: Part; featured?: boolean
   return (
     <div
       className={cn(
-        "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-primary/10 text-primary",
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-gradient-to-br text-primary shadow-inner",
+        CATEGORY_VISUALS[part.category] ?? "from-primary/15 to-secondary",
         featured ? "size-20" : "size-16",
       )}
     >

@@ -222,14 +222,16 @@ export function getCartPreviewItems(build: Build): CartPreviewItem[] {
   return build.parts.map((part) => ({
     partId: part.id,
     displayName: part.displayName,
-    retailer: part.retailer ?? "Partner retailer",
-    estimatedPrice: part.price,
+    retailer: part.owned ? "Already owned" : part.retailer ?? "Partner retailer",
+    estimatedPrice: part.owned ? 0 : part.price,
     quantity: 1,
-    productUrl: part.productUrl,
-    searchUrl: part.searchUrl,
-    affiliateLinks: part.affiliateLinks,
-    availability: part.availability,
-    note: getAvailabilityNote(part.availability),
+    productUrl: part.owned ? undefined : part.productUrl,
+    searchUrl: part.owned ? undefined : part.searchUrl,
+    affiliateLinks: part.owned ? [] : part.affiliateLinks,
+    availability: part.owned ? "unknown" : part.availability,
+    note: part.owned
+      ? "Already owned — no purchase needed."
+      : getAvailabilityNote(part.availability),
   }));
 }
 

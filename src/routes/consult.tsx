@@ -10,7 +10,7 @@ import { UpgradeCard } from "@/components/UpgradeCard";
 import { UsageBadge } from "@/components/UsageBadge";
 import { categoryLabels } from "@/data/seedParts";
 import {
-  consumeAiUsage,
+  askAdvisor,
   getEntitlementStatus,
   getCartPreview,
   getCompareParts,
@@ -18,12 +18,13 @@ import {
   getRecommendedBuild,
   getRecommendedReplacementForWarning,
   getUsageStatus,
+  consumeReplacementUsage,
   resetMockMonetizationState,
   replaceBuildPart,
   trackAffiliateClick,
 } from "@/lib/apiClient";
 import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
-import { hasUsefulNeedInfo, mergeCustomerNeeds, parseCustomerNeeds } from "@/lib/needParser";
+import { mergeCustomerNeeds } from "@/lib/needParser";
 import type {
   CustomerNeeds,
   RecommendedBuildInput,
@@ -41,6 +42,7 @@ import { Button } from "@/components/ui/button";
 import {
   AlertTriangle,
   ArrowRightLeft,
+  ChevronDown,
   CheckCircle2,
   ClipboardList,
   LoaderCircle,
@@ -245,6 +247,18 @@ function buildAssistantReply({
   return `Noted ${responseBits.join(", ")}. I refreshed the recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. ${followUp}`;
 }
 
+function hasExtractedNeeds(needs: CustomerNeeds | undefined) {
+  return Boolean(
+    needs &&
+      (needs.budget ||
+        needs.targetUseCase?.length ||
+        needs.appearancePreference ||
+        needs.experienceLevel ||
+        needs.cpuBrandPreference ||
+        needs.gpuBrandPreference),
+  );
+}
+
 function ConsultPage() {
   const [build, setBuild] = useState<BuildModel | null>(null);
   const [buildError, setBuildError] = useState<string | null>(null);
@@ -268,6 +282,7 @@ function ConsultPage() {
   const [usageStatus, setUsageStatus] = useState<UsageStatus | null>(null);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [showUsageUpgrade, setShowUsageUpgrade] = useState(false);
+  const [expandedWarningIds, setExpandedWarningIds] = useState<Set<string>>(new Set());
   const plan = getPlanForEntitlement(entitlement);
   const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
 
@@ -439,6 +454,20 @@ function ConsultPage() {
     setDetailsError(null);
 
     try {
+      const replacementUsage = await consumeReplacementUsage();
+      setUsageStatus(replacementUsage.usage);
+
+      if (!replacementUsage.consumed) {
+        setShowUsageUpgrade(true);
+        setToast({
+          message:
+            replacementUsage.message ??
+            "You have used your included hardware replacements for this build.",
+          tone: "error",
+        });
+        return;
+      }
+
       const nextState = await replaceBuildPart(build, part);
       setBuild(nextState.build);
       setCartPreview(nextState.cartPreview);
@@ -497,77 +526,50 @@ function ConsultPage() {
     setChatMessages((current) => [...current, userMessage]);
     setChatInput("");
 
-    const parsed = parseCustomerNeeds(message);
-    const mergedNeeds = mergeCustomerNeeds(customerNeeds, parsed.parsedNeeds);
+    setIsGeneratingRecommendation(true);
+    setDetailsError(null);
 
-    setCustomerNeeds(mergedNeeds);
+    try {
+      const advisorResponse = await askAdvisor({
+        message,
+        currentBuild: build,
+        collectedNeeds: customerNeeds,
+        plan,
+        usageStatus,
+      });
 
-    if (!hasUsefulNeedInfo(parsed)) {
+      setUsageStatus(advisorResponse.usage);
+      setShowUsageUpgrade(Boolean(advisorResponse.upgradeRequired));
       setChatMessages((current) => [
         ...current,
         {
           id: createMessageId(),
           role: "assistant",
-          text: buildAssistantReply({ matchedFields: parsed.matchedFields, needs: mergedNeeds }),
+          text: advisorResponse.assistantMessage,
         },
       ]);
-      return;
-    }
 
-    try {
-      const usageResult = await consumeAiUsage();
-      setUsageStatus(usageResult.usage);
-
-      if (!usageResult.consumed) {
-        setShowUsageUpgrade(true);
-        setChatMessages((current) => [
-          ...current,
-          {
-            id: createMessageId(),
-            role: "assistant",
-            text:
-              usageResult.message ??
-              "You have used your included AI questions. The current mock build stays available.",
-          },
-        ]);
+      if (!advisorResponse.usageConsumed) {
         return;
       }
-    } catch {
-      setToast({
-        message: "Usage tracking is temporarily unavailable, so I kept the current build stable.",
-        tone: "error",
-      });
-      return;
-    }
 
-      setIsGeneratingRecommendation(true);
-      setIsLoadingDetails(true);
-      setDetailsError(null);
+      if (hasExtractedNeeds(advisorResponse.extractedNeeds)) {
+        const mergedNeeds = mergeCustomerNeeds(customerNeeds, advisorResponse.extractedNeeds ?? {});
+        setCustomerNeeds(mergedNeeds);
+        setIsLoadingDetails(true);
 
-    try {
-      const nextState = await refreshBuildAndDetails(mergedNeeds);
-      setBuild(nextState.build);
-      setCartPreview(nextState.cartPreview);
-      setEmployeeSummary(nextState.employeeSummary);
-      handleDrawerOpenChange(false);
-      setChatMessages((current) => [
-        ...current,
-        {
-          id: createMessageId(),
-          role: "assistant",
-          text: buildAssistantReply({
-            build: nextState.build,
-            matchedFields: parsed.matchedFields,
-            needs: mergedNeeds,
-          }),
-        },
-      ]);
+        const nextState = await refreshBuildAndDetails(mergedNeeds);
+        setBuild(nextState.build);
+        setCartPreview(nextState.cartPreview);
+        setEmployeeSummary(nextState.employeeSummary);
+        handleDrawerOpenChange(false);
+      }
     } catch {
       setDetailsError(
-        "The recommendation could not be refreshed from the internal API. The previous build is still shown.",
+        "The advisor could not complete the request. The previous build is still shown.",
       );
       setToast({
-        message: "Could not refresh the build recommendation right now. Please try again.",
+        message: "Could not reach the advisor right now. Please try again.",
         tone: "error",
       });
       setChatMessages((current) => [
@@ -575,7 +577,7 @@ function ConsultPage() {
         {
           id: createMessageId(),
           role: "assistant",
-          text: "I parsed the request, but the internal recommendation API did not refresh the build this time. Please try sending the request again.",
+          text: "I could not reach the advisor service this time. Your current build is unchanged, and compatibility checks remain available.",
         },
       ]);
     } finally {
@@ -618,7 +620,7 @@ function ConsultPage() {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-primary">
               <Wrench className="size-4" />
-              Fix Now
+              Review options
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{getFixNowDescription(category)}</p>
           </div>
@@ -648,6 +650,18 @@ function ConsultPage() {
         )}
       </div>
     );
+  }
+
+  function toggleWarningDetails(id: string) {
+    setExpandedWarningIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
   }
 
   return (
@@ -757,71 +771,82 @@ function ConsultPage() {
                 )}
 
                 <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                  <section className="rounded-2xl border border-border bg-card p-6">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="size-4 text-primary" />
-                          <h2 className="text-xl font-bold">Compatibility Warnings</h2>
+                  {build.compatibilityWarnings.length === 0 ? (
+                    <section className="rounded-2xl border border-success/20 bg-success/10 p-4">
+                      <div className="flex items-center gap-3 text-success">
+                        <ShieldCheck className="size-5" />
+                        <div>
+                          <h2 className="text-base font-bold">Compatibility checks passed</h2>
+                          <p className="text-sm">No rule-based issues found in the current build.</p>
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Every warning stays visible and includes a fix path when local mock data can support it.
-                        </p>
                       </div>
-                      <Badge
-                        className={
-                          build.compatibilityStatus === "pass"
-                            ? "bg-success/15 text-success"
-                            : build.compatibilityStatus === "warning"
-                              ? "bg-warning/15 text-warning"
-                              : "bg-destructive/15 text-destructive"
-                        }
-                      >
-                        {build.compatibilityStatus === "pass"
-                          ? "All checks passed"
-                          : `${build.compatibilityWarnings.length} active`}
-                      </Badge>
-                    </div>
+                    </section>
+                  ) : (
+                    <section className="rounded-2xl border border-border bg-card p-4">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="size-4 text-warning" />
+                          <h2 className="text-lg font-bold">Compatibility needs review</h2>
+                        </div>
+                        <Badge className="bg-warning/15 text-warning">
+                          {build.compatibilityWarnings.length} item{build.compatibilityWarnings.length === 1 ? "" : "s"}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {build.compatibilityWarnings.map((warning) => {
+                          const expanded = expandedWarningIds.has(warning.id);
+                          const affectedNames = warning.affectedPartIds
+                            .map((partId) => build.parts.find((part) => part.id === partId)?.displayName)
+                            .filter(Boolean)
+                            .join(" + ");
 
-                    {build.compatibilityWarnings.length === 0 ? (
-                      <div className="rounded-2xl border border-success/20 bg-success/10 p-4 text-sm text-success">
-                        Every current part passes the local mock compatibility rules.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {build.compatibilityWarnings.map((warning) => (
-                          <div
-                            key={warning.id}
-                            className="rounded-2xl border border-border bg-background/60 p-4 transition-colors hover:border-primary/20"
-                          >
-                            <div className="flex items-start gap-3">
-                              <AlertTriangle
-                                className={
-                                  warning.severity === "error"
-                                    ? "mt-0.5 size-4 shrink-0 text-destructive"
-                                    : "mt-0.5 size-4 shrink-0 text-warning"
-                                }
-                              />
-                              <div className="flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="font-medium">{warning.message}</p>
-                                  {getWarningTargetCategory(warning) && (
-                                    <Badge className="bg-primary/15 text-primary">Fix Now</Badge>
-                                  )}
+                          return (
+                            <div key={warning.id} className="rounded-xl border border-border bg-background/60 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge
+                                      className={
+                                        warning.severity === "error"
+                                          ? "bg-destructive/15 text-destructive"
+                                          : "bg-warning/15 text-warning"
+                                      }
+                                    >
+                                      {warning.severity === "error" ? "Needs review" : "Warning"}
+                                    </Badge>
+                                    {affectedNames && (
+                                      <span className="truncate text-sm text-muted-foreground">
+                                        {affectedNames}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="mt-1 text-sm font-medium">{warning.message}</p>
                                 </div>
-                                {warning.suggestedFix && (
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    Suggested fix: {warning.suggestedFix}
-                                  </p>
-                                )}
-                                {renderWarningActions(warning)}
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="rounded-md"
+                                  onClick={() => toggleWarningDetails(warning.id)}
+                                >
+                                  View details <ChevronDown className={`ml-1 size-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                                </Button>
                               </div>
+                              {expanded && (
+                                <div className="mt-3 border-t border-border pt-3">
+                                  {warning.suggestedFix && (
+                                    <p className="text-sm text-muted-foreground">
+                                      Suggested fix: {warning.suggestedFix}
+                                    </p>
+                                  )}
+                                  {renderWarningActions(warning)}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
-                    )}
-                  </section>
+                    </section>
+                  )}
 
                   <section className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
                     <div className="mb-4 flex items-center justify-between gap-3">
@@ -1036,6 +1061,7 @@ function ConsultPage() {
           errorMessage={compareError}
           recommendedReplacementId={recommendedReplacementId}
           plan={plan}
+          usageStatus={usageStatus}
           onUpgraded={() => void refreshMonetizationState()}
           onOpenChange={handleDrawerOpenChange}
           onReplace={(part) => void handleReplacePart(part)}

@@ -13,6 +13,8 @@ function createPart(part: PartSeed): Part {
 
   return {
     ...part,
+    source: part.source ?? "catalog",
+    color: part.color ?? (typeof part.specs.color === "string" ? part.specs.color : undefined),
     searchUrl,
     affiliateLinks: part.affiliateLinks ?? [
       {

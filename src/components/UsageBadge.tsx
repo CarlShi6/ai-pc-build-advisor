@@ -1,4 +1,4 @@
-import { getRemainingAiQuestions } from "@/lib/monetization";
+import { getRemainingAiQuestions, getRemainingReplacements } from "@/lib/monetization";
 import { cn } from "@/lib/utils";
 import type { UsageStatus } from "@/types/monetization";
 import { Badge } from "@/components/ui/badge";
@@ -20,16 +20,17 @@ export function UsageBadge({
   }
 
   const remaining = getRemainingAiQuestions(usage);
+  const replacements = getRemainingReplacements(usage);
   const text =
     usage.plan === "build_pro"
-      ? `${remaining} AI questions remaining for this build`
-      : `${remaining} AI questions remaining today`;
+      ? `${remaining} AI questions · ${replacements} replacements left`
+      : `${remaining} AI questions today · ${replacements} swaps left`;
 
   return (
     <Badge
       className={cn(
         "rounded-md border border-primary/25 bg-primary/10 text-primary",
-        remaining === 0 && "border-warning/30 bg-warning/10 text-warning",
+        (remaining === 0 || replacements === 0) && "border-warning/30 bg-warning/10 text-warning",
         className,
       )}
     >

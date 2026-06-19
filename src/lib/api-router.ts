@@ -7,13 +7,17 @@ import {
   getStoreEmployeeSummary,
   recalculateBuild,
 } from "@/lib/build-advisor";
+import { getAdvisorResponse } from "@/lib/ai/advisor-service";
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import type {
+  AdvisorRequestPayload,
+  AdvisorResponsePayload,
   AffiliateClickRequest,
   AffiliateClickResponse,
   CartPreviewRequest,
   CartPreviewResponse,
   CheckoutResponse,
+  ConsumeReplacementResponse,
   ConsumeUsageResponse,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
@@ -45,6 +49,7 @@ type MockMonetizationState = {
   entitlement: Entitlement;
   aiQuestionsUsedToday: number;
   aiQuestionsUsedForBuild: number;
+  replacementsUsedForBuild: number;
   affiliateClicks: AffiliateClickEvent[];
 };
 
@@ -57,6 +62,7 @@ const mockState: MockMonetizationState = {
   },
   aiQuestionsUsedToday: 0,
   aiQuestionsUsedForBuild: 0,
+  replacementsUsedForBuild: 0,
   affiliateClicks: [],
 };
 
@@ -73,6 +79,7 @@ function resetMockMonetizationState() {
   mockState.entitlement = createFreeEntitlement();
   mockState.aiQuestionsUsedToday = 0;
   mockState.aiQuestionsUsedForBuild = 0;
+  mockState.replacementsUsedForBuild = 0;
   mockState.affiliateClicks = [];
 }
 
@@ -82,6 +89,11 @@ function getCurrentPlan(): PlanType {
 
 function getUsageStatus(): UsageStatus {
   const plan = getCurrentPlan();
+  const replacementLimit =
+    plan === "build_pro"
+      ? BUILD_PRO_PLAN.replacementLimit ?? 25
+      : FREE_PLAN.replacementLimit ?? 3;
+  const remainingReplacements = Math.max(0, replacementLimit - mockState.replacementsUsedForBuild);
 
   if (plan === "build_pro") {
     const limit = BUILD_PRO_PLAN.aiQuestionsPerBuild ?? 50;
@@ -95,6 +107,10 @@ function getUsageStatus(): UsageStatus {
       aiQuestionsLimitForBuild: limit,
       remainingAiQuestions: remaining,
       canAskAiQuestion: remaining > 0,
+      replacementLimit,
+      replacementsUsed: mockState.replacementsUsedForBuild,
+      remainingReplacements,
+      canReplacePart: remainingReplacements > 0,
     };
   }
 
@@ -108,6 +124,10 @@ function getUsageStatus(): UsageStatus {
     aiQuestionsLimitToday: limit,
     remainingAiQuestions: remaining,
     canAskAiQuestion: remaining > 0,
+    replacementLimit,
+    replacementsUsed: mockState.replacementsUsedForBuild,
+    remainingReplacements,
+    canReplacePart: remainingReplacements > 0,
   };
 }
 
@@ -127,6 +147,25 @@ function consumeAiUsage(): ConsumeUsageResponse {
   } else {
     mockState.aiQuestionsUsedToday += 1;
   }
+
+  return {
+    usage: getUsageStatus(),
+    consumed: true,
+  };
+}
+
+function consumeReplacementUsage(): ConsumeReplacementResponse {
+  const usage = getUsageStatus();
+
+  if (!usage.canReplacePart) {
+    return {
+      usage,
+      consumed: false,
+      message: "You have used your included hardware replacements for this build.",
+    };
+  }
+
+  mockState.replacementsUsedForBuild += 1;
 
   return {
     usage: getUsageStatus(),
@@ -250,6 +289,52 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       return jsonResponse(payload);
     }
 
+    if (pathname === "/api/ai/advisor") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const payload = await readJson<AdvisorRequestPayload>(request);
+      const message = payload.message?.trim();
+
+      if (!message) {
+        throw new ApiRouteError(400, "Advisor request requires a user message.");
+      }
+
+      const usageBefore = getUsageStatus();
+
+      if (!usageBefore.canAskAiQuestion) {
+        const responsePayload: AdvisorResponsePayload = {
+          assistantMessage:
+            "You have used your included AI questions for this plan. You can keep using the current build and compare parts, or unlock Build Pro for more advisor questions.",
+          explanation: "Usage was not consumed because the current plan has no remaining advisor questions.",
+          provider: "mock",
+          usage: usageBefore,
+          usageConsumed: false,
+          upgradeRequired: usageBefore.plan === "free",
+          suggestedActions: [],
+          extractedNeeds: {},
+        };
+        return jsonResponse(responsePayload);
+      }
+
+      const usageResult = consumeAiUsage();
+      const advisorResponse = await getAdvisorResponse({
+        message,
+        currentBuild: payload.currentBuild ?? null,
+        collectedNeeds: payload.collectedNeeds ?? {},
+        plan: getCurrentPlan(),
+        usageStatus: usageResult.usage,
+      });
+
+      const responsePayload: AdvisorResponsePayload = {
+        ...advisorResponse,
+        usage: usageResult.usage,
+        usageConsumed: usageResult.consumed,
+      };
+      return jsonResponse(responsePayload);
+    }
+
     if (pathname === "/api/offers") {
       if (request.method !== "GET") {
         return methodNotAllowed(["GET"]);
@@ -298,6 +383,15 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       }
 
       const payload = consumeAiUsage();
+      return jsonResponse(payload, { status: payload.consumed ? 200 : 429 });
+    }
+
+    if (pathname === "/api/usage/replacement/consume") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const payload = consumeReplacementUsage();
       return jsonResponse(payload, { status: payload.consumed ? 200 : 429 });
     }
 

@@ -8,12 +8,14 @@ import type {
 
 export const FREE_PLAN: UsageLimit = {
   aiQuestionsPerDay: 5,
+  replacementLimit: 3,
   maxCompareParts: 4,
   canUseAdvancedCompare: false,
 };
 
 export const BUILD_PRO_PLAN: UsageLimit = {
   aiQuestionsPerBuild: 50,
+  replacementLimit: 25,
   maxCompareParts: 4,
   canUseAdvancedCompare: true,
 };
@@ -41,6 +43,10 @@ export function canUseFeature(plan: PlanType, featureKey: FeatureKey) {
 
 export function getRemainingAiQuestions(usageStatus: UsageStatus) {
   return Math.max(0, usageStatus.remainingAiQuestions);
+}
+
+export function getRemainingReplacements(usageStatus: UsageStatus) {
+  return Math.max(0, usageStatus.remainingReplacements);
 }
 
 export function formatUpgradeMessage(featureKey: FeatureKey) {

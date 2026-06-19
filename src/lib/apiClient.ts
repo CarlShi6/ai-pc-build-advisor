@@ -12,8 +12,11 @@ import type {
   EntitlementStatusResponse,
   ConsumeUsageResponse,
   CheckoutResponse,
+  ConsumeReplacementResponse,
   AffiliateClickResponse,
   ResetMonetizationResponse,
+  AdvisorRequestPayload,
+  AdvisorResponsePayload,
 } from "@/types/api";
 import type { Build, StoreEmployeeSummary } from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, UsageStatus } from "@/types/monetization";
@@ -133,6 +136,26 @@ export async function consumeAiUsage(): Promise<ConsumeUsageResponse> {
   }
 }
 
+export async function consumeReplacementUsage(): Promise<ConsumeReplacementResponse> {
+  try {
+    return await requestJson<ConsumeReplacementResponse>("/api/usage/replacement/consume", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 429) {
+      const usage = await getUsageStatus();
+      return {
+        usage,
+        consumed: false,
+        message: "You have used your included hardware replacements for this build.",
+      };
+    }
+
+    throw error;
+  }
+}
+
 export async function getEntitlementStatus(): Promise<Entitlement> {
   const response = await requestJson<EntitlementStatusResponse>("/api/entitlement/status");
 
@@ -165,6 +188,15 @@ export async function resetMockMonetizationState(): Promise<ResetMonetizationRes
   return requestJson<ResetMonetizationResponse>("/api/monetization/reset", {
     method: "POST",
     body: JSON.stringify({}),
+  });
+}
+
+export async function askAdvisor(
+  payload: AdvisorRequestPayload,
+): Promise<AdvisorResponsePayload> {
+  return requestJson<AdvisorResponsePayload>("/api/ai/advisor", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

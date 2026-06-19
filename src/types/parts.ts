@@ -22,10 +22,14 @@ export interface Part {
   model: string;
   displayName: string;
   price: number;
+  source?: "catalog" | "user_owned" | "manual";
+  owned?: boolean;
+  userProvided?: boolean;
   retailer?: string;
   productUrl?: string;
   searchUrl?: string;
   imageUrl?: string;
+  color?: string;
   affiliateLinks?: AffiliateLink[];
   availability?: PartAvailability;
   specs: Record<string, string | number | boolean>;

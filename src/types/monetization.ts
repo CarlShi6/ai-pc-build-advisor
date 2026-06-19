@@ -10,6 +10,7 @@ export type FeatureKey =
 export interface UsageLimit {
   aiQuestionsPerDay?: number;
   aiQuestionsPerBuild?: number;
+  replacementLimit?: number;
   maxCompareParts?: number;
   canUseAdvancedCompare: boolean;
 }
@@ -32,6 +33,10 @@ export interface UsageStatus {
   aiQuestionsLimitForBuild?: number;
   remainingAiQuestions: number;
   canAskAiQuestion: boolean;
+  replacementLimit: number;
+  replacementsUsed: number;
+  remainingReplacements: number;
+  canReplacePart: boolean;
 }
 
 export type AffiliateMerchant =
