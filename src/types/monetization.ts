@@ -22,6 +22,9 @@ export interface Entitlement {
   active: boolean;
   startedAt: string;
   expiresAt?: string;
+  paymentProvider?: "mock" | "stripe";
+  checkoutSessionId?: string;
+  activatedAt?: string;
 }
 
 export interface UsageStatus {
@@ -60,6 +63,18 @@ export interface CheckoutResult {
   plan: PlanType;
   entitlement?: Entitlement;
   message?: string;
+}
+
+export interface CreateCheckoutSessionRequest {
+  plan: "build_pro";
+  buildId?: string;
+  userId?: string;
+}
+
+export interface CreateCheckoutSessionResponse {
+  checkoutUrl?: string;
+  fallbackUsed: boolean;
+  message: string;
 }
 
 export interface AffiliateClickEvent {

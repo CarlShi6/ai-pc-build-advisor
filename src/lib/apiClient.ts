@@ -12,6 +12,8 @@ import type {
   EntitlementStatusResponse,
   ConsumeUsageResponse,
   CheckoutResponse,
+  CreateCheckoutSessionApiResponse,
+  CreateCheckoutSessionPayload,
   ConsumeReplacementResponse,
   AffiliateClickResponse,
   ResetMonetizationResponse,
@@ -171,6 +173,15 @@ export async function mockUpgradeToPro(): Promise<CheckoutResponse> {
   return requestJson<CheckoutResponse>("/api/checkout/mock-upgrade", {
     method: "POST",
     body: JSON.stringify({}),
+  });
+}
+
+export async function createCheckoutSession(
+  payload: CreateCheckoutSessionPayload,
+): Promise<CreateCheckoutSessionApiResponse> {
+  return requestJson<CreateCheckoutSessionApiResponse>("/api/checkout/create-session", {
+    method: "POST",
+    body: JSON.stringify(payload),
   });
 }
 

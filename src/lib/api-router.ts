@@ -10,6 +10,7 @@ import {
 import { getAdvisorResponse } from "@/lib/ai/advisor-service";
 import { normalizeAdvisorActions } from "@/lib/ai/types";
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
+import { createStripeCheckoutSession } from "@/lib/stripe.server";
 import type {
   AdvisorRequestPayload,
   AdvisorResponsePayload,
@@ -23,6 +24,8 @@ import type {
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
   ComparePartsResponse,
+  CreateCheckoutSessionApiResponse,
+  CreateCheckoutSessionPayload,
   DeleteSavedBuildResponse,
   EntitlementStatusResponse,
   OffersResponse,
@@ -81,6 +84,7 @@ function createFreeEntitlement(): Entitlement {
     plan: "free",
     active: true,
     startedAt: new Date().toISOString(),
+    paymentProvider: "mock",
   };
 }
 
@@ -94,6 +98,32 @@ function resetMockMonetizationState() {
 
 function getCurrentPlan(): PlanType {
   return mockState.entitlement.active ? mockState.entitlement.plan : "free";
+}
+
+function activateBuildProEntitlement({
+  paymentProvider,
+  buildId = MOCK_BUILD_ID,
+  checkoutSessionId,
+  userId = MOCK_USER_ID,
+}: {
+  paymentProvider: "mock" | "stripe";
+  buildId?: string;
+  checkoutSessionId?: string;
+  userId?: string;
+}) {
+  const now = new Date().toISOString();
+  mockState.entitlement = {
+    userId,
+    plan: "build_pro",
+    buildId,
+    active: true,
+    startedAt: mockState.entitlement.startedAt || now,
+    paymentProvider,
+    checkoutSessionId,
+    activatedAt: now,
+  };
+
+  return mockState.entitlement;
 }
 
 function getSavedBuildLimit() {
@@ -553,21 +583,83 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["POST"]);
       }
 
-      mockState.entitlement = {
-        userId: MOCK_USER_ID,
-        plan: "build_pro",
-        buildId: MOCK_BUILD_ID,
-        active: true,
-        startedAt: new Date().toISOString(),
-      };
+      const entitlement = activateBuildProEntitlement({ paymentProvider: "mock" });
 
       const payload: CheckoutResponse = {
         success: true,
         plan: "build_pro",
-        entitlement: mockState.entitlement,
+        entitlement,
         message: "Build Pro unlocked for this mock session.",
       };
       return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/checkout/create-session") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const input = await readJson<CreateCheckoutSessionPayload>(request);
+
+      if (input.plan !== "build_pro") {
+        throw new ApiRouteError(400, "Only Build Pro checkout is supported.");
+      }
+
+      const stripeResult = await createStripeCheckoutSession({
+        plan: input.plan,
+        buildId: input.buildId ?? MOCK_BUILD_ID,
+        userId: input.userId ?? MOCK_USER_ID,
+      });
+      const payload: CreateCheckoutSessionApiResponse = {
+        checkoutUrl: stripeResult.checkoutUrl,
+        fallbackUsed: stripeResult.fallbackUsed,
+        message: stripeResult.message,
+      };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/stripe/webhook") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const event = await readJson<{
+        id?: string;
+        type?: string;
+        data?: {
+          object?: {
+            id?: string;
+            metadata?: {
+              plan?: string;
+              buildId?: string;
+              userId?: string;
+            };
+          };
+        };
+      }>(request);
+
+      // TODO: In production, verify the raw request body with STRIPE_WEBHOOK_SECRET
+      // before trusting this event. The mock API reads parsed JSON so local dev can
+      // exercise the entitlement path without breaking when the secret is missing.
+      if (event.type === "checkout.session.completed") {
+        const session = event.data?.object;
+        const plan = session?.metadata?.plan;
+
+        if (session && plan === "build_pro") {
+          activateBuildProEntitlement({
+            paymentProvider: "stripe",
+            buildId: session.metadata?.buildId ?? MOCK_BUILD_ID,
+            userId: session.metadata?.userId ?? MOCK_USER_ID,
+            checkoutSessionId: session.id,
+          });
+        }
+      }
+
+      return jsonResponse({
+        received: true,
+        entitlement: mockState.entitlement,
+        message: "Stripe webhook placeholder received.",
+      });
     }
 
     if (pathname === "/api/affiliate/click") {

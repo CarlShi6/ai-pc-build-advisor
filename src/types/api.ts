@@ -10,6 +10,8 @@ import type { Part, PartAvailability } from "@/types/parts";
 import type {
   AffiliateClickEvent,
   CheckoutResult,
+  CreateCheckoutSessionRequest,
+  CreateCheckoutSessionResponse,
   Entitlement,
   UsageStatus,
 } from "@/types/monetization";
@@ -105,6 +107,10 @@ export interface ConsumeReplacementResponse {
 }
 
 export type CheckoutResponse = CheckoutResult;
+
+export type CreateCheckoutSessionPayload = CreateCheckoutSessionRequest;
+
+export type CreateCheckoutSessionApiResponse = CreateCheckoutSessionResponse;
 
 export interface AffiliateClickRequest {
   event: Omit<AffiliateClickEvent, "clickedAt"> & { clickedAt?: string };

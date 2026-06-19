@@ -1,4 +1,4 @@
-import { mockUpgradeToPro } from "@/lib/apiClient";
+import { createCheckoutSession, mockUpgradeToPro } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { CheckCircle2, LoaderCircle, Sparkles } from "lucide-react";
@@ -28,11 +28,26 @@ export function UpgradeCard({
     setMessage(null);
 
     try {
+      const checkout = await createCheckoutSession({ plan: "build_pro" });
+
+      if (checkout.checkoutUrl && !checkout.fallbackUsed) {
+        window.location.href = checkout.checkoutUrl;
+        return;
+      }
+
       const result = await mockUpgradeToPro();
-      setMessage(result.message ?? "Build Pro unlocked for this mock session.");
+      setMessage(
+        checkout.message || result.message || "Build Pro unlocked for this mock session.",
+      );
       onUpgraded?.();
     } catch {
-      setMessage("Mock checkout could not finish. Please try again.");
+      try {
+        const result = await mockUpgradeToPro();
+        setMessage(result.message ?? "Build Pro unlocked for this mock session.");
+        onUpgraded?.();
+      } catch {
+        setMessage("Checkout could not finish. Please try again.");
+      }
     } finally {
       setIsUpgrading(false);
     }
