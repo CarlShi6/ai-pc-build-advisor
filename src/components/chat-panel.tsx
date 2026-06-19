@@ -1,12 +1,16 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
+import type { AdvisorSuggestedAction } from "@/lib/ai/types";
 import { ArrowRight, LoaderCircle, MessageSquareText, Sparkles } from "lucide-react";
 
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
   text: string;
+  actions?: AdvisorSuggestedAction[];
+  warnings?: string[];
+  fallbackUsed?: boolean;
 };
 
 export function ChatPanel({
@@ -19,6 +23,7 @@ export function ChatPanel({
   limitSlot,
   onInputChange,
   onSend,
+  onActionClick,
 }: {
   className?: string;
   input: string;
@@ -29,6 +34,7 @@ export function ChatPanel({
   limitSlot?: ReactNode;
   onInputChange: (value: string) => void;
   onSend: (value: string) => void;
+  onActionClick?: (action: AdvisorSuggestedAction) => void;
 }) {
   const messagesRef = useRef<HTMLDivElement | null>(null);
 
@@ -90,6 +96,34 @@ export function ChatPanel({
               </div>
               <div className="rounded-2xl rounded-tl-none border border-border bg-card p-4">
                 <p className="text-sm leading-relaxed">{m.text}</p>
+                {m.fallbackUsed && (
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Mock advisor used. Build checks remain rule-based.
+                  </p>
+                )}
+                {m.warnings && m.warnings.length > 0 && (
+                  <div className="mt-3 space-y-1">
+                    {m.warnings.map((warning) => (
+                      <p key={warning} className="text-xs text-warning">
+                        {warning}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {m.actions && m.actions.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {m.actions.map((action, index) => (
+                      <button
+                        key={`${m.id}-${action.type}-${index}`}
+                        type="button"
+                        onClick={() => onActionClick?.(action)}
+                        className="rounded-md border border-primary/25 bg-primary/10 px-3 py-1.5 text-left text-xs font-medium text-primary transition-colors hover:bg-primary/15"
+                      >
+                        {getActionLabel(action)}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           ) : (
@@ -146,4 +180,35 @@ export function ChatPanel({
       </form>
     </aside>
   );
+}
+
+function getActionLabel(action: AdvisorSuggestedAction) {
+  if (action.label) {
+    return action.label;
+  }
+
+  switch (action.type) {
+    case "update_budget":
+      return `Update budget to $${action.budget.toLocaleString()}`;
+    case "update_use_case":
+      return `Use ${action.targetUseCase.join(" + ")}`;
+    case "update_appearance":
+      return action.appearancePreference === "rgb"
+        ? "Use RGB style"
+        : `Use ${action.appearancePreference} style`;
+    case "update_brand_preference":
+      return `Use ${[action.cpuBrandPreference?.toUpperCase(), action.gpuBrandPreference?.toUpperCase()]
+        .filter(Boolean)
+        .join(" / ")} preference`;
+    case "update_experience_level":
+      return `Set ${action.experienceLevel} experience`;
+    case "add_owned_part":
+      return "Add owned part";
+    case "open_part_explorer":
+      return `Open ${action.category.toUpperCase()} Explorer`;
+    case "explain_current_build":
+      return "Explain current build";
+    case "ask_clarifying_question":
+      return "Ask clarifying question";
+  }
 }

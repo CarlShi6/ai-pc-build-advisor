@@ -277,6 +277,8 @@ export function CompareDrawer({
   onReplace,
   plan = "free",
   usageStatus,
+  startWithOwnedPartForm = false,
+  ownedPartHint,
   onUpgraded,
 }: {
   build: Build | null;
@@ -291,6 +293,8 @@ export function CompareDrawer({
   onReplace: (part: Part) => void;
   plan?: PlanType;
   usageStatus?: UsageStatus | null;
+  startWithOwnedPartForm?: boolean;
+  ownedPartHint?: string | null;
   onUpgraded?: () => void;
 }) {
   const [activeTab, setActiveTab] = useState<ExplorerTab>("recommended");
@@ -326,12 +330,12 @@ export function CompareDrawer({
       return;
     }
 
-    setActiveTab("recommended");
-    setSearchQuery("");
+    setActiveTab(startWithOwnedPartForm ? "search" : "recommended");
+    setSearchQuery(ownedPartHint ?? "");
     setPreviewPart(null);
-    setShowCustomPartForm(false);
+    setShowCustomPartForm(startWithOwnedPartForm);
     setSelectedIds([selectedPart.id]);
-  }, [open, selectedPart]);
+  }, [open, ownedPartHint, selectedPart, startWithOwnedPartForm]);
 
   if (!build || !category || !selectedPart) {
     return null;

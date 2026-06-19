@@ -25,6 +25,7 @@ import {
 } from "@/lib/apiClient";
 import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
 import { mergeCustomerNeeds } from "@/lib/needParser";
+import type { AdvisorSuggestedAction } from "@/lib/ai/types";
 import type {
   CustomerNeeds,
   RecommendedBuildInput,
@@ -247,18 +248,6 @@ function buildAssistantReply({
   return `Noted ${responseBits.join(", ")}. I refreshed the recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. ${followUp}`;
 }
 
-function hasExtractedNeeds(needs: CustomerNeeds | undefined) {
-  return Boolean(
-    needs &&
-      (needs.budget ||
-        needs.targetUseCase?.length ||
-        needs.appearancePreference ||
-        needs.experienceLevel ||
-        needs.cpuBrandPreference ||
-        needs.gpuBrandPreference),
-  );
-}
-
 function ConsultPage() {
   const [build, setBuild] = useState<BuildModel | null>(null);
   const [buildError, setBuildError] = useState<string | null>(null);
@@ -283,6 +272,9 @@ function ConsultPage() {
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [showUsageUpgrade, setShowUsageUpgrade] = useState(false);
   const [expandedWarningIds, setExpandedWarningIds] = useState<Set<string>>(new Set());
+  const [advisorUpdatedFields, setAdvisorUpdatedFields] = useState<Set<keyof CustomerNeeds>>(new Set());
+  const [openOwnedPartForm, setOpenOwnedPartForm] = useState(false);
+  const [ownedPartHint, setOwnedPartHint] = useState<string | null>(null);
   const plan = getPlanForEntitlement(entitlement);
   const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
 
@@ -367,6 +359,8 @@ function ConsultPage() {
       setCompareParts([]);
       setCompareError(null);
       setRecommendedReplacementId(null);
+      setOpenOwnedPartForm(false);
+      setOwnedPartHint(null);
       setIsLoadingCompare(false);
     }
   }
@@ -546,23 +540,14 @@ function ConsultPage() {
           id: createMessageId(),
           role: "assistant",
           text: advisorResponse.assistantMessage,
+          actions: advisorResponse.suggestedActions,
+          warnings: advisorResponse.warnings,
+          fallbackUsed: advisorResponse.fallbackUsed,
         },
       ]);
 
       if (!advisorResponse.usageConsumed) {
         return;
-      }
-
-      if (hasExtractedNeeds(advisorResponse.extractedNeeds)) {
-        const mergedNeeds = mergeCustomerNeeds(customerNeeds, advisorResponse.extractedNeeds ?? {});
-        setCustomerNeeds(mergedNeeds);
-        setIsLoadingDetails(true);
-
-        const nextState = await refreshBuildAndDetails(mergedNeeds);
-        setBuild(nextState.build);
-        setCartPreview(nextState.cartPreview);
-        setEmployeeSummary(nextState.employeeSummary);
-        handleDrawerOpenChange(false);
       }
     } catch {
       setDetailsError(
@@ -583,6 +568,105 @@ function ConsultPage() {
     } finally {
       setIsGeneratingRecommendation(false);
       setIsLoadingDetails(false);
+    }
+  }
+
+  async function applyAdvisorNeedsUpdate(nextNeeds: CustomerNeeds, updatedFields: Array<keyof CustomerNeeds>) {
+    const mergedNeeds = mergeCustomerNeeds(customerNeeds, nextNeeds);
+    setCustomerNeeds(mergedNeeds);
+    setAdvisorUpdatedFields((current) => {
+      const next = new Set(current);
+      updatedFields.forEach((field) => next.add(field));
+      return next;
+    });
+    setIsLoadingDetails(true);
+
+    try {
+      const nextState = await refreshBuildAndDetails(mergedNeeds);
+      setBuild(nextState.build);
+      setCartPreview(nextState.cartPreview);
+      setEmployeeSummary(nextState.employeeSummary);
+      handleDrawerOpenChange(false);
+      setToast({ message: "Build needs updated from advisor action.", tone: "success" });
+    } catch {
+      setDetailsError("The build needs were updated, but the recommendation could not refresh right now.");
+      setToast({ message: "Could not refresh the build after updating needs.", tone: "error" });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  }
+
+  async function handleAdvisorAction(action: AdvisorSuggestedAction) {
+    switch (action.type) {
+      case "update_budget":
+        await applyAdvisorNeedsUpdate({ budget: action.budget }, ["budget"]);
+        return;
+      case "update_use_case":
+        await applyAdvisorNeedsUpdate({ targetUseCase: action.targetUseCase }, ["targetUseCase"]);
+        return;
+      case "update_appearance":
+        await applyAdvisorNeedsUpdate(
+          { appearancePreference: action.appearancePreference },
+          ["appearancePreference"],
+        );
+        return;
+      case "update_brand_preference":
+        await applyAdvisorNeedsUpdate(
+          {
+            ...(action.cpuBrandPreference ? { cpuBrandPreference: action.cpuBrandPreference } : {}),
+            ...(action.gpuBrandPreference ? { gpuBrandPreference: action.gpuBrandPreference } : {}),
+          },
+          [
+            ...(action.cpuBrandPreference ? (["cpuBrandPreference"] as const) : []),
+            ...(action.gpuBrandPreference ? (["gpuBrandPreference"] as const) : []),
+          ],
+        );
+        return;
+      case "update_experience_level":
+        await applyAdvisorNeedsUpdate(
+          { experienceLevel: action.experienceLevel },
+          ["experienceLevel"],
+        );
+        return;
+      case "add_owned_part": {
+        const category = action.category ?? "gpu";
+        setOpenOwnedPartForm(true);
+        setOwnedPartHint(action.partHint ?? categoryLabels[category]);
+        await openCompare(category);
+        return;
+      }
+      case "open_part_explorer":
+        setOpenOwnedPartForm(false);
+        setOwnedPartHint(null);
+        await openCompare(action.category);
+        return;
+      case "explain_current_build": {
+        const partSummary = build
+          ? build.parts
+              .slice(0, 4)
+              .map((part) => `${categoryLabels[part.category]}: ${part.displayName}`)
+              .join(". ")
+          : "The build is still loading.";
+        setChatMessages((current) => [
+          ...current,
+          {
+            id: createMessageId(),
+            role: "assistant",
+            text: `${build?.name ?? "Current build"} is at ${build ? `$${build.totalPrice.toLocaleString()}` : "the current budget"}. ${partSummary}. Compatibility remains checked by local rules.`,
+          },
+        ]);
+        return;
+      }
+      case "ask_clarifying_question":
+        setChatMessages((current) => [
+          ...current,
+          {
+            id: createMessageId(),
+            role: "assistant",
+            text: action.question,
+          },
+        ]);
+        return;
     }
   }
 
@@ -736,17 +820,31 @@ function ConsultPage() {
                           ? `$${customerNeeds.budget.toLocaleString()}`
                           : "Still collecting"
                       }
+                      updated={advisorUpdatedFields.has("budget")}
                     />
-                    <NeedsCard label="Use case" value={formatNeedsList(customerNeeds.targetUseCase)} />
+                    <NeedsCard
+                      label="Use case"
+                      value={formatNeedsList(customerNeeds.targetUseCase)}
+                      updated={advisorUpdatedFields.has("targetUseCase")}
+                    />
                     <NeedsCard
                       label="Appearance"
                       value={formatAppearancePreference(customerNeeds.appearancePreference)}
+                      updated={advisorUpdatedFields.has("appearancePreference")}
                     />
                     <NeedsCard
                       label="Experience"
                       value={formatExperienceLevel(customerNeeds.experienceLevel)}
+                      updated={advisorUpdatedFields.has("experienceLevel")}
                     />
-                    <NeedsCard label="Brand preference" value={formatBrandPreference(customerNeeds)} />
+                    <NeedsCard
+                      label="Brand preference"
+                      value={formatBrandPreference(customerNeeds)}
+                      updated={
+                        advisorUpdatedFields.has("cpuBrandPreference") ||
+                        advisorUpdatedFields.has("gpuBrandPreference")
+                      }
+                    />
                   </div>
                 </section>
 
@@ -1047,6 +1145,7 @@ function ConsultPage() {
           }
           onInputChange={setChatInput}
           onSend={(value) => void handleChatSend(value)}
+          onActionClick={(action) => void handleAdvisorAction(action)}
         />
       </main>
 
@@ -1062,6 +1161,8 @@ function ConsultPage() {
           recommendedReplacementId={recommendedReplacementId}
           plan={plan}
           usageStatus={usageStatus}
+          startWithOwnedPartForm={openOwnedPartForm}
+          ownedPartHint={ownedPartHint}
           onUpgraded={() => void refreshMonetizationState()}
           onOpenChange={handleDrawerOpenChange}
           onReplace={(part) => void handleReplacePart(part)}
@@ -1093,10 +1194,17 @@ function ConsultPage() {
   );
 }
 
-function NeedsCard({ label, value }: { label: string; value: string }) {
+function NeedsCard({ label, value, updated }: { label: string; value: string; updated?: boolean }) {
   return (
     <div className="rounded-2xl border border-primary/15 bg-background/60 p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+        {updated && (
+          <Badge className="rounded-md border border-primary/20 bg-primary/10 text-[10px] text-primary">
+            Updated
+          </Badge>
+        )}
+      </div>
       <p className="mt-2 text-sm leading-relaxed">{value}</p>
     </div>
   );

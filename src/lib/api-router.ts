@@ -8,6 +8,7 @@ import {
   recalculateBuild,
 } from "@/lib/build-advisor";
 import { getAdvisorResponse } from "@/lib/ai/advisor-service";
+import { normalizeAdvisorActions } from "@/lib/ai/types";
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import type {
   AdvisorRequestPayload,
@@ -314,6 +315,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
           upgradeRequired: usageBefore.plan === "free",
           suggestedActions: [],
           extractedNeeds: {},
+          warnings: [],
+          fallbackUsed: true,
         };
         return jsonResponse(responsePayload);
       }
@@ -329,6 +332,9 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
 
       const responsePayload: AdvisorResponsePayload = {
         ...advisorResponse,
+        suggestedActions: normalizeAdvisorActions(advisorResponse.suggestedActions),
+        warnings: advisorResponse.warnings ?? [],
+        fallbackUsed: advisorResponse.fallbackUsed ?? advisorResponse.provider === "mock",
         usage: usageResult.usage,
         usageConsumed: usageResult.consumed,
       };

@@ -4,12 +4,22 @@ import type { AdvisorRequest, AdvisorProviderResponse } from "@/lib/ai/types";
 
 export async function getAdvisorResponse(request: AdvisorRequest): Promise<AdvisorProviderResponse> {
   if (!openAiProvider.isConfigured()) {
-    return createMockAdvisorResponse(request);
+    return {
+      ...createMockAdvisorResponse(request),
+      fallbackUsed: true,
+    };
   }
 
   try {
-    return await openAiProvider.getAdvisorResponse(request);
+    return {
+      ...(await openAiProvider.getAdvisorResponse(request)),
+      fallbackUsed: false,
+    };
   } catch {
-    return createMockAdvisorResponse(request);
+    return {
+      ...createMockAdvisorResponse(request),
+      fallbackUsed: true,
+      warnings: ["The configured AI provider was unavailable, so the mock advisor handled this message."],
+    };
   }
 }
