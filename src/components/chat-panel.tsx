@@ -1,5 +1,6 @@
 import { cn } from "@/lib/utils";
 import { useEffect, useRef } from "react";
+import type { ReactNode } from "react";
 import { ArrowRight, LoaderCircle, MessageSquareText, Sparkles } from "lucide-react";
 
 export type ChatMessage = {
@@ -14,6 +15,8 @@ export function ChatPanel({
   isGenerating,
   messages,
   quickReplies,
+  usageSlot,
+  limitSlot,
   onInputChange,
   onSend,
 }: {
@@ -22,6 +25,8 @@ export function ChatPanel({
   isGenerating?: boolean;
   messages: ChatMessage[];
   quickReplies: string[];
+  usageSlot?: ReactNode;
+  limitSlot?: ReactNode;
   onInputChange: (value: string) => void;
   onSend: (value: string) => void;
 }) {
@@ -54,6 +59,7 @@ export function ChatPanel({
             <p className="text-xs text-muted-foreground">Collect needs, explain tradeoffs, and tune your build.</p>
           </div>
         </div>
+        {usageSlot && <div className="mt-3">{usageSlot}</div>}
       </div>
 
       <div className="shrink-0 border-b border-border/80 px-5 py-4">
@@ -114,6 +120,7 @@ export function ChatPanel({
         }}
         className="shrink-0 border-t border-border bg-card/85 p-5 backdrop-blur-sm"
       >
+        {limitSlot && <div className="mb-4">{limitSlot}</div>}
         <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <Sparkles className="size-3.5 text-primary" />
           The input stays fixed while messages scroll above.

@@ -1,3 +1,4 @@
+import type { AffiliateLink } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 
 export interface CompatibilityWarning {
@@ -28,9 +29,12 @@ export interface CartPreviewItem {
   quantity: number;
   productUrl?: string;
   searchUrl?: string;
+  affiliateLinks?: AffiliateLink[];
   availability?: "in_stock" | "low_stock" | "out_of_stock" | "unknown";
   note?: string;
 }
+
+export type PurchaseListItem = CartPreviewItem;
 
 export interface BuyerSummary {
   customerGoal: string;
@@ -43,3 +47,4 @@ export interface BuyerSummary {
 }
 
 export type StoreEmployeeSummary = BuyerSummary;
+export type BuyerRecommendationSummary = BuyerSummary;

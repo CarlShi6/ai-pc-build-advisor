@@ -4,15 +4,25 @@ import { BuildCard } from "@/components/build-card";
 import { ChatPanel, type ChatMessage } from "@/components/chat-panel";
 import { CompareDrawer } from "@/components/compare-drawer";
 import { TopBar } from "@/components/top-bar";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
+import { ProFeatureLock } from "@/components/ProFeatureLock";
+import { UpgradeCard } from "@/components/UpgradeCard";
+import { UsageBadge } from "@/components/UsageBadge";
 import { categoryLabels } from "@/data/seedParts";
 import {
+  consumeAiUsage,
+  getEntitlementStatus,
   getCartPreview,
   getCompareParts,
   getPartsByCategory,
   getRecommendedBuild,
   getRecommendedReplacementForWarning,
+  getUsageStatus,
+  resetMockMonetizationState,
   replaceBuildPart,
+  trackAffiliateClick,
 } from "@/lib/apiClient";
+import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
 import { hasUsefulNeedInfo, mergeCustomerNeeds, parseCustomerNeeds } from "@/lib/needParser";
 import type {
   CustomerNeeds,
@@ -24,6 +34,7 @@ import type {
   CompatibilityWarning as CompatibilityWarningModel,
   StoreEmployeeSummary as StoreEmployeeSummaryModel,
 } from "@/types/build";
+import type { Entitlement, UsageStatus } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,13 +71,24 @@ const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   },
 ];
 
+const PRO_PURCHASE_CHECKLIST = [
+  "Confirm CPU and motherboard socket compatibility",
+  "Confirm RAM type",
+  "Confirm PSU wattage",
+  "Confirm GPU clearance",
+  "Confirm case and cooler fit",
+  "Confirm storage slots",
+  "Confirm Windows/license plan",
+  "Confirm monitor resolution target",
+];
+
 export const Route = createFileRoute("/consult")({
   head: () => ({
     meta: [
-      { title: "Customer Consultation | AI PC Build Advisor" },
+      { title: "Build Advisor | AI PC Build Advisor" },
       {
         name: "description",
-        content: "Chat with the AI advisor to collect customer needs and generate a live PC build.",
+        content: "Chat with the AI advisor to collect your PC needs and generate a live build.",
       },
     ],
   }),
@@ -243,6 +265,11 @@ function ConsultPage() {
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
   const [chatInput, setChatInput] = useState("");
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
+  const [usageStatus, setUsageStatus] = useState<UsageStatus | null>(null);
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [showUsageUpgrade, setShowUsageUpgrade] = useState(false);
+  const plan = getPlanForEntitlement(entitlement);
+  const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
 
   useEffect(() => {
     let active = true;
@@ -305,6 +332,10 @@ function ConsultPage() {
   }, []);
 
   useEffect(() => {
+    void refreshMonetizationState();
+  }, []);
+
+  useEffect(() => {
     if (!toast) {
       return;
     }
@@ -322,6 +353,45 @@ function ConsultPage() {
       setCompareError(null);
       setRecommendedReplacementId(null);
       setIsLoadingCompare(false);
+    }
+  }
+
+  async function refreshMonetizationState() {
+    try {
+      const [nextEntitlement, nextUsage] = await Promise.all([
+        getEntitlementStatus(),
+        getUsageStatus(),
+      ]);
+      setEntitlement(nextEntitlement);
+      setUsageStatus(nextUsage);
+      if (nextUsage.canAskAiQuestion) {
+        setShowUsageUpgrade(false);
+      }
+    } catch {
+      setEntitlement({
+        userId: "mock-user",
+        plan: "free",
+        active: true,
+        startedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  async function handleResetMonetization() {
+    try {
+      const result = await resetMockMonetizationState();
+      setEntitlement(result.entitlement);
+      setUsageStatus(result.usage);
+      setShowUsageUpgrade(false);
+      setToast({
+        message: result.message,
+        tone: "success",
+      });
+    } catch {
+      setToast({
+        message: "Could not reset mock monetization state right now.",
+        tone: "error",
+      });
     }
   }
 
@@ -444,6 +514,32 @@ function ConsultPage() {
       return;
     }
 
+    try {
+      const usageResult = await consumeAiUsage();
+      setUsageStatus(usageResult.usage);
+
+      if (!usageResult.consumed) {
+        setShowUsageUpgrade(true);
+        setChatMessages((current) => [
+          ...current,
+          {
+            id: createMessageId(),
+            role: "assistant",
+            text:
+              usageResult.message ??
+              "You have used your included AI questions. The current mock build stays available.",
+          },
+        ]);
+        return;
+      }
+    } catch {
+      setToast({
+        message: "Usage tracking is temporarily unavailable, so I kept the current build stable.",
+        tone: "error",
+      });
+      return;
+    }
+
       setIsGeneratingRecommendation(true);
       setIsLoadingDetails(true);
       setDetailsError(null);
@@ -486,6 +582,19 @@ function ConsultPage() {
       setIsGeneratingRecommendation(false);
       setIsLoadingDetails(false);
     }
+  }
+
+  async function handleAffiliateClick(
+    item: CartPreviewItemModel,
+    link: NonNullable<CartPreviewItemModel["affiliateLinks"]>[number],
+  ) {
+    await trackAffiliateClick({
+      partId: item.partId,
+      merchant: link.merchant,
+      url: link.url,
+      buildId: build?.id,
+    });
+    window.open(link.url, "_blank", "noopener,noreferrer");
   }
 
   function renderWarningActions(warning: CompatibilityWarningModel) {
@@ -566,6 +675,17 @@ function ConsultPage() {
                   Loading recommended build
                 </div>
               )}
+              <div className="flex flex-wrap items-center gap-2">
+                <UsageBadge usage={usageStatus} />
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-md"
+                  onClick={() => void handleResetMonetization()}
+                >
+                  Reset mock access
+                </Button>
+              </div>
             </div>
 
             {buildError ? (
@@ -575,7 +695,7 @@ function ConsultPage() {
               </div>
             ) : build ? (
               <>
-                <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                  <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -615,6 +735,13 @@ function ConsultPage() {
                     <NeedsCard label="Brand preference" value={formatBrandPreference(customerNeeds)} />
                   </div>
                 </section>
+
+                {showUsageUpgrade && (
+                  <UpgradeCard
+                    onUpgraded={() => void refreshMonetizationState()}
+                    className="border-warning/25 bg-warning/10"
+                  />
+                )}
 
                 <BuildCard
                   build={build}
@@ -718,7 +845,7 @@ function ConsultPage() {
                           value={employeeSummary.recommendedBuildLogic}
                         />
                         <SummaryList
-                          label="Key selling points"
+                          label="Why these parts fit"
                           values={employeeSummary.keySellingPoints}
                         />
                         <SummaryBlock
@@ -756,6 +883,7 @@ function ConsultPage() {
                         Mock retailer references only. No checkout, payment, or live stock integration yet.
                       </p>
                     </div>
+                    <AffiliateDisclosure />
                     <div className="flex items-center gap-2">
                       {isLoadingDetails && (
                         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
@@ -787,6 +915,7 @@ function ConsultPage() {
                             <th className="px-4 py-3 font-medium">Retailer</th>
                             <th className="px-4 py-3 font-medium">Note</th>
                             <th className="px-4 py-3 text-right font-medium">Price</th>
+                            <th className="px-4 py-3 text-right font-medium">Deal</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -798,10 +927,23 @@ function ConsultPage() {
                               <td className="px-4 py-3 text-right font-mono">
                                 ${item.estimatedPrice.toFixed(2)}
                               </td>
+                              <td className="px-4 py-3 text-right">
+                                {(item.affiliateLinks ?? []).slice(0, 1).map((link) => (
+                                  <Button
+                                    key={`${item.partId}-${link.merchant}`}
+                                    size="sm"
+                                    variant="secondary"
+                                    className="rounded-md"
+                                    onClick={() => void handleAffiliateClick(item, link)}
+                                  >
+                                    {link.label ?? "Check price"}
+                                  </Button>
+                                ))}
+                              </td>
                             </tr>
                           ))}
                           <tr className="bg-background/70">
-                            <td colSpan={3} className="px-4 py-3 text-right font-semibold">
+                            <td colSpan={4} className="px-4 py-3 text-right font-semibold">
                               Total
                             </td>
                             <td className="px-4 py-3 text-right font-mono text-base font-bold text-primary">
@@ -812,6 +954,44 @@ function ConsultPage() {
                       </table>
                     )}
                   </div>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6">
+                  <div className="mb-4 flex items-center gap-2">
+                    <ClipboardList className="size-4 text-primary" />
+                    <h2 className="text-xl font-bold">Purchase Checklist</h2>
+                  </div>
+                  {hasPurchaseChecklist ? (
+                    <ul className="grid gap-2 md:grid-cols-2">
+                      {PRO_PURCHASE_CHECKLIST.map((item) => (
+                        <li
+                          key={item}
+                          className="flex items-center gap-3 rounded-xl border border-border bg-background/60 p-3 text-sm"
+                        >
+                          <CheckCircle2 className="size-4 shrink-0 text-success" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {PRO_PURCHASE_CHECKLIST.slice(0, 4).map((item) => (
+                          <div
+                            key={item}
+                            className="rounded-xl border border-border bg-background/40 p-3 text-sm text-muted-foreground"
+                          >
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                      <ProFeatureLock
+                        feature="purchase_checklist"
+                        label="Full purchase checklist"
+                        onUpgraded={() => void refreshMonetizationState()}
+                      />
+                    </div>
+                  )}
                 </section>
               </>
             ) : (
@@ -834,6 +1014,12 @@ function ConsultPage() {
           isGenerating={isGeneratingRecommendation}
           messages={chatMessages}
           quickReplies={QUICK_REPLIES}
+          usageSlot={<UsageBadge usage={usageStatus} />}
+          limitSlot={
+            showUsageUpgrade ? (
+              <UpgradeCard compact onUpgraded={() => void refreshMonetizationState()} />
+            ) : undefined
+          }
           onInputChange={setChatInput}
           onSend={(value) => void handleChatSend(value)}
         />
@@ -849,6 +1035,8 @@ function ConsultPage() {
           isReplacing={isReplacingPart}
           errorMessage={compareError}
           recommendedReplacementId={recommendedReplacementId}
+          plan={plan}
+          onUpgraded={() => void refreshMonetizationState()}
           onOpenChange={handleDrawerOpenChange}
           onReplace={(part) => void handleReplacePart(part)}
         />

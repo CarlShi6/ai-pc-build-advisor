@@ -227,6 +227,7 @@ export function getCartPreviewItems(build: Build): CartPreviewItem[] {
     quantity: 1,
     productUrl: part.productUrl,
     searchUrl: part.searchUrl,
+    affiliateLinks: part.affiliateLinks,
     availability: part.availability,
     note: getAvailabilityNote(part.availability),
   }));
@@ -247,6 +248,7 @@ export function getOffersForPart(partId: string): PartOffer[] {
       availability: part.availability ?? "unknown",
       productUrl: part.productUrl,
       searchUrl: part.searchUrl,
+      affiliateLinks: part.affiliateLinks,
       note: getAvailabilityNote(part.availability),
     },
   ];

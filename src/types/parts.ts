@@ -1,3 +1,5 @@
+import type { AffiliateLink } from "@/types/monetization";
+
 export type PartCategory =
   | "cpu"
   | "gpu"
@@ -23,8 +25,14 @@ export interface Part {
   retailer?: string;
   productUrl?: string;
   searchUrl?: string;
+  imageUrl?: string;
+  affiliateLinks?: AffiliateLink[];
   availability?: PartAvailability;
   specs: Record<string, string | number | boolean>;
   compatibilityTags: string[];
   recommendationReason?: string;
+  pros?: string[];
+  cons?: string[];
+  valueScore?: number;
+  performanceScore?: number;
 }

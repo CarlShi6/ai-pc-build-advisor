@@ -6,8 +6,11 @@ import {
   getPartSummarySpecs,
 } from "@/lib/build-advisor";
 import { calculateBuildTotal, deriveCompatibilityStatus, evaluateCompatibility } from "@/lib/compatibility";
+import { canUseFeature } from "@/lib/monetization";
+import { trackAffiliateClick } from "@/lib/apiClient";
 import { cn } from "@/lib/utils";
 import type { Build } from "@/types/build";
+import type { AffiliateLink, PlanType } from "@/types/monetization";
 import type { Part, PartCategory } from "@/types/parts";
 import { useEffect, useMemo, useState } from "react";
 import {
@@ -20,7 +23,33 @@ import {
 } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRightLeft, Check, GitCompare, LoaderCircle, Sparkles } from "lucide-react";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
+import { ProFeatureLock } from "@/components/ProFeatureLock";
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  Check,
+  CheckCircle2,
+  GitCompare,
+  LoaderCircle,
+  Search,
+  ShoppingBag,
+  Sparkles,
+  X,
+} from "lucide-react";
+
+type ExplorerTab = "recommended" | "search" | "compare";
+
+const CATEGORY_ICONS: Partial<Record<PartCategory, string>> = {
+  cpu: "CPU",
+  gpu: "GPU",
+  motherboard: "MB",
+  ram: "RAM",
+  ssd: "SSD",
+  psu: "PSU",
+  case: "CASE",
+  cooler: "FAN",
+};
 
 function formatMoney(value: number) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
@@ -106,6 +135,28 @@ function sortParts(parts: Part[], selectedPart: Part, mode: string) {
   });
 }
 
+function partMatchesSearch(part: Part, query: string) {
+  const normalized = query.trim().toLowerCase();
+
+  if (!normalized) {
+    return true;
+  }
+
+  const haystack = [
+    part.brand,
+    part.model,
+    part.displayName,
+    part.retailer,
+    ...part.compatibilityTags,
+    ...Object.entries(part.specs).flatMap(([key, value]) => [key, String(value)]),
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+
+  return haystack.includes(normalized);
+}
+
 export function CompareDrawer({
   build,
   category,
@@ -117,6 +168,8 @@ export function CompareDrawer({
   recommendedReplacementId,
   onOpenChange,
   onReplace,
+  plan = "free",
+  onUpgraded,
 }: {
   build: Build | null;
   category: string | null;
@@ -128,9 +181,14 @@ export function CompareDrawer({
   recommendedReplacementId?: string | null;
   onOpenChange: (open: boolean) => void;
   onReplace: (part: Part) => void;
+  plan?: PlanType;
+  onUpgraded?: () => void;
 }) {
+  const [activeTab, setActiveTab] = useState<ExplorerTab>("recommended");
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  const [sortMode, setSortMode] = useState("price");
+  const [sortMode, setSortMode] = useState("value");
+  const [searchQuery, setSearchQuery] = useState("");
+  const [previewPart, setPreviewPart] = useState<Part | null>(null);
 
   const selectedPart = build?.parts.find((part) => part.category === category);
   const sectionTitle = selectedPart ? categoryLabels[selectedPart.category] : "Part";
@@ -153,34 +211,31 @@ export function CompareDrawer({
       return;
     }
 
-    const recommendedIds = [selectedPart.id, recommendedReplacementId].filter(
-      (id): id is string => Boolean(id),
-    );
-    const fallbackIds = sameCategoryParts.slice(0, 4).map((part) => part.id);
-    const nextIds = Array.from(new Set([...recommendedIds, ...fallbackIds])).slice(0, 4);
-
-    setSelectedIds(nextIds.length >= 2 ? nextIds : sameCategoryParts.map((part) => part.id).slice(0, 4));
-  }, [open, recommendedReplacementId, sameCategoryParts, selectedPart]);
+    setActiveTab("recommended");
+    setSearchQuery("");
+    setPreviewPart(null);
+    setSelectedIds([selectedPart.id]);
+  }, [open, selectedPart]);
 
   if (!build || !category || !selectedPart) {
     return null;
   }
 
-  const alternatives = sameCategoryParts.filter((part) => part.id !== selectedPart.id);
-  const comparisonParts = selectedIds
+  const currentBuild = build;
+  const currentSelectedPart = selectedPart;
+  const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
+  const selectedCompareParts = selectedIds
     .map((id) => sameCategoryParts.find((part) => part.id === id))
     .filter((part): part is Part => Boolean(part));
-  const comparisonFields = getCategoryComparisonFields(selectedPart.category as PartCategory);
+  const recommendedParts = sameCategoryParts
+    .filter((part, index) => index < 6 || part.id === recommendedReplacementId)
+    .slice(0, 8);
+  const searchedParts = sameCategoryParts.filter((part) => partMatchesSearch(part, searchQuery));
 
   function toggleComparePart(part: Part) {
     setSelectedIds((current) => {
-      if (part.id === selectedPart.id) {
-        return current.includes(part.id) ? current : [part.id, ...current].slice(0, 4);
-      }
-
       if (current.includes(part.id)) {
-        const next = current.filter((id) => id !== part.id);
-        return next.includes(selectedPart.id) ? next : [selectedPart.id, ...next].slice(0, 4);
+        return current.filter((id) => id !== part.id);
       }
 
       if (current.length >= 4) {
@@ -191,20 +246,42 @@ export function CompareDrawer({
     });
   }
 
+  function clearSelection() {
+    setSelectedIds([currentSelectedPart.id]);
+    setActiveTab("recommended");
+  }
+
+  async function handleAffiliateClick(part: Part, link: AffiliateLink) {
+    await trackAffiliateClick({
+      partId: part.id,
+      merchant: link.merchant,
+      url: link.url,
+      buildId: currentBuild.id,
+    });
+    window.open(link.url, "_blank", "noopener,noreferrer");
+  }
+
+  function confirmPreviewSwap() {
+    if (!previewPart || previewPart.id === currentSelectedPart.id) {
+      return;
+    }
+
+    onReplace(previewPart);
+  }
+
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="mx-auto flex max-h-[90vh] w-full max-w-7xl flex-col rounded-t-[28px] border-primary/20 bg-background">
+      <DrawerContent className="mx-auto flex max-h-[92vh] w-full max-w-7xl flex-col rounded-t-[28px] border-primary/20 bg-background">
         <DrawerHeader className="border-b border-border px-6 pb-5 pt-6">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div className="space-y-3">
               <Badge className="w-fit rounded-md border border-primary/30 bg-primary/10 text-primary">
-                <GitCompare className="mr-1 size-3" /> Part Compare Drawer
+                <GitCompare className="mr-1 size-3" /> Part Explorer Drawer
               </Badge>
               <div>
-                <DrawerTitle className="text-2xl">Compare {sectionTitle} options</DrawerTitle>
+                <DrawerTitle className="text-2xl">Explore {sectionTitle} options</DrawerTitle>
                 <DrawerDescription className="mt-1 max-w-2xl">
-                  Select 2 to 4 same-category parts, review the fields that matter for this category,
-                  then replace the current pick when you find the better fit.
+                  Review recommended alternatives, search the local mock catalog, then preview a swap before changing your build.
                 </DrawerDescription>
               </div>
             </div>
@@ -215,178 +292,404 @@ export function CompareDrawer({
           </div>
         </DrawerHeader>
 
-        <div className="flex-1 overflow-y-auto px-6 pb-4 pt-6">
-          <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
-            <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Current Selection</p>
-                <h3 className="mt-1 text-xl font-bold">{selectedPart.displayName}</h3>
-              </div>
-              <Badge className="rounded-md border border-primary/30 bg-primary/15 text-primary">
-                <Check className="mr-1 size-3" /> In build now
+        <div className="flex-1 overflow-y-auto px-6 pb-32 pt-6">
+          <CurrentSelection build={build} part={selectedPart} plan={plan} onUpgraded={onUpgraded} />
+
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex rounded-full border border-border bg-card p-1">
+              {[
+                { key: "recommended", label: "Recommended", icon: Sparkles },
+                { key: "search", label: "Search", icon: Search },
+                { key: "compare", label: "Compare", icon: GitCompare },
+              ].map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  className={cn(
+                    "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                    activeTab === key
+                      ? "bg-primary text-primary-foreground shadow-glow"
+                      : "text-muted-foreground hover:text-foreground",
+                  )}
+                  onClick={() => setActiveTab(key as ExplorerTab)}
+                >
+                  <Icon className="size-4" />
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              {["price", "value", "performance"].map((mode) => (
+                <Button
+                  key={mode}
+                  size="sm"
+                  variant={sortMode === mode ? "default" : "secondary"}
+                  className="rounded-md capitalize"
+                  onClick={() => setSortMode(mode)}
+                >
+                  {mode}
+                </Button>
+              ))}
+              <Badge variant="secondary" className="rounded-md">
+                {Math.max(0, sameCategoryParts.length - 1)} alternatives
               </Badge>
             </div>
+          </div>
 
-            <div className="grid gap-4 lg:grid-cols-[1.1fr_1.4fr]">
-              <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
-                <InfoRow label="Price" value={formatMoney(selectedPart.price)} />
-                <InfoRow label="Power requirement" value={getPartPowerRequirement(selectedPart)} />
-                <InfoRow
-                  label="Recommendation reason"
-                  value={selectedPart.recommendationReason ?? "Chosen for balance in this mock build."}
-                />
-              </div>
-              <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
-                <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Key specs</p>
-                <div className="flex flex-wrap gap-2">
-                  {getPartSummarySpecs(selectedPart).map((spec) => (
-                    <span key={spec} className="rounded-md border border-border bg-background/60 px-2.5 py-1 text-xs">
-                      {spec}
-                    </span>
-                  ))}
-                </div>
-                <div className="space-y-2">
-                  {getCompatibilityNotesForPart(build, selectedPart).map((note) => (
-                    <p key={note} className="rounded-xl border border-border bg-background/60 px-3 py-2 text-sm text-muted-foreground">
-                      {note}
-                    </p>
-                  ))}
-                </div>
-              </div>
+          {recommendedReplacementId && (
+            <div className="mt-4 rounded-2xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
+              A recommended fix is highlighted because it resolves the selected compatibility warning.
             </div>
-          </section>
+          )}
 
-          <section className="mt-6 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <h3 className="text-xl font-bold">Choose parts to compare</h3>
-                <p className="text-sm text-muted-foreground">
-                  The current part stays available for context. Pick up to four columns.
-                </p>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {["price", "value", "performance"].map((mode) => (
-                  <Button
-                    key={mode}
-                    size="sm"
-                    variant={sortMode === mode ? "default" : "secondary"}
-                    className="rounded-md capitalize"
-                    onClick={() => setSortMode(mode)}
-                  >
-                    {mode}
-                  </Button>
-                ))}
-                <Badge variant="secondary" className="rounded-md">
-                  {alternatives.length} alternatives
-                </Badge>
-              </div>
-            </div>
-
-            {recommendedReplacementId && (
-              <div className="rounded-2xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
-                A recommended fix is highlighted because it resolves the selected compatibility warning.
-              </div>
-            )}
-
+          <div className="mt-5">
             {isLoading ? (
-              <div className="flex min-h-48 items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-8 text-sm text-muted-foreground">
-                <LoaderCircle className="mr-2 size-4 animate-spin" />
-                Loading {sectionTitle.toLowerCase()} alternatives
-              </div>
+              <LoadingState title={`Loading ${sectionTitle.toLowerCase()} options`} />
             ) : errorMessage ? (
               <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
                 {errorMessage}
               </div>
             ) : sameCategoryParts.length < 2 ? (
               <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-                This category needs at least two mock parts before comparison is useful.
+                This category needs at least two mock parts before exploration is useful.
               </div>
-            ) : (
-              <>
-                <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  {sameCategoryParts.map((part) => {
-                    const checked = selectedIds.includes(part.id);
-                    const isCurrent = part.id === selectedPart.id;
-                    const isRecommendedFix = part.id === recommendedReplacementId;
-                    const delta = part.price - selectedPart.price;
-
-                    return (
-                      <button
-                        key={part.id}
-                        type="button"
-                        className={cn(
-                          "min-h-44 rounded-2xl border p-4 text-left transition-colors",
-                          checked ? "border-primary/50 bg-primary/10" : "border-border bg-card hover:border-primary/30",
-                          isRecommendedFix && "border-success/50 bg-success/[0.07]",
-                        )}
-                        onClick={() => toggleComparePart(part)}
-                        aria-pressed={checked}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap gap-2">
-                              {isCurrent && <Badge className="rounded-md bg-primary/15 text-primary">Current</Badge>}
-                              {isRecommendedFix && (
-                                <Badge className="rounded-md border border-success/30 bg-success/15 text-success">
-                                  <Sparkles className="mr-1 size-3" /> Fix
-                                </Badge>
-                              )}
-                            </div>
-                            <h4 className="font-bold leading-snug">{part.displayName}</h4>
-                          </div>
-                          <span
-                            className={cn(
-                              "flex size-5 shrink-0 items-center justify-center rounded-md border text-[10px]",
-                              checked ? "border-primary bg-primary text-primary-foreground" : "border-border",
-                            )}
-                          >
-                            {checked ? "✓" : ""}
-                          </span>
-                        </div>
-                        <p className="mt-3 font-mono text-xl font-bold">{formatMoney(part.price)}</p>
-                        <p className={cn("mt-1 text-xs", delta <= 0 ? "text-success" : "text-warning")}>
-                          {isCurrent
-                            ? "Baseline"
-                            : delta < 0
-                              ? `${formatMoney(Math.abs(delta))} cheaper`
-                              : `+${formatMoney(delta)}`}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {getPartSummarySpecs(part).slice(0, 3).map((spec) => (
-                            <span key={spec} className="rounded-md border border-border bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
-                              {spec}
-                            </span>
-                          ))}
-                        </div>
-                      </button>
-                    );
-                  })}
+            ) : activeTab === "recommended" ? (
+              <PartCardGrid
+                build={build}
+                parts={recommendedParts}
+                selectedPart={selectedPart}
+                selectedIds={selectedIds}
+                recommendedReplacementId={recommendedReplacementId}
+                onToggleCompare={toggleComparePart}
+                onPreviewSwap={setPreviewPart}
+                onAffiliateClick={handleAffiliateClick}
+              />
+            ) : activeTab === "search" ? (
+              <section className="space-y-4">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className="w-full rounded-2xl border border-border bg-card py-4 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/25"
+                    placeholder="Search brand, model, name, socket, wattage, VRAM, RAM type..."
+                  />
                 </div>
-
-                {selectedIds.length >= 4 && (
-                  <p className="text-xs text-muted-foreground">Four parts are already selected. Deselect one to add another.</p>
-                )}
-
-                <ComparisonTable
+                <PartCardGrid
                   build={build}
-                  fields={comparisonFields}
-                  parts={comparisonParts}
+                  parts={searchedParts}
                   selectedPart={selectedPart}
-                  isReplacing={isReplacing}
-                  onReplace={onReplace}
+                  selectedIds={selectedIds}
+                  recommendedReplacementId={recommendedReplacementId}
+                  onToggleCompare={toggleComparePart}
+                  onPreviewSwap={setPreviewPart}
+                  onAffiliateClick={handleAffiliateClick}
+                  emptyMessage="No local mock parts match that search."
                 />
-              </>
+              </section>
+            ) : (
+              <CompareTab
+                build={build}
+                parts={selectedCompareParts}
+                selectedPart={selectedPart}
+                plan={plan}
+                isReplacing={isReplacing}
+                onPreviewSwap={setPreviewPart}
+                onUpgraded={onUpgraded}
+              />
             )}
-          </section>
+          </div>
+
+          {previewPart && (
+            <PreviewSwapPanel
+              build={build}
+              currentPart={selectedPart}
+              previewPart={previewPart}
+              plan={plan}
+              isReplacing={isReplacing}
+              onCancel={() => setPreviewPart(null)}
+              onConfirm={confirmPreviewSwap}
+              onUpgraded={onUpgraded}
+            />
+          )}
         </div>
+
+        <CompareTray
+          parts={selectedCompareParts}
+          selectedPart={selectedPart}
+          onRemove={(part) => setSelectedIds((current) => current.filter((id) => id !== part.id))}
+          onClear={clearSelection}
+          onCompare={() => setActiveTab("compare")}
+        />
 
         <DrawerFooter className="border-t border-border px-6 py-4 sm:flex-row sm:justify-end">
           <Button variant="ghost" className="rounded-xl" onClick={() => onOpenChange(false)}>
-            Close compare drawer
+            Close part explorer
           </Button>
         </DrawerFooter>
       </DrawerContent>
     </Drawer>
+  );
+}
+
+function CurrentSelection({
+  build,
+  part,
+  plan,
+  onUpgraded,
+}: {
+  build: Build;
+  part: Part;
+  plan: PlanType;
+  onUpgraded?: () => void;
+}) {
+  const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
+
+  return (
+    <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+      <div className="grid gap-4 lg:grid-cols-[160px_1fr_320px]">
+        <PartVisual part={part} featured />
+        <div>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <Badge className="rounded-md border border-primary/30 bg-primary/15 text-primary">
+              <Check className="mr-1 size-3" /> In build now
+            </Badge>
+            <CompatibilityBadge build={build} />
+          </div>
+          <p className="text-xs uppercase tracking-[0.22em] text-muted-foreground">Current Selection</p>
+          <h3 className="mt-1 text-xl font-bold">{part.displayName}</h3>
+          <p className="mt-2 font-mono text-2xl font-bold text-primary">{formatMoney(part.price)}</p>
+          <div className="mt-4 flex flex-wrap gap-2">
+            {getPartSummarySpecs(part).map((spec) => (
+              <span key={spec} className="rounded-md border border-border bg-background/60 px-2.5 py-1 text-xs">
+                {spec}
+              </span>
+            ))}
+          </div>
+        </div>
+        <div className="space-y-3 rounded-2xl border border-border bg-card p-4">
+          <InfoRow label="Power requirement" value={getPartPowerRequirement(part)} />
+          {hasAdvancedCompare ? (
+            <InfoRow
+              label="AI recommendation reason"
+              value={part.recommendationReason ?? "Chosen for balance in this mock build."}
+            />
+          ) : (
+            <ProFeatureLock
+              feature="ai_reasoning"
+              label="AI recommendation reason"
+              onUpgraded={onUpgraded}
+            />
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PartCardGrid({
+  build,
+  parts,
+  selectedPart,
+  selectedIds,
+  recommendedReplacementId,
+  onToggleCompare,
+  onPreviewSwap,
+  onAffiliateClick,
+  emptyMessage = "No parts are available in this category yet.",
+}: {
+  build: Build;
+  parts: Part[];
+  selectedPart: Part;
+  selectedIds: string[];
+  recommendedReplacementId?: string | null;
+  onToggleCompare: (part: Part) => void;
+  onPreviewSwap: (part: Part) => void;
+  onAffiliateClick: (part: Part, link: AffiliateLink) => void;
+  emptyMessage?: string;
+}) {
+  if (parts.length === 0) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+        {emptyMessage}
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      {parts.map((part) => (
+        <PartCard
+          key={part.id}
+          build={build}
+          part={part}
+          selectedPart={selectedPart}
+          isSelected={selectedIds.includes(part.id)}
+          isRecommendedFix={part.id === recommendedReplacementId}
+          compareDisabled={!selectedIds.includes(part.id) && selectedIds.length >= 4}
+          onToggleCompare={() => onToggleCompare(part)}
+          onPreviewSwap={() => onPreviewSwap(part)}
+          onAffiliateClick={(link) => onAffiliateClick(part, link)}
+        />
+      ))}
+    </div>
+  );
+}
+
+function PartCard({
+  build,
+  part,
+  selectedPart,
+  isSelected,
+  isRecommendedFix,
+  compareDisabled,
+  onToggleCompare,
+  onPreviewSwap,
+  onAffiliateClick,
+}: {
+  build: Build;
+  part: Part;
+  selectedPart: Part;
+  isSelected: boolean;
+  isRecommendedFix: boolean;
+  compareDisabled: boolean;
+  onToggleCompare: () => void;
+  onPreviewSwap: () => void;
+  onAffiliateClick: (link: AffiliateLink) => void;
+}) {
+  const isCurrent = part.id === selectedPart.id;
+  const delta = part.price - selectedPart.price;
+  const candidateBuild = buildCandidate(build, part);
+  const link = part.affiliateLinks?.[0];
+
+  return (
+    <article
+      className={cn(
+        "flex min-h-[360px] flex-col rounded-2xl border bg-card p-4 transition-colors",
+        isSelected ? "border-primary/50 bg-primary/10" : "border-border hover:border-primary/30",
+        isRecommendedFix && "border-success/50 bg-success/[0.07]",
+      )}
+    >
+      <div className="flex items-start gap-4">
+        <PartVisual part={part} />
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap gap-2">
+            {isCurrent && <Badge className="rounded-md bg-primary/15 text-primary">Current</Badge>}
+            {isRecommendedFix && (
+              <Badge className="rounded-md border border-success/30 bg-success/15 text-success">
+                <Sparkles className="mr-1 size-3" /> Fix
+              </Badge>
+            )}
+            <CompatibilityBadge build={candidateBuild} />
+          </div>
+          <h4 className="font-bold leading-snug">{part.displayName}</h4>
+          <p className="mt-2 font-mono text-2xl font-bold">{formatMoney(part.price)}</p>
+          <p className={cn("mt-1 text-xs", delta <= 0 ? "text-success" : "text-warning")}>
+            {isCurrent
+              ? "Current baseline"
+              : delta < 0
+                ? `${formatMoney(Math.abs(delta))} cheaper`
+                : `+${formatMoney(delta)}`}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-1.5">
+        {getPartSummarySpecs(part).slice(0, 4).map((spec) => (
+          <span key={spec} className="rounded-md border border-border bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
+            {spec}
+          </span>
+        ))}
+      </div>
+
+      <div className="mt-4 space-y-2 text-xs text-muted-foreground">
+        {getCompatibilityNotesForPart(candidateBuild, part).slice(0, 2).map((note) => (
+          <p key={note} className="rounded-xl border border-border bg-background/50 px-3 py-2">
+            {note}
+          </p>
+        ))}
+      </div>
+
+      <div className="mt-auto pt-4">
+        <AffiliateDisclosure />
+        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+          <Button
+            variant={isSelected ? "default" : "secondary"}
+            className="rounded-xl"
+            disabled={compareDisabled}
+            onClick={onToggleCompare}
+          >
+            {isSelected ? (
+              <>
+                <Check className="mr-2 size-4" /> Selected
+              </>
+            ) : (
+              <>
+                <GitCompare className="mr-2 size-4" /> Compare
+              </>
+            )}
+          </Button>
+          <Button
+            className="rounded-xl"
+            disabled={isCurrent}
+            onClick={onPreviewSwap}
+          >
+            <ArrowRightLeft className="mr-2 size-4" />
+            Preview swap
+          </Button>
+          {link && (
+            <Button
+              variant="ghost"
+              className="rounded-xl sm:col-span-2"
+              onClick={() => onAffiliateClick(link)}
+            >
+              <ShoppingBag className="mr-2 size-4" />
+              {link.label ?? "Check price"}
+            </Button>
+          )}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CompareTab({
+  build,
+  parts,
+  selectedPart,
+  plan,
+  isReplacing,
+  onPreviewSwap,
+  onUpgraded,
+}: {
+  build: Build;
+  parts: Part[];
+  selectedPart: Part;
+  plan: PlanType;
+  isReplacing?: boolean;
+  onPreviewSwap: (part: Part) => void;
+  onUpgraded?: () => void;
+}) {
+  if (parts.length < 2) {
+    return (
+      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+        Select 2 to 4 parts from Recommended or Search to unlock the comparison table.
+      </div>
+    );
+  }
+
+  return (
+    <ComparisonTable
+      build={build}
+      fields={getCategoryComparisonFields(selectedPart.category)}
+      parts={parts}
+      selectedPart={selectedPart}
+      plan={plan}
+      isReplacing={isReplacing}
+      onPreviewSwap={onPreviewSwap}
+      onUpgraded={onUpgraded}
+    />
   );
 }
 
@@ -395,29 +698,27 @@ function ComparisonTable({
   fields,
   parts,
   selectedPart,
+  plan,
   isReplacing,
-  onReplace,
+  onPreviewSwap,
+  onUpgraded,
 }: {
   build: Build;
   fields: ReturnType<typeof getCategoryComparisonFields>;
   parts: Part[];
   selectedPart: Part;
+  plan: PlanType;
   isReplacing?: boolean;
-  onReplace: (part: Part) => void;
+  onPreviewSwap: (part: Part) => void;
+  onUpgraded?: () => void;
 }) {
-  if (parts.length < 2) {
-    return (
-      <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-        Select at least two parts to show a side-by-side comparison.
-      </div>
-    );
-  }
+  const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
 
   return (
     <div className="overflow-hidden rounded-2xl border border-border bg-card">
       <div className="border-b border-border bg-secondary/40 px-4 py-3">
         <h3 className="text-base font-semibold">Side-by-side comparison</h3>
-        <p className="text-xs text-muted-foreground">Mock pricing and availability only. Check retailer listings before buying.</p>
+        <p className="text-xs text-muted-foreground">Basic fields stay visible. Build Pro unlocks deeper reasoning.</p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
@@ -463,50 +764,76 @@ function ComparisonTable({
                 ))}
               </tr>
             ))}
-            <tr>
-              <td className="px-4 py-3 text-muted-foreground">Value rating</td>
-              {parts.map((part) => (
-                <td key={part.id} className="px-4 py-3">{getValueRating(part)}/100</td>
-              ))}
-            </tr>
-            <tr>
-              <td className="px-4 py-3 text-muted-foreground">Performance fit</td>
-              {parts.map((part) => (
-                <td key={part.id} className="px-4 py-3">
-                  {getPerformanceFit(part) !== null ? `${getPerformanceFit(part)}/100` : "Category fit"}
-                </td>
-              ))}
-            </tr>
+            <AdvancedRow
+              label="Value analysis"
+              unlocked={hasAdvancedCompare}
+              featureLabel="Value analysis"
+              onUpgraded={onUpgraded}
+              values={parts.map((part) => `${getValueRating(part)}/100 value score`)}
+            />
+            <AdvancedRow
+              label="Performance fit"
+              unlocked={hasAdvancedCompare}
+              featureLabel="Performance fit"
+              onUpgraded={onUpgraded}
+              values={parts.map((part) =>
+                getPerformanceFit(part) !== null ? `${getPerformanceFit(part)}/100` : "Category fit",
+              )}
+            />
             <tr>
               <td className="px-4 py-3 text-muted-foreground">Compatibility impact</td>
               {parts.map((part) => {
                 const candidateBuild = buildCandidate(build, part);
                 return (
                   <td key={part.id} className="px-4 py-3">
-                    <CompatibilityBadge build={candidateBuild} />
-                    {candidateBuild.compatibilityWarnings.length > 0 && (
-                      <p className="mt-2 text-xs text-muted-foreground">
-                        {candidateBuild.compatibilityWarnings.length} item
-                        {candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} need review.
-                      </p>
+                    {hasAdvancedCompare ? (
+                      <>
+                        <CompatibilityBadge build={candidateBuild} />
+                        {candidateBuild.compatibilityWarnings.length > 0 && (
+                          <p className="mt-2 text-xs text-muted-foreground">
+                            {candidateBuild.compatibilityWarnings.length} item
+                            {candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} need review.
+                          </p>
+                        )}
+                      </>
+                    ) : (
+                      <ProFeatureLock
+                        feature="advanced_compare"
+                        label="Compatibility impact"
+                        showUpgrade={false}
+                        onUpgraded={onUpgraded}
+                      />
                     )}
                   </td>
                 );
               })}
             </tr>
             <tr>
-              <td className="px-4 py-3 text-muted-foreground">Build total after replace</td>
+              <td className="px-4 py-3 text-muted-foreground">AI recommendation reason</td>
               {parts.map((part) => (
-                <td key={part.id} className="px-4 py-3 font-mono font-semibold">
-                  {formatMoney(buildCandidate(build, part).totalPrice)}
+                <td key={part.id} className="px-4 py-3 text-muted-foreground">
+                  {hasAdvancedCompare ? (
+                    part.recommendationReason ?? "Configured in the local mock catalog."
+                  ) : (
+                    <ProFeatureLock feature="ai_reasoning" label="AI reasoning" showUpgrade={false} onUpgraded={onUpgraded} />
+                  )}
                 </td>
               ))}
             </tr>
             <tr>
-              <td className="px-4 py-3 text-muted-foreground">Recommendation reason</td>
+              <td className="px-4 py-3 text-muted-foreground">Final recommendation</td>
               {parts.map((part) => (
-                <td key={part.id} className="px-4 py-3 text-muted-foreground">
-                  {part.recommendationReason ?? "Configured in the local mock catalog."}
+                <td key={part.id} className="px-4 py-3">
+                  {hasAdvancedCompare ? (
+                    part.id === selectedPart.id ? "Keep as the balanced baseline." : "Preview the swap before replacing."
+                  ) : (
+                    <ProFeatureLock
+                      feature="advanced_compare"
+                      label="Final recommendation"
+                      showUpgrade={false}
+                      onUpgraded={onUpgraded}
+                    />
+                  )}
                 </td>
               ))}
             </tr>
@@ -518,13 +845,9 @@ function ComparisonTable({
                     className="rounded-xl"
                     variant={part.id === selectedPart.id ? "secondary" : "default"}
                     disabled={part.id === selectedPart.id || Boolean(isReplacing)}
-                    onClick={() => onReplace(part)}
+                    onClick={() => onPreviewSwap(part)}
                   >
-                    {part.id === selectedPart.id
-                      ? "Currently selected"
-                      : isReplacing
-                        ? "Replacing..."
-                        : "Replace with this part"}
+                    {part.id === selectedPart.id ? "Currently selected" : "Preview swap"}
                   </Button>
                 </td>
               ))}
@@ -536,9 +859,212 @@ function ComparisonTable({
   );
 }
 
+function AdvancedRow({
+  label,
+  values,
+  unlocked,
+  featureLabel,
+  onUpgraded,
+}: {
+  label: string;
+  values: string[];
+  unlocked: boolean;
+  featureLabel: string;
+  onUpgraded?: () => void;
+}) {
+  return (
+    <tr>
+      <td className="px-4 py-3 text-muted-foreground">{label}</td>
+      {values.map((value, index) => (
+        <td key={`${label}-${index}`} className="px-4 py-3">
+          {unlocked ? (
+            value
+          ) : (
+            <ProFeatureLock
+              feature="advanced_compare"
+              label={featureLabel}
+              showUpgrade={false}
+              onUpgraded={onUpgraded}
+            />
+          )}
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+function PreviewSwapPanel({
+  build,
+  currentPart,
+  previewPart,
+  plan,
+  isReplacing,
+  onCancel,
+  onConfirm,
+  onUpgraded,
+}: {
+  build: Build;
+  currentPart: Part;
+  previewPart: Part;
+  plan: PlanType;
+  isReplacing?: boolean;
+  onCancel: () => void;
+  onConfirm: () => void;
+  onUpgraded?: () => void;
+}) {
+  const candidateBuild = buildCandidate(build, previewPart);
+  const delta = previewPart.price - currentPart.price;
+  const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
+
+  return (
+    <section className="mt-6 rounded-2xl border border-primary/25 bg-primary/5 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Badge className="mb-3 rounded-md border border-primary/30 bg-primary/15 text-primary">
+            <ArrowRightLeft className="mr-1 size-3" /> Preview Swap
+          </Badge>
+          <h3 className="text-xl font-bold">{previewPart.displayName}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Review the price and compatibility impact before replacing the current {categoryLabels[currentPart.category].toLowerCase()}.
+          </p>
+        </div>
+        <button
+          type="button"
+          className="rounded-md p-2 text-muted-foreground hover:bg-secondary hover:text-foreground"
+          onClick={onCancel}
+          aria-label="Close preview"
+        >
+          <X className="size-4" />
+        </button>
+      </div>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-4">
+        <InfoRow label="Price change" value={delta < 0 ? `-${formatMoney(Math.abs(delta))}` : `+${formatMoney(delta)}`} valueClass={delta <= 0 ? "text-success" : "text-warning"} />
+        <InfoRow label="New build total" value={formatMoney(candidateBuild.totalPrice)} />
+        <div className="rounded-xl border border-border bg-background/60 px-3 py-3">
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Compatibility</p>
+          <div className="mt-2">
+            <CompatibilityBadge build={candidateBuild} />
+          </div>
+        </div>
+        <InfoRow label="Power requirement" value={getPartPowerRequirement(previewPart)} />
+      </div>
+
+      <div className="mt-4">
+        {hasAdvancedCompare ? (
+          <div className="rounded-xl border border-border bg-background/60 p-4 text-sm text-muted-foreground">
+            {delta < 0
+              ? "This swap lowers cost. Check the listed specs and compatibility status to decide whether the savings are worth the tradeoff."
+              : "This swap raises the build total. Choose it if the added performance or fit matters for your target workload."}
+          </div>
+        ) : (
+          <ProFeatureLock
+            feature="unlimited_swaps"
+            label="Upgrade/downgrade explanation"
+            onUpgraded={onUpgraded}
+          />
+        )}
+      </div>
+
+      {candidateBuild.compatibilityWarnings.length > 0 && (
+        <div className="mt-4 space-y-2">
+          {candidateBuild.compatibilityWarnings.slice(0, 3).map((warning) => (
+            <div key={warning.id} className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+              {warning.message}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-5 flex flex-wrap justify-end gap-3">
+        <Button variant="secondary" className="rounded-xl" onClick={onCancel}>
+          Keep current part
+        </Button>
+        <Button className="rounded-xl shadow-glow" disabled={isReplacing} onClick={onConfirm}>
+          {isReplacing ? (
+            <>
+              <LoaderCircle className="mr-2 size-4 animate-spin" /> Replacing
+            </>
+          ) : (
+            "Replace with this part"
+          )}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+function CompareTray({
+  parts,
+  selectedPart,
+  onRemove,
+  onClear,
+  onCompare,
+}: {
+  parts: Part[];
+  selectedPart: Part;
+  onRemove: (part: Part) => void;
+  onClear: () => void;
+  onCompare: () => void;
+}) {
+  return (
+    <div className="sticky bottom-0 z-10 border-t border-border bg-background/95 px-6 py-3 backdrop-blur">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
+          <Badge className="rounded-md border border-primary/30 bg-primary/10 text-primary">
+            <GitCompare className="mr-1 size-3" /> {parts.length}/4 selected
+          </Badge>
+          {parts.length === 0 ? (
+            <span className="text-sm text-muted-foreground">Select 2 to 4 parts to compare.</span>
+          ) : (
+            parts.map((part) => (
+              <button
+                key={part.id}
+                type="button"
+                className="inline-flex max-w-[220px] items-center gap-2 rounded-full border border-border bg-card px-3 py-1 text-xs"
+                onClick={() => onRemove(part)}
+              >
+                <span className="truncate">{part.id === selectedPart.id ? "Current: " : ""}{part.displayName}</span>
+                <X className="size-3 shrink-0 text-muted-foreground" />
+              </button>
+            ))
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Button size="sm" variant="ghost" className="rounded-md" onClick={onClear}>
+            Reset
+          </Button>
+          <Button size="sm" className="rounded-md" disabled={parts.length < 2} onClick={onCompare}>
+            Compare selected
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function PartVisual({ part, featured = false }: { part: Part; featured?: boolean }) {
+  return (
+    <div
+      className={cn(
+        "flex shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-primary/20 bg-primary/10 text-primary",
+        featured ? "size-36" : "size-20",
+      )}
+    >
+      {part.imageUrl ? (
+        <img src={part.imageUrl} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span className={cn("font-mono font-bold", featured ? "text-2xl" : "text-base")}>
+          {CATEGORY_ICONS[part.category] ?? part.category.slice(0, 3).toUpperCase()}
+        </span>
+      )}
+    </div>
+  );
+}
+
 function CompatibilityBadge({ build }: { build: Build }) {
   if (build.compatibilityStatus === "pass") {
-    return <Badge className="rounded-md bg-success/15 text-success">Pass</Badge>;
+    return <Badge className="rounded-md bg-success/15 text-success"><CheckCircle2 className="mr-1 size-3" /> Pass</Badge>;
   }
 
   if (build.compatibilityStatus === "warning") {
@@ -549,6 +1075,15 @@ function CompatibilityBadge({ build }: { build: Build }) {
     <Badge className="rounded-md bg-destructive/15 text-destructive">
       <AlertTriangle className="mr-1 size-3" /> Fix needed
     </Badge>
+  );
+}
+
+function LoadingState({ title }: { title: string }) {
+  return (
+    <div className="flex min-h-48 items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-8 text-sm text-muted-foreground">
+      <LoaderCircle className="mr-2 size-4 animate-spin" />
+      {title}
+    </div>
   );
 }
 

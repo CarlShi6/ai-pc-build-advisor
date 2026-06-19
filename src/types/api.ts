@@ -5,6 +5,12 @@ import type {
   StoreEmployeeSummary,
 } from "@/types/build";
 import type { Part, PartAvailability } from "@/types/parts";
+import type {
+  AffiliateClickEvent,
+  CheckoutResult,
+  Entitlement,
+  UsageStatus,
+} from "@/types/monetization";
 
 export type AppearancePreference = "black" | "white" | "rgb";
 export type ExperienceLevel = "beginner" | "intermediate" | "expert";
@@ -36,6 +42,7 @@ export interface PartOffer {
   availability: PartAvailability;
   productUrl?: string;
   searchUrl?: string;
+  affiliateLinks?: Part["affiliateLinks"];
   note: string;
 }
 
@@ -72,4 +79,36 @@ export interface CartPreviewRequest {
 export interface CartPreviewResponse {
   items: CartPreviewItem[];
   employeeSummary: StoreEmployeeSummary;
+}
+
+export interface UsageStatusResponse {
+  usage: UsageStatus;
+}
+
+export interface EntitlementStatusResponse {
+  entitlement: Entitlement;
+}
+
+export interface ConsumeUsageResponse {
+  usage: UsageStatus;
+  consumed: boolean;
+  message?: string;
+}
+
+export type CheckoutResponse = CheckoutResult;
+
+export interface AffiliateClickRequest {
+  event: Omit<AffiliateClickEvent, "clickedAt"> & { clickedAt?: string };
+}
+
+export interface AffiliateClickResponse {
+  success: boolean;
+  event: AffiliateClickEvent;
+}
+
+export interface ResetMonetizationResponse {
+  success: boolean;
+  entitlement: Entitlement;
+  usage: UsageStatus;
+  message: string;
 }

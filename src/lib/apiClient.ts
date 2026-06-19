@@ -8,8 +8,15 @@ import type {
   PartsResponse,
   RecommendBuildResponse,
   RecommendedBuildInput,
+  UsageStatusResponse,
+  EntitlementStatusResponse,
+  ConsumeUsageResponse,
+  CheckoutResponse,
+  AffiliateClickResponse,
+  ResetMonetizationResponse,
 } from "@/types/api";
 import type { Build, StoreEmployeeSummary } from "@/types/build";
+import type { AffiliateClickEvent, Entitlement, UsageStatus } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 
 class ApiClientError extends Error {
@@ -98,6 +105,67 @@ export async function getOffers(partId: string): Promise<PartOffer[]> {
   );
 
   return response.offers;
+}
+
+export async function getUsageStatus(): Promise<UsageStatus> {
+  const response = await requestJson<UsageStatusResponse>("/api/usage/status");
+
+  return response.usage;
+}
+
+export async function consumeAiUsage(): Promise<ConsumeUsageResponse> {
+  try {
+    return await requestJson<ConsumeUsageResponse>("/api/usage/consume", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 429) {
+      const usage = await getUsageStatus();
+      return {
+        usage,
+        consumed: false,
+        message: "You have used your included AI questions for this plan.",
+      };
+    }
+
+    throw error;
+  }
+}
+
+export async function getEntitlementStatus(): Promise<Entitlement> {
+  const response = await requestJson<EntitlementStatusResponse>("/api/entitlement/status");
+
+  return response.entitlement;
+}
+
+export async function mockUpgradeToPro(): Promise<CheckoutResponse> {
+  return requestJson<CheckoutResponse>("/api/checkout/mock-upgrade", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function trackAffiliateClick(
+  event: Omit<AffiliateClickEvent, "clickedAt"> & { clickedAt?: string },
+): Promise<AffiliateClickEvent | null> {
+  try {
+    const response = await requestJson<AffiliateClickResponse>("/api/affiliate/click", {
+      method: "POST",
+      body: JSON.stringify({ event }),
+    });
+
+    return response.event;
+  } catch {
+    return null;
+  }
+}
+
+export async function resetMockMonetizationState(): Promise<ResetMonetizationResponse> {
+  return requestJson<ResetMonetizationResponse>("/api/monetization/reset", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function replaceBuildPart(

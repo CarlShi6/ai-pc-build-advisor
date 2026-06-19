@@ -7,17 +7,26 @@ import {
   getStoreEmployeeSummary,
   recalculateBuild,
 } from "@/lib/build-advisor";
+import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import type {
+  AffiliateClickRequest,
+  AffiliateClickResponse,
   CartPreviewRequest,
   CartPreviewResponse,
+  CheckoutResponse,
+  ConsumeUsageResponse,
   CompatibilityCheckRequest,
   CompatibilityCheckResponse,
   ComparePartsResponse,
+  EntitlementStatusResponse,
   OffersResponse,
   PartsResponse,
   RecommendBuildResponse,
   RecommendedBuildInput,
+  ResetMonetizationResponse,
+  UsageStatusResponse,
 } from "@/types/api";
+import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
 
 class ApiRouteError extends Error {
   status: number;
@@ -27,6 +36,102 @@ class ApiRouteError extends Error {
     this.name = "ApiRouteError";
     this.status = status;
   }
+}
+
+const MOCK_USER_ID = "mock-user";
+const MOCK_BUILD_ID = "mock-build";
+
+type MockMonetizationState = {
+  entitlement: Entitlement;
+  aiQuestionsUsedToday: number;
+  aiQuestionsUsedForBuild: number;
+  affiliateClicks: AffiliateClickEvent[];
+};
+
+const mockState: MockMonetizationState = {
+  entitlement: {
+    userId: MOCK_USER_ID,
+    plan: "free",
+    active: true,
+    startedAt: new Date().toISOString(),
+  },
+  aiQuestionsUsedToday: 0,
+  aiQuestionsUsedForBuild: 0,
+  affiliateClicks: [],
+};
+
+function createFreeEntitlement(): Entitlement {
+  return {
+    userId: MOCK_USER_ID,
+    plan: "free",
+    active: true,
+    startedAt: new Date().toISOString(),
+  };
+}
+
+function resetMockMonetizationState() {
+  mockState.entitlement = createFreeEntitlement();
+  mockState.aiQuestionsUsedToday = 0;
+  mockState.aiQuestionsUsedForBuild = 0;
+  mockState.affiliateClicks = [];
+}
+
+function getCurrentPlan(): PlanType {
+  return mockState.entitlement.active ? mockState.entitlement.plan : "free";
+}
+
+function getUsageStatus(): UsageStatus {
+  const plan = getCurrentPlan();
+
+  if (plan === "build_pro") {
+    const limit = BUILD_PRO_PLAN.aiQuestionsPerBuild ?? 50;
+    const remaining = Math.max(0, limit - mockState.aiQuestionsUsedForBuild);
+
+    return {
+      userId: MOCK_USER_ID,
+      plan,
+      aiQuestionsUsedToday: mockState.aiQuestionsUsedToday,
+      aiQuestionsUsedForBuild: mockState.aiQuestionsUsedForBuild,
+      aiQuestionsLimitForBuild: limit,
+      remainingAiQuestions: remaining,
+      canAskAiQuestion: remaining > 0,
+    };
+  }
+
+  const limit = FREE_PLAN.aiQuestionsPerDay ?? 5;
+  const remaining = Math.max(0, limit - mockState.aiQuestionsUsedToday);
+
+  return {
+    userId: MOCK_USER_ID,
+    plan,
+    aiQuestionsUsedToday: mockState.aiQuestionsUsedToday,
+    aiQuestionsLimitToday: limit,
+    remainingAiQuestions: remaining,
+    canAskAiQuestion: remaining > 0,
+  };
+}
+
+function consumeAiUsage(): ConsumeUsageResponse {
+  const usage = getUsageStatus();
+
+  if (!usage.canAskAiQuestion) {
+    return {
+      usage,
+      consumed: false,
+      message: "You have used your included AI questions for this plan.",
+    };
+  }
+
+  if (usage.plan === "build_pro") {
+    mockState.aiQuestionsUsedForBuild += 1;
+  } else {
+    mockState.aiQuestionsUsedToday += 1;
+  }
+
+  return {
+    usage: getUsageStatus(),
+    consumed: true,
+  };
 }
 
 function jsonResponse(payload: unknown, init?: ResponseInit) {
@@ -174,6 +279,97 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       const payload: CartPreviewResponse = {
         items,
         employeeSummary: getStoreEmployeeSummary(nextBuild, items),
+      };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/usage/status") {
+      if (request.method !== "GET") {
+        return methodNotAllowed(["GET"]);
+      }
+
+      const payload: UsageStatusResponse = { usage: getUsageStatus() };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/usage/consume") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const payload = consumeAiUsage();
+      return jsonResponse(payload, { status: payload.consumed ? 200 : 429 });
+    }
+
+    if (pathname === "/api/entitlement/status") {
+      if (request.method !== "GET") {
+        return methodNotAllowed(["GET"]);
+      }
+
+      const payload: EntitlementStatusResponse = { entitlement: mockState.entitlement };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/checkout/mock-upgrade") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      mockState.entitlement = {
+        userId: MOCK_USER_ID,
+        plan: "build_pro",
+        buildId: MOCK_BUILD_ID,
+        active: true,
+        startedAt: new Date().toISOString(),
+      };
+
+      const payload: CheckoutResponse = {
+        success: true,
+        plan: "build_pro",
+        entitlement: mockState.entitlement,
+        message: "Build Pro unlocked for this mock session.",
+      };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/affiliate/click") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const { event } = await readJson<AffiliateClickRequest>(request);
+
+      if (!event?.partId || !event.merchant || !event.url) {
+        throw new ApiRouteError(400, "Affiliate click requires partId, merchant, and url.");
+      }
+
+      const clickEvent: AffiliateClickEvent = {
+        ...event,
+        userId: event.userId ?? MOCK_USER_ID,
+        buildId: event.buildId ?? MOCK_BUILD_ID,
+        clickedAt: event.clickedAt ?? new Date().toISOString(),
+      };
+      mockState.affiliateClicks.push(clickEvent);
+
+      const payload: AffiliateClickResponse = {
+        success: true,
+        event: clickEvent,
+      };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/monetization/reset") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      resetMockMonetizationState();
+
+      const payload: ResetMonetizationResponse = {
+        success: true,
+        entitlement: mockState.entitlement,
+        usage: getUsageStatus(),
+        message: "Mock monetization state reset for local testing.",
       };
       return jsonResponse(payload);
     }
