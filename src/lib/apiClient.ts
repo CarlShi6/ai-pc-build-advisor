@@ -20,6 +20,8 @@ import type {
   AdvisorRequestPayload,
   AdvisorResponsePayload,
   DeleteSavedBuildResponse,
+  ProductSearchRequest,
+  ProductsSearchResponse,
   SaveBuildRequest,
   SaveBuildResponse,
   SavedBuildResponse,
@@ -91,6 +93,15 @@ export async function getCompareParts(ids: string[]): Promise<Part[]> {
   );
 
   return response.parts;
+}
+
+export async function searchProducts(
+  payload: ProductSearchRequest,
+): Promise<ProductsSearchResponse> {
+  return requestJson<ProductsSearchResponse>("/api/products/search", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function checkCompatibility(build: Build): Promise<Build> {

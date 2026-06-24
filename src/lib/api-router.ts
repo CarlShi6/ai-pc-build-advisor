@@ -10,6 +10,7 @@ import {
 import { getAdvisorResponse } from "@/lib/ai/advisor-service";
 import { normalizeAdvisorActions } from "@/lib/ai/types";
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
+import { searchProducts } from "@/lib/product-search/search-service";
 import { createStripeCheckoutSession } from "@/lib/stripe.server";
 import type {
   AdvisorRequestPayload,
@@ -30,6 +31,8 @@ import type {
   EntitlementStatusResponse,
   OffersResponse,
   PartsResponse,
+  ProductSearchRequest,
+  ProductsSearchResponse,
   RecommendBuildResponse,
   RecommendedBuildInput,
   ResetMonetizationResponse,
@@ -347,6 +350,22 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
 
       const ids = getIdsFromSearchParams(url);
       const payload: ComparePartsResponse = { parts: getComparePartsData(ids) };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/products/search") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const input = await readJson<ProductSearchRequest>(request);
+      const payload: ProductsSearchResponse = await searchProducts({
+        query: input.query ?? "",
+        category: input.category,
+        onlyCompatible: input.onlyCompatible,
+        includeExternal: input.includeExternal,
+        currentBuild: input.currentBuild,
+      });
       return jsonResponse(payload);
     }
 

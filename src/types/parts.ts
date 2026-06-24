@@ -22,7 +22,7 @@ export interface Part {
   model: string;
   displayName: string;
   price: number;
-  source?: "catalog" | "user_owned" | "manual";
+  source?: "catalog" | "user_owned" | "manual" | "mock_retailer" | "external_placeholder";
   owned?: boolean;
   userProvided?: boolean;
   retailer?: string;

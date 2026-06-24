@@ -16,6 +16,10 @@ import type {
   UsageStatus,
 } from "@/types/monetization";
 import type { AdvisorApiRequest, AdvisorApiResponse } from "@/lib/ai/types";
+import type {
+  ProductSearchQuery,
+  ProductSearchResponse,
+} from "@/lib/product-search/types";
 
 export type AppearancePreference = "black" | "white" | "rgb";
 export type ExperienceLevel = "beginner" | "intermediate" | "expert";
@@ -54,6 +58,10 @@ export interface PartOffer {
 export interface PartsResponse {
   parts: Part[];
 }
+
+export type ProductSearchRequest = ProductSearchQuery;
+
+export type ProductsSearchResponse = ProductSearchResponse;
 
 export interface ComparePartsResponse {
   parts: Part[];

@@ -6,12 +6,14 @@ import {
 } from "@/lib/build-advisor";
 import { calculateBuildTotal, deriveCompatibilityStatus, evaluateCompatibility } from "@/lib/compatibility";
 import { canUseFeature } from "@/lib/monetization";
-import { trackAffiliateClick } from "@/lib/apiClient";
+import { searchProducts as searchProductsApi, trackAffiliateClick } from "@/lib/apiClient";
+import { productSearchResultToPart } from "@/lib/product-search/search-service";
 import { cn } from "@/lib/utils";
 import type { Build } from "@/types/build";
 import type { AffiliateLink, PlanType, UsageStatus } from "@/types/monetization";
 import type { Part, PartCategory } from "@/types/parts";
-import { useEffect, useMemo, useState } from "react";
+import type { ProductSearchResult } from "@/lib/product-search/types";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -21,6 +23,7 @@ import {
 } from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { ProFeatureLock } from "@/components/ProFeatureLock";
 import {
@@ -62,6 +65,36 @@ const CATEGORY_VISUALS: Partial<Record<PartCategory, string>> = {
 
 function formatMoney(value: number) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatRetailerName(value: string) {
+  const labels: Record<string, string> = {
+    amazon: "Amazon",
+    newegg: "Newegg",
+    microcenter: "Micro Center",
+    bestbuy: "Best Buy",
+    bhphoto: "B&H Photo",
+    partner_mock: "Partner preview",
+    other: "Retailer",
+  };
+
+  return labels[value] ?? value;
+}
+
+function formatStockStatus(value: ProductSearchResult["stockStatus"]) {
+  if (value === "in_stock") {
+    return "Mock in stock";
+  }
+
+  if (value === "low_stock") {
+    return "Mock low stock";
+  }
+
+  if (value === "out_of_stock") {
+    return "Mock out of stock";
+  }
+
+  return "Stock unknown";
 }
 
 function buildCandidate(build: Build, replacement: Part) {
@@ -304,11 +337,18 @@ export function CompareDrawer({
   const [previewPart, setPreviewPart] = useState<Part | null>(null);
   const [customParts, setCustomParts] = useState<Part[]>([]);
   const [showCustomPartForm, setShowCustomPartForm] = useState(false);
+  const [includeRetailerResults, setIncludeRetailerResults] = useState(false);
+  const [retailerResults, setRetailerResults] = useState<ProductSearchResult[]>([]);
+  const [productSearchDisclaimer, setProductSearchDisclaimer] = useState(
+    "Retailer results are mock data in this preview. Prices and stock may change. External live search coming later.",
+  );
+  const [isProductSearching, setIsProductSearching] = useState(false);
+  const [productSearchError, setProductSearchError] = useState<string | null>(null);
 
   const selectedPart = build?.parts.find((part) => part.category === category);
   const sectionTitle = selectedPart ? categoryLabels[selectedPart.category] : "Part";
 
-  const sameCategoryParts = useMemo(() => {
+  const baseCategoryParts = useMemo(() => {
     if (!selectedPart) {
       return [];
     }
@@ -325,6 +365,26 @@ export function CompareDrawer({
     return sortParts(Array.from(byId.values()), selectedPart, sortMode);
   }, [customParts, parts, selectedPart, sortMode]);
 
+  const retailerPreviewParts = useMemo(
+    () => retailerResults.map((result) => productSearchResultToPart(result)),
+    [retailerResults],
+  );
+
+  const sameCategoryParts = useMemo(() => {
+    if (!selectedPart) {
+      return [];
+    }
+
+    const byId = new Map<string, Part>();
+    [...baseCategoryParts, ...retailerPreviewParts].forEach((part) => {
+      if (part.category === selectedPart.category) {
+        byId.set(part.id, part);
+      }
+    });
+
+    return sortParts(Array.from(byId.values()), selectedPart, sortMode);
+  }, [baseCategoryParts, retailerPreviewParts, selectedPart, sortMode]);
+
   useEffect(() => {
     if (!open || !selectedPart) {
       return;
@@ -335,7 +395,56 @@ export function CompareDrawer({
     setPreviewPart(null);
     setShowCustomPartForm(startWithOwnedPartForm);
     setSelectedIds([selectedPart.id]);
+    setRetailerResults([]);
+    setProductSearchError(null);
   }, [open, ownedPartHint, selectedPart, startWithOwnedPartForm]);
+
+  useEffect(() => {
+    if (!open || !selectedPart || activeTab !== "search" || !includeRetailerResults) {
+      setIsProductSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsProductSearching(true);
+    setProductSearchError(null);
+
+    const timer = window.setTimeout(() => {
+      void searchProductsApi({
+        query: searchQuery,
+        category: selectedPart.category,
+        includeExternal: true,
+        onlyCompatible: false,
+        currentBuild: build,
+      })
+        .then((response) => {
+          if (cancelled) {
+            return;
+          }
+
+          setRetailerResults(response.mockRetailerResults);
+          setProductSearchDisclaimer(response.disclaimer);
+        })
+        .catch(() => {
+          if (cancelled) {
+            return;
+          }
+
+          setRetailerResults([]);
+          setProductSearchError("Retailer preview results are unavailable right now.");
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsProductSearching(false);
+          }
+        });
+    }, 180);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [activeTab, build, includeRetailerResults, open, searchQuery, selectedPart]);
 
   if (!build || !category || !selectedPart) {
     return null;
@@ -345,10 +454,10 @@ export function CompareDrawer({
   const selectedCompareParts = selectedIds
     .map((id) => sameCategoryParts.find((part) => part.id === id))
     .filter((part): part is Part => Boolean(part));
-  const recommendedParts = sameCategoryParts
+  const recommendedParts = baseCategoryParts
     .filter((part, index) => index < 6 || part.id === recommendedReplacementId)
     .slice(0, 8);
-  const searchedParts = sameCategoryParts.filter((part) => partMatchesSearch(part, searchQuery));
+  const searchedParts = baseCategoryParts.filter((part) => partMatchesSearch(part, searchQuery));
   const visibleTabs = [
     { key: "recommended", label: "Recommended", icon: Sparkles },
     { key: "search", label: "Search", icon: Search },
@@ -490,13 +599,23 @@ export function CompareDrawer({
                       placeholder="Search brand, model, name, socket, wattage, VRAM, RAM type..."
                     />
                   </div>
-                  <Button
-                    variant="secondary"
-                    className="rounded-xl"
-                    onClick={() => setShowCustomPartForm((current) => !current)}
-                  >
-                    Add part I already own
-                  </Button>
+                  <div className="flex flex-wrap items-center justify-end gap-3">
+                    <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm">
+                      <Switch
+                        checked={includeRetailerResults}
+                        onCheckedChange={setIncludeRetailerResults}
+                        aria-label="Include retailer results"
+                      />
+                      <span>Include retailer results</span>
+                    </label>
+                    <Button
+                      variant="secondary"
+                      className="rounded-xl"
+                      onClick={() => setShowCustomPartForm((current) => !current)}
+                    >
+                      Add part I already own
+                    </Button>
+                  </div>
                 </div>
 
                 {showCustomPartForm && (
@@ -512,18 +631,64 @@ export function CompareDrawer({
                   />
                 )}
 
-                <PartCardGrid
-                  build={build}
-                  parts={searchedParts}
-                  selectedPart={selectedPart}
-                  selectedIds={selectedIds}
-                  recommendedReplacementId={recommendedReplacementId}
-                  onToggleCompare={toggleComparePart}
-                  onPreviewSwap={setPreviewPart}
-                  emptyMessage="No local mock parts match that search."
-                  isSearchEmpty={searchQuery.trim().length > 0}
-                  onAddCustom={() => setShowCustomPartForm(true)}
-                />
+                <SearchSection
+                  title="In your catalog"
+                  description="Local seed parts remain available without live retailer calls."
+                >
+                  <PartCardGrid
+                    build={build}
+                    parts={searchedParts}
+                    selectedPart={selectedPart}
+                    selectedIds={selectedIds}
+                    recommendedReplacementId={recommendedReplacementId}
+                    onToggleCompare={toggleComparePart}
+                    onPreviewSwap={setPreviewPart}
+                    emptyMessage="No local mock parts match that search."
+                    isSearchEmpty={searchQuery.trim().length > 0}
+                    onAddCustom={() => setShowCustomPartForm(true)}
+                  />
+                </SearchSection>
+
+                <SearchSection
+                  title="Retailer results preview"
+                  description="Retailer results are mock data in this preview. Prices and stock may change."
+                  action={<AffiliateDisclosure />}
+                >
+                  {!includeRetailerResults ? (
+                    <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+                      Turn on retailer results to preview mock retailer matches.
+                    </div>
+                  ) : productSearchError ? (
+                    <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
+                      {productSearchError}
+                    </div>
+                  ) : isProductSearching ? (
+                    <LoadingState title="Loading retailer preview results" />
+                  ) : retailerResults.length === 0 ? (
+                    <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+                      No mock retailer results match that search yet.
+                    </div>
+                  ) : (
+                    <RetailerResultGrid
+                      build={build}
+                      results={retailerResults}
+                      selectedPart={selectedPart}
+                      selectedIds={selectedIds}
+                      compareDisabled={selectedIds.length >= 4}
+                      onToggleCompare={toggleComparePart}
+                      onPreviewSwap={setPreviewPart}
+                    />
+                  )}
+                </SearchSection>
+
+                <SearchSection
+                  title="External search coming later"
+                  description={productSearchDisclaimer}
+                >
+                  <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-sm text-muted-foreground">
+                    External live search coming later. No retailer websites are scraped in this preview.
+                  </div>
+                </SearchSection>
               </section>
             ) : (
               <CompareTab
@@ -617,6 +782,181 @@ function CurrentSelection({
         </div>
       </div>
     </section>
+  );
+}
+
+function SearchSection({
+  title,
+  description,
+  action,
+  children,
+}: {
+  title: string;
+  description: string;
+  action?: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <section className="space-y-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-semibold">{title}</h3>
+          <p className="mt-1 text-xs text-muted-foreground">{description}</p>
+        </div>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function RetailerResultGrid({
+  build,
+  results,
+  selectedPart,
+  selectedIds,
+  compareDisabled,
+  onToggleCompare,
+  onPreviewSwap,
+}: {
+  build: Build;
+  results: ProductSearchResult[];
+  selectedPart: Part;
+  selectedIds: string[];
+  compareDisabled: boolean;
+  onToggleCompare: (part: Part) => void;
+  onPreviewSwap: (part: Part) => void;
+}) {
+  return (
+    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+      {results.map((result) => {
+        const part = productSearchResultToPart(result);
+        return (
+          <RetailerResultCard
+            key={result.id}
+            build={build}
+            result={result}
+            part={part}
+            selectedPart={selectedPart}
+            isSelected={selectedIds.includes(part.id)}
+            compareDisabled={compareDisabled && !selectedIds.includes(part.id)}
+            onToggleCompare={() => onToggleCompare(part)}
+            onPreviewSwap={() => onPreviewSwap(part)}
+          />
+        );
+      })}
+    </div>
+  );
+}
+
+function RetailerResultCard({
+  build,
+  result,
+  part,
+  selectedPart,
+  isSelected,
+  compareDisabled,
+  onToggleCompare,
+  onPreviewSwap,
+}: {
+  build: Build;
+  result: ProductSearchResult;
+  part: Part;
+  selectedPart: Part;
+  isSelected: boolean;
+  compareDisabled: boolean;
+  onToggleCompare: () => void;
+  onPreviewSwap: () => void;
+}) {
+  const isCurrent = part.id === selectedPart.id;
+  const candidateBuild = buildCandidate(build, part);
+  const priceLabel = result.price === null ? "Price unknown" : formatMoney(result.price);
+  const affiliateLink = part.affiliateLinks?.[0];
+
+  async function handleCheckPrice() {
+    const url = result.affiliateUrl ?? result.productUrl;
+
+    if (affiliateLink) {
+      await trackAffiliateClick({
+        partId: part.id,
+        merchant: affiliateLink.merchant,
+        url,
+        buildId: build.id,
+      });
+    }
+
+    window.open(url, "_blank", "noopener,noreferrer");
+  }
+
+  return (
+    <article
+      className={cn(
+        "flex min-h-[330px] flex-col rounded-xl border bg-card p-4 transition-colors",
+        isSelected ? "border-primary/50 bg-primary/10" : "border-border hover:border-primary/30",
+      )}
+    >
+      <div className="flex items-start gap-4">
+        <PartVisual part={part} />
+        <div className="min-w-0 flex-1">
+          <div className="mb-2 flex flex-wrap gap-2">
+            <Badge className="rounded-md border border-warning/30 bg-warning/10 text-warning">
+              Mock retailer
+            </Badge>
+            <CompatibilityBadge build={candidateBuild} />
+          </div>
+          <h4 className="font-bold leading-snug">{result.displayName}</h4>
+          <p className="mt-2 text-xs text-muted-foreground">
+            {formatRetailerName(result.retailer)}
+          </p>
+        </div>
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+        <InfoRow label="Price" value={priceLabel} />
+        <InfoRow label="Stock" value={formatStockStatus(result.stockStatus)} />
+        <InfoRow label="Confidence" value={`${Math.round(result.confidence * 100)}%`} />
+        <InfoRow label="Source" value="Preview data" />
+      </div>
+
+      {candidateBuild.compatibilityWarnings.length > 0 && (
+        <div className="mt-3 space-y-1.5">
+          {candidateBuild.compatibilityWarnings.slice(0, 2).map((warning) => (
+            <div key={warning.id} className="rounded-md border border-warning/30 bg-warning/10 px-2.5 py-2 text-xs text-warning">
+              {warning.message}
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="mt-auto pt-4">
+        <div className="grid gap-2">
+          <Button
+            variant={isSelected ? "default" : "secondary"}
+            className="rounded-xl"
+            disabled={compareDisabled}
+            onClick={onToggleCompare}
+          >
+            {isSelected ? (
+              <>
+                <Check className="mr-2 size-4" /> Selected
+              </>
+            ) : (
+              <>
+                <GitCompare className="mr-2 size-4" /> Add to compare
+              </>
+            )}
+          </Button>
+          <Button className="rounded-xl" disabled={isCurrent} onClick={onPreviewSwap}>
+            <ArrowRightLeft className="mr-2 size-4" />
+            Preview swap
+          </Button>
+          <Button variant="ghost" className="rounded-xl" onClick={() => void handleCheckPrice()}>
+            <ShoppingBag className="mr-2 size-4" />
+            Check price
+          </Button>
+        </div>
+      </div>
+    </article>
   );
 }
 
@@ -1344,6 +1684,9 @@ function CompareTray({
 }
 
 function PartVisual({ part, featured = false }: { part: Part; featured?: boolean }) {
+  const [imageFailed, setImageFailed] = useState(false);
+  const showImage = Boolean(part.imageUrl) && !imageFailed;
+
   return (
     <div
       className={cn(
@@ -1352,8 +1695,13 @@ function PartVisual({ part, featured = false }: { part: Part; featured?: boolean
         featured ? "size-20" : "size-16",
       )}
     >
-      {part.imageUrl ? (
-        <img src={part.imageUrl} alt="" className="h-full w-full object-cover" />
+      {showImage ? (
+        <img
+          src={part.imageUrl}
+          alt=""
+          className="h-full w-full object-cover"
+          onError={() => setImageFailed(true)}
+        />
       ) : (
         <span className={cn("font-mono font-bold", featured ? "text-2xl" : "text-base")}>
           {CATEGORY_ICONS[part.category] ?? part.category.slice(0, 3).toUpperCase()}
