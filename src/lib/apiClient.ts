@@ -135,7 +135,8 @@ export async function consumeAiUsage(): Promise<ConsumeUsageResponse> {
       return {
         usage,
         consumed: false,
-        message: "You have used your included AI questions for this plan.",
+        message:
+          "You have used the Free advisor questions for today. Build Pro unlocks 50 AI questions per build.",
       };
     }
 
@@ -155,7 +156,8 @@ export async function consumeReplacementUsage(): Promise<ConsumeReplacementRespo
       return {
         usage,
         consumed: false,
-        message: "You have used your included hardware replacements for this build.",
+        message:
+          "You have used the Free hardware replacements for this build. Build Pro unlocks 25 replacements.",
       };
     }
 

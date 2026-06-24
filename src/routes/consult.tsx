@@ -97,6 +97,13 @@ const PRO_PURCHASE_CHECKLIST = [
   "Confirm monitor resolution target",
 ];
 
+const AI_LIMIT_UPGRADE_COPY =
+  "You have used the Free advisor questions for today. Your build is still here, and Build Pro unlocks 50 AI questions per build.";
+const REPLACEMENT_LIMIT_UPGRADE_COPY =
+  "You have used the Free hardware replacements for this build. Build Pro unlocks 25 replacements so you can keep tuning parts.";
+const SAVED_BUILD_LIMIT_UPGRADE_COPY =
+  "Your Free saved build slot is full. Build Pro unlocks up to 10 saved builds plus full export.";
+
 export const Route = createFileRoute("/consult")({
   head: () => ({
     meta: [
@@ -347,7 +354,7 @@ function ConsultPage() {
   const [customerNeeds, setCustomerNeeds] = useState<CustomerNeeds>({});
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
   const [chatInput, setChatInput] = useState("");
-  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" | "notice" } | null>(null);
   const [usageStatus, setUsageStatus] = useState<UsageStatus | null>(null);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [showUsageUpgrade, setShowUsageUpgrade] = useState(false);
@@ -539,8 +546,8 @@ function ConsultPage() {
       if (error instanceof ApiClientError && error.status === 403) {
         setShowUsageUpgrade(true);
         setToast({
-          message: error.message,
-          tone: "error",
+          message: SAVED_BUILD_LIMIT_UPGRADE_COPY,
+          tone: "notice",
         });
       } else {
         setToast({ message: "Could not save this build right now.", tone: "error" });
@@ -694,10 +701,8 @@ function ConsultPage() {
       if (!replacementUsage.consumed) {
         setShowUsageUpgrade(true);
         setToast({
-          message:
-            replacementUsage.message ??
-            "You have used your included hardware replacements for this build.",
-          tone: "error",
+          message: replacementUsage.message ?? REPLACEMENT_LIMIT_UPGRADE_COPY,
+          tone: "notice",
         });
         return;
       }
@@ -774,6 +779,12 @@ function ConsultPage() {
 
       setUsageStatus(advisorResponse.usage);
       setShowUsageUpgrade(Boolean(advisorResponse.upgradeRequired));
+      if (advisorResponse.upgradeRequired) {
+        setToast({
+          message: AI_LIMIT_UPGRADE_COPY,
+          tone: "notice",
+        });
+      }
       setChatMessages((current) => [
         ...current,
         {
@@ -1015,6 +1026,12 @@ function ConsultPage() {
               )}
               <div className="flex flex-wrap items-center gap-2">
                 <UsageBadge usage={usageStatus} />
+                {plan === "build_pro" && (
+                  <Badge className="rounded-md border border-success/25 bg-success/10 text-success">
+                    <ShieldCheck className="mr-1 size-3" />
+                    Build Pro active
+                  </Badge>
+                )}
                 <Button
                   size="sm"
                   variant="secondary"
@@ -1089,10 +1106,25 @@ function ConsultPage() {
                 </section>
 
                 {showUsageUpgrade && (
-                  <UpgradeCard
-                    onUpgraded={() => void refreshMonetizationState()}
-                    className="border-warning/25 bg-warning/10"
-                  />
+                  <section className="rounded-2xl border border-warning/25 bg-warning/10 p-5">
+                    <div className="mb-4 flex items-start gap-3">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-warning/30 bg-background text-warning">
+                        <Sparkles className="size-4" />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold">Keep building with Build Pro</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Free planning limits are designed for a first pass. Build Pro unlocks more advisor questions,
+                          more hardware replacements, saved builds, and full export.
+                        </p>
+                      </div>
+                    </div>
+                    <UpgradeCard
+                      compact
+                      onUpgraded={() => void refreshMonetizationState()}
+                      className="border-warning/25 bg-background/70"
+                    />
+                  </section>
                 )}
 
                 <BuildCard
@@ -1379,7 +1411,7 @@ function ConsultPage() {
                     ) : (
                       <ProFeatureLock
                         feature="build_export"
-                        label="Full export"
+                        label="Full export and saved builds"
                         onUpgraded={() => void refreshMonetizationState()}
                       />
                     )}
@@ -1497,11 +1529,15 @@ function ConsultPage() {
             className={`pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-3 text-sm shadow-glow backdrop-blur ${
               toast.tone === "error"
                 ? "border border-destructive/30 bg-destructive/10 text-destructive"
+                : toast.tone === "notice"
+                  ? "border border-warning/30 bg-warning/10 text-warning"
                 : "border border-primary/30 bg-card/95"
             }`}
           >
             {toast.tone === "error" ? (
               <AlertTriangle className="size-4" />
+            ) : toast.tone === "notice" ? (
+              <Sparkles className="size-4" />
             ) : (
               <CheckCircle2 className="size-4 text-primary" />
             )}
@@ -1566,7 +1602,7 @@ function SavedBuildsPanel({
                 <h2 className="text-xl font-bold">Saved Builds</h2>
               </div>
               <p className="mt-1 text-sm text-muted-foreground">
-                {builds.length} of {limit} saved locally for this mock session.
+                {builds.length} of {limit} saved locally for this session.
               </p>
             </div>
             <Button size="sm" variant="secondary" className="rounded-md" onClick={onClose}>

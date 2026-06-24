@@ -27,12 +27,12 @@ function CheckoutCancelPage() {
               <p className="text-sm font-semibold uppercase tracking-[0.2em] text-warning">
                 Checkout cancelled
               </p>
-              <h1 className="mt-2 text-3xl font-bold tracking-tight">Payment was cancelled</h1>
+              <h1 className="mt-2 text-3xl font-bold tracking-tight">Payment cancelled</h1>
               <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
-                No payment was completed. Your current build and free features are still available.
+                No charge was made. Your current build and Free features are still available.
               </p>
               <Button asChild className="mt-6 rounded-xl shadow-glow">
-                <Link to="/consult">Back to advisor</Link>
+                <Link to="/consult">Back to /consult</Link>
               </Button>
             </div>
           </div>

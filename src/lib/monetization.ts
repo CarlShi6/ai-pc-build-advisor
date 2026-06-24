@@ -52,11 +52,11 @@ export function getRemainingReplacements(usageStatus: UsageStatus) {
 export function formatUpgradeMessage(featureKey: FeatureKey) {
   const messages: Record<FeatureKey, string> = {
     advanced_compare:
-      "Unlock Build Pro to see advanced reasoning, value analysis, and compatibility impact.",
-    ai_reasoning: "Unlock Build Pro to see AI reasoning for every recommendation.",
-    purchase_checklist: "Unlock Build Pro to use the full purchase-ready checklist.",
-    build_export: "Unlock Build Pro to save an export-ready build.",
-    unlimited_swaps: "Unlock Build Pro for better upgrade and downgrade decisions.",
+      "Build Pro adds advanced reasoning, value analysis, and compatibility impact before you choose.",
+    ai_reasoning: "Build Pro adds AI reasoning for every recommendation in this build.",
+    purchase_checklist: "Build Pro unlocks the full purchase checklist before you buy.",
+    build_export: "Build Pro unlocks saved builds, copy, JSON, and Markdown export.",
+    unlimited_swaps: "Build Pro includes 25 hardware replacements for this build.",
   };
 
   return messages[featureKey];

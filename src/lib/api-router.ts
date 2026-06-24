@@ -226,7 +226,8 @@ function consumeAiUsage(): ConsumeUsageResponse {
     return {
       usage,
       consumed: false,
-      message: "You have used your included AI questions for this plan.",
+      message:
+        "You have used the Free advisor questions for today. Build Pro unlocks 50 AI questions per build.",
     };
   }
 
@@ -249,7 +250,8 @@ function consumeReplacementUsage(): ConsumeReplacementResponse {
     return {
       usage,
       consumed: false,
-      message: "You have used your included hardware replacements for this build.",
+      message:
+        "You have used the Free hardware replacements for this build. Build Pro unlocks 25 replacements.",
     };
   }
 
@@ -410,7 +412,7 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
           403,
           getCurrentPlan() === "build_pro"
             ? "You can save up to 10 builds with Build Pro."
-            : "Free users can save 1 build. Unlock Build Pro to save up to 10 builds.",
+            : "Your Free saved build slot is full. Build Pro unlocks up to 10 saved builds plus full export.",
         );
       }
 
@@ -475,7 +477,7 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       if (!usageBefore.canAskAiQuestion) {
         const responsePayload: AdvisorResponsePayload = {
           assistantMessage:
-            "You have used your included AI questions for this plan. You can keep using the current build and compare parts, or unlock Build Pro for more advisor questions.",
+            "You have used the Free advisor questions for today. Your current build, compatibility checks, and part comparisons are still available. Build Pro unlocks 50 AI questions per build.",
           explanation: "Usage was not consumed because the current plan has no remaining advisor questions.",
           provider: "mock",
           usage: usageBefore,
@@ -589,7 +591,7 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         success: true,
         plan: "build_pro",
         entitlement,
-        message: "Build Pro unlocked for this mock session.",
+        message: "Build Pro unlocked for this local session.",
       };
       return jsonResponse(payload);
     }

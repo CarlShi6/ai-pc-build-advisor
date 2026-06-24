@@ -1247,7 +1247,7 @@ function PreviewSwapPanel({
         <div className="mt-4">
           <ProFeatureLock
             feature="unlimited_swaps"
-            label="Hardware replacement limit reached"
+            label="Keep tuning this build"
             onUpgraded={onUpgraded}
           />
         </div>

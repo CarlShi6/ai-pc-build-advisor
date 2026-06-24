@@ -34,7 +34,8 @@ export async function createStripeCheckoutSession({
   if (!config.stripeSecretKey || !config.stripeBuildProPriceId) {
     return {
       fallbackUsed: true,
-      message: "Stripe is not configured locally. Using mock Build Pro unlock.",
+      message:
+        "Local dev checkout is using the mock Build Pro unlock because Stripe keys are not configured.",
     };
   }
 
@@ -66,7 +67,7 @@ export async function createStripeCheckoutSession({
       fallbackUsed: true,
       message:
         payload.error?.message ??
-        "Stripe Checkout could not be created. Using mock Build Pro unlock.",
+        "Stripe Checkout could not be created, so this session is using the mock Build Pro unlock.",
     };
   }
 
