@@ -7,6 +7,17 @@ export function isSupabaseServerConfigured() {
   return Boolean(config.supabaseUrl && config.supabaseAnonKey && config.supabaseServiceRoleKey);
 }
 
+export function isSupabasePersistenceEnabled() {
+  const config = getServerConfig();
+  const provider = config.persistenceProvider?.toLowerCase();
+
+  if (provider === "mock") {
+    return false;
+  }
+
+  return isSupabaseServerConfigured();
+}
+
 export function createSupabaseServiceClient() {
   const config = getServerConfig();
 

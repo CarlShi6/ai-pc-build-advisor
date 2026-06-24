@@ -22,12 +22,14 @@ export function getServerConfig() {
     openAiApiKey: process.env.OPENAI_API_KEY,
     aiProviderApiKey: process.env.AI_PROVIDER_API_KEY,
     aiProviderModel: process.env.AI_PROVIDER_MODEL ?? "gpt-4.1-mini",
+    persistenceProvider: process.env.PERSISTENCE_PROVIDER,
     stripeSecretKey: process.env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     stripeBuildProPriceId: process.env.STRIPE_BUILD_PRO_PRICE_ID,
     supabaseUrl: process.env.SUPABASE_URL,
     supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+    supabaseSmokeTestEnabled: process.env.SUPABASE_SMOKE_TEST_ENABLED,
     publicAppUrl: process.env.PUBLIC_APP_URL ?? "http://localhost:5173",
   };
 }

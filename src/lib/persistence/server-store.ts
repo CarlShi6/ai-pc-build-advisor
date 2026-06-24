@@ -4,7 +4,7 @@ import { MockPersistenceStore } from "@/lib/persistence/mock-store";
 import {
   createSupabaseAuthClient,
   createSupabaseServiceClient,
-  isSupabaseServerConfigured,
+  isSupabasePersistenceEnabled,
 } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
 import type { SavedBuild, SavedBuildSummary } from "@/types/build";
@@ -778,7 +778,7 @@ export class SupabasePersistenceStore implements PersistenceStore {
 }
 
 export function createServerPersistenceStore(): PersistenceStore {
-  if (isSupabaseServerConfigured()) {
+  if (isSupabasePersistenceEnabled()) {
     return new SupabasePersistenceStore();
   }
 
