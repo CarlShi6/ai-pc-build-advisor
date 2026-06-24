@@ -12,6 +12,7 @@ import { normalizeAdvisorActions } from "@/lib/ai/types";
 import { getPersistenceStore } from "@/lib/persistence";
 import { clearSessionCookie, createSessionCookie } from "@/lib/persistence/mock-store";
 import { searchProducts } from "@/lib/product-search/search-service";
+import { runSupabaseSmokeTest } from "@/lib/supabase/smoke-test.server";
 import { createStripeCheckoutSession } from "@/lib/stripe.server";
 import type {
   AdvisorRequestPayload,
@@ -178,6 +179,15 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
 
       const payload: SignOutApiResponse = await store.signOut(request);
       return jsonResponse(payload, { headers: { "Set-Cookie": clearSessionCookie() } });
+    }
+
+    if (pathname === "/api/smoke/supabase") {
+      if (request.method !== "GET") {
+        return methodNotAllowed(["GET"]);
+      }
+
+      const result = await runSupabaseSmokeTest();
+      return jsonResponse(result.body, { status: result.httpStatus });
     }
 
     if (pathname === "/api/parts") {
