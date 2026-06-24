@@ -491,6 +491,8 @@ function ConsultPage() {
       const result = await resetMockMonetizationState();
       setEntitlement(result.entitlement);
       setUsageStatus(result.usage);
+      setSavedBuilds([]);
+      setSavedBuildLimit(1);
       setShowUsageUpgrade(false);
       setToast({
         message: result.message,
@@ -691,10 +693,20 @@ function ConsultPage() {
       return;
     }
 
+    if (usageStatus && !usageStatus.canReplacePart) {
+      setShowUsageUpgrade(true);
+      setToast({
+        message: REPLACEMENT_LIMIT_UPGRADE_COPY,
+        tone: "notice",
+      });
+      return;
+    }
+
     setIsReplacingPart(true);
     setDetailsError(null);
 
     try {
+      const nextState = await replaceBuildPart(build, part);
       const replacementUsage = await consumeReplacementUsage();
       setUsageStatus(replacementUsage.usage);
 
@@ -707,7 +719,6 @@ function ConsultPage() {
         return;
       }
 
-      const nextState = await replaceBuildPart(build, part);
       setBuild(nextState.build);
       setCartPreview(nextState.cartPreview);
       setEmployeeSummary(nextState.employeeSummary);
@@ -925,13 +936,24 @@ function ConsultPage() {
     item: CartPreviewItemModel,
     link: NonNullable<CartPreviewItemModel["affiliateLinks"]>[number],
   ) {
+    const openedWindow = window.open("about:blank", "_blank");
+
+    if (!openedWindow) {
+      setToast({
+        message: "Your browser blocked the new tab. Please allow popups for this site and try again.",
+        tone: "notice",
+      });
+      return;
+    }
+
+    openedWindow.opener = null;
     await trackAffiliateClick({
       partId: item.partId,
       merchant: link.merchant,
       url: link.url,
       buildId: build?.id,
     });
-    window.open(link.url, "_blank", "noopener,noreferrer");
+    openedWindow.location.href = link.url;
   }
 
   function renderWarningActions(warning: CompatibilityWarningModel) {
@@ -1014,7 +1036,7 @@ function ConsultPage() {
                 <h1 className="text-3xl font-bold tracking-tight">Live Build Recommendation</h1>
                 <p className="mt-2 text-sm text-muted-foreground">
                   Compare parts, replace components, and watch pricing, compatibility, and purchase
-                  references update from local mock data.
+                  references update from the local demo catalog.
                 </p>
               </div>
 
@@ -1038,7 +1060,7 @@ function ConsultPage() {
                   className="rounded-md"
                   onClick={() => void handleResetMonetization()}
                 >
-                  Reset mock access
+                  Reset demo state
                 </Button>
               </div>
             </div>
@@ -1275,7 +1297,7 @@ function ConsultPage() {
                         <h2 className="text-xl font-bold">Purchase Reference List</h2>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Mock retailer references only. No checkout, payment, or live stock integration yet.
+                        Demo retailer references only. No checkout, payment, or live stock integration yet.
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1319,7 +1341,7 @@ function ConsultPage() {
                       </div>
                     ) : cartPreview.length === 0 ? (
                       <div className="p-5 text-sm text-muted-foreground">
-                        Purchase references will populate as soon as the mock build is ready.
+                        Purchase references will populate as soon as the build is ready.
                       </div>
                     ) : (
                       <table className="w-full text-left text-sm">
@@ -1339,7 +1361,7 @@ function ConsultPage() {
                               <td className="px-4 py-3 text-muted-foreground">{item.retailer}</td>
                               <td className="px-4 py-3 text-muted-foreground">{item.note}</td>
                               <td className="px-4 py-3 text-right font-mono">
-                                ${item.estimatedPrice.toFixed(2)}
+                                {item.estimatedPrice === 0 ? "Already owned" : `$${item.estimatedPrice.toFixed(2)}`}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 {(item.affiliateLinks ?? []).slice(0, 1).map((link) => (
@@ -1461,7 +1483,7 @@ function ConsultPage() {
                 <div className="mx-auto flex size-12 items-center justify-center rounded-full bg-primary/10 text-primary">
                   <LoaderCircle className="size-5 animate-spin" />
                 </div>
-                <h2 className="mt-4 text-xl font-bold">Preparing the first mock recommendation</h2>
+                <h2 className="mt-4 text-xl font-bold">Preparing the first recommendation</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
                   The consultation layout is loading the initial build and seed catalog.
                 </p>

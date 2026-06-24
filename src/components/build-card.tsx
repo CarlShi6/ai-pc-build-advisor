@@ -28,6 +28,7 @@ type BuildCardRow = {
   categoryLabel: string;
   name: string;
   price: number;
+  owned?: boolean;
   specs: string[];
 };
 
@@ -51,7 +52,8 @@ function normalizeRows(build?: Build, parts?: LegacyBuildPart[]) {
       category: part.category,
       categoryLabel: categoryLabels[part.category],
       name: part.displayName,
-      price: part.price,
+      price: part.owned ? 0 : part.price,
+      owned: part.owned,
       specs: getPartSummarySpecs(part),
     }));
   }
@@ -62,6 +64,7 @@ function normalizeRows(build?: Build, parts?: LegacyBuildPart[]) {
     categoryLabel: part.category,
     name: part.name,
     price: part.price,
+    owned: false,
     specs: [],
   }));
 }
@@ -149,7 +152,7 @@ export function BuildCardInner({
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <Badge className="mb-3 rounded-md bg-primary/10 text-primary">
-            {build ? "Live Mock Recommendation" : "Build #A7-22"}
+            {build ? "Live Recommendation" : "Build #A7-22"}
           </Badge>
           <h2 className="text-4xl font-bold tracking-tight">
             {build?.name ?? "Production Master Pro"}
@@ -234,6 +237,11 @@ export function BuildCardInner({
                     <div className="space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <span>{part.name}</span>
+                        {part.owned && (
+                          <Badge className="rounded-md bg-success/15 text-[10px] text-success">
+                            Already owned
+                          </Badge>
+                        )}
                         {focusedCategory === part.category && (
                           <Badge className="rounded-md bg-primary/15 text-[10px] text-primary">
                             <Eye className="mr-1 size-3" /> Currently Viewing
@@ -257,7 +265,9 @@ export function BuildCardInner({
                       )}
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-right font-mono">{formatMoney(part.price)}</td>
+                  <td className="px-6 py-4 text-right font-mono">
+                    {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
+                  </td>
                   {(onFocus || onCompare) && (
                     <td className="px-6 py-4 text-right">
                       <RowActions category={part.category} categoryLabel={part.categoryLabel} onCompare={onCompare} onFocus={onFocus} />
@@ -277,7 +287,7 @@ export function BuildCardInner({
               <h4 className="text-lg font-bold text-primary">Build Insight</h4>
               <p className="mt-1 text-sm text-muted-foreground">
                 {build
-                  ? "This build updates from mock data, so replacements flow through pricing, warnings, and purchase references."
+                  ? "This build updates from demo data, so replacements flow through pricing, warnings, and purchase references."
                   : "Compare a lower-cost GPU or a stronger PSU before finalizing the parts list."}
               </p>
             </div>
