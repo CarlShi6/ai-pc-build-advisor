@@ -97,6 +97,7 @@ function resetMockMonetizationState() {
   mockState.aiQuestionsUsedForBuild = 0;
   mockState.replacementsUsedForBuild = 0;
   mockState.affiliateClicks = [];
+  mockState.savedBuilds = [];
 }
 
 function getCurrentPlan(): PlanType {
@@ -720,7 +721,7 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         success: true,
         entitlement: mockState.entitlement,
         usage: getUsageStatus(),
-        message: "Mock monetization state reset for local testing.",
+        message: "Demo state reset. Free limits, usage, Pro access, and saved builds are back to the starting point.",
       };
       return jsonResponse(payload);
     }

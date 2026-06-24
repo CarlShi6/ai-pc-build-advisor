@@ -23,8 +23,8 @@ export function UsageBadge({
   const replacements = getRemainingReplacements(usage);
   const text =
     usage.plan === "build_pro"
-      ? `${remaining} AI questions - ${replacements} replacements left`
-      : `${remaining} AI questions today - ${replacements} swaps left`;
+      ? `${remaining} AI questions and ${replacements} replacements left`
+      : `${remaining} AI questions today and ${replacements} swaps left`;
 
   return (
     <Badge
@@ -35,7 +35,7 @@ export function UsageBadge({
       )}
     >
       <Sparkles className="mr-1 size-3" />
-      {usage.plan === "build_pro" ? "Build Pro active - " : ""}
+      {usage.plan === "build_pro" ? "Build Pro active: " : ""}
       {text}
     </Badge>
   );

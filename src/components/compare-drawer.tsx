@@ -87,15 +87,15 @@ function formatRetailerName(value: string) {
 
 function formatStockStatus(value: ProductSearchResult["stockStatus"]) {
   if (value === "in_stock") {
-    return "Mock in stock";
+    return "Demo in stock";
   }
 
   if (value === "low_stock") {
-    return "Mock low stock";
+    return "Demo low stock";
   }
 
   if (value === "out_of_stock") {
-    return "Mock out of stock";
+    return "Demo out of stock";
   }
 
   return "Stock unknown";
@@ -647,7 +647,7 @@ export function CompareDrawer({
               </div>
             ) : sameCategoryParts.length < 2 ? (
               <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-                This category needs at least two mock parts before exploration is useful.
+                This category needs at least two demo parts before exploration is useful.
               </div>
             ) : displayedTab === "recommended" ? (
               <PartCardGrid
@@ -715,7 +715,7 @@ export function CompareDrawer({
                     recommendedReplacementId={recommendedReplacementId}
                     onToggleCompare={toggleComparePart}
                     onPreviewSwap={previewSwap}
-                    emptyMessage="No local mock parts match that search."
+                    emptyMessage="No local demo parts match that search."
                     isSearchEmpty={searchQuery.trim().length > 0}
                     onAddCustom={() => setShowCustomPartForm(true)}
                   />
@@ -728,7 +728,7 @@ export function CompareDrawer({
                 >
                   {!includeRetailerResults ? (
                     <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-                      Turn on retailer results to preview mock retailer matches.
+                      Turn on retailer results to preview demo retailer matches.
                     </div>
                   ) : productSearchError ? (
                     <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
@@ -738,7 +738,7 @@ export function CompareDrawer({
                     <LoadingState title="Loading retailer preview results" />
                   ) : retailerResults.length === 0 ? (
                     <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-                      No mock retailer results match that search yet.
+                      No demo retailer results match that search yet.
                     </div>
                   ) : (
                     <RetailerResultGrid
@@ -960,21 +960,12 @@ function RetailerResultCard({
   async function handleCheckPrice() {
     const url = result.affiliateUrl ?? result.productUrl;
 
-    if (affiliateLink) {
-      await trackAffiliateClick({
-        partId: part.id,
-        merchant: affiliateLink.merchant,
-        url: url ?? affiliateLink.url,
-        buildId: build.id,
-      });
-    }
-
     if (!url) {
-      setDealMessage("We do not have a deal link for this mock result yet.");
+      setDealMessage("We do not have a deal link for this demo result yet.");
       return;
     }
 
-    const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
+    const openedWindow = window.open("about:blank", "_blank");
 
     if (!openedWindow) {
       setDealMessage(
@@ -983,6 +974,17 @@ function RetailerResultCard({
       return;
     }
 
+    openedWindow.opener = null;
+    if (affiliateLink) {
+      await trackAffiliateClick({
+        partId: part.id,
+        merchant: affiliateLink.merchant,
+        url,
+        buildId: build.id,
+      });
+    }
+
+    openedWindow.location.href = url;
     setDealMessage(null);
   }
 
@@ -998,7 +1000,7 @@ function RetailerResultCard({
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap gap-2">
             <Badge className="rounded-md border border-warning/30 bg-warning/10 text-warning">
-              Mock retailer
+              Retailer preview
             </Badge>
             <CompatibilityBadge build={candidateBuild} />
           </div>
@@ -1018,7 +1020,7 @@ function RetailerResultCard({
 
       {candidateBuild.compatibilityWarnings.length > 0 && (
         <div className="mt-3 space-y-1.5">
-          {candidateBuild.compatibilityWarnings.slice(0, 2).map((warning) => (
+          {candidateBuild.compatibilityWarnings.map((warning) => (
             <div
               key={warning.id}
               className="rounded-md border border-warning/30 bg-warning/10 px-2.5 py-2 text-xs text-warning"
@@ -1422,7 +1424,7 @@ function ComparisonTable({
                       )}
                     </div>
                     <p className="font-mono text-lg font-bold text-primary">
-                      {part.owned ? "$0 · Already owned" : formatMoney(part.price)}
+                      {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
                     </p>
                     <div className="flex flex-wrap gap-1">
                       {getComparisonDeltaBadges(build, part, selectedPart)
@@ -1513,7 +1515,7 @@ function ComparisonTable({
               {parts.map((part) => (
                 <td key={part.id} className="px-4 py-3 text-muted-foreground">
                   {hasAdvancedCompare ? (
-                    (part.recommendationReason ?? "Configured in the local mock catalog.")
+                    (part.recommendationReason ?? "Configured in the local demo catalog.")
                   ) : (
                     <ProFeatureLock
                       feature="ai_reasoning"
@@ -1649,19 +1651,12 @@ function PreviewSwapPanel({
   const [dealMessage, setDealMessage] = useState<string | null>(null);
 
   async function handlePreviewAffiliateClick(link: AffiliateLink) {
-    await trackAffiliateClick({
-      partId: previewPart.id,
-      merchant: link.merchant,
-      url: link.url,
-      buildId: build.id,
-    });
-
     if (!link.url) {
       setDealMessage("We do not have a deal link for this part yet.");
       return;
     }
 
-    const openedWindow = window.open(link.url, "_blank", "noopener,noreferrer");
+    const openedWindow = window.open("about:blank", "_blank");
 
     if (!openedWindow) {
       setDealMessage(
@@ -1670,6 +1665,15 @@ function PreviewSwapPanel({
       return;
     }
 
+    openedWindow.opener = null;
+    await trackAffiliateClick({
+      partId: previewPart.id,
+      merchant: link.merchant,
+      url: link.url,
+      buildId: build.id,
+    });
+
+    openedWindow.location.href = link.url;
     setDealMessage(null);
   }
 
@@ -1707,7 +1711,7 @@ function PreviewSwapPanel({
           label="Price change"
           value={
             previewPart.owned
-              ? "$0 · Already owned"
+              ? "$0 - Already owned"
               : delta < 0
                 ? `-${formatMoney(Math.abs(delta))}`
                 : `+${formatMoney(delta)}`
@@ -1753,7 +1757,7 @@ function PreviewSwapPanel({
 
       {candidateBuild.compatibilityWarnings.length > 0 && (
         <div className="mt-4 space-y-2">
-          {candidateBuild.compatibilityWarnings.slice(0, 3).map((warning) => (
+          {candidateBuild.compatibilityWarnings.map((warning) => (
             <div
               key={warning.id}
               className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning"
@@ -1852,9 +1856,11 @@ function CompareTray({
           <Button size="sm" variant="ghost" className="rounded-md" onClick={onClear}>
             Reset
           </Button>
-          <Button size="sm" className="rounded-md" disabled={parts.length < 2} onClick={onCompare}>
-            Compare selected
-          </Button>
+          {parts.length >= 2 && (
+            <Button size="sm" className="rounded-md" onClick={onCompare}>
+              Compare selected
+            </Button>
+          )}
         </div>
       </div>
     </div>

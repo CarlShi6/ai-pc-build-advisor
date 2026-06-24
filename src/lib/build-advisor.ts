@@ -215,7 +215,7 @@ function getAvailabilityNote(availability?: PartAvailability) {
     return "Out of stock in this mock dataset.";
   }
 
-  return "Use this mock purchase reference when checking current retailer listings.";
+  return "Use this demo purchase reference when checking current retailer listings.";
 }
 
 export function getCartPreviewItems(build: Build): CartPreviewItem[] {
@@ -230,7 +230,7 @@ export function getCartPreviewItems(build: Build): CartPreviewItem[] {
     affiliateLinks: part.owned ? [] : part.affiliateLinks,
     availability: part.owned ? "unknown" : part.availability,
     note: part.owned
-      ? "Already owned — no purchase needed."
+      ? "Already owned - no purchase needed."
       : getAvailabilityNote(part.availability),
   }));
 }
@@ -475,14 +475,14 @@ export function getStoreEmployeeSummary(
     ],
     cheaperAlternative: cheaperGpu
       ? `${cheaperGpu.displayName} saves about $${Math.round((gpu?.price ?? 0) - cheaperGpu.price)} on the graphics budget.`
-      : "The selected parts are already near the value floor in this mock dataset.",
+      : "The selected parts are already near the value floor in this demo catalog.",
     upsellOption: upsellGpu
       ? `${upsellGpu.displayName} is the clearest upgrade if you want more graphics headroom.`
-      : "No higher-tier upgrade is configured in the current mock dataset.",
+      : "No higher-tier upgrade is configured in the current demo catalog.",
     compatibilityStatus:
       build.compatibilityStatus === "pass"
         ? "All checks passed."
         : `${build.compatibilityWarnings.length} compatibility item(s) need attention.`,
-    preCartStatus: `${preCartReadyCount}/${cartItems.length} items have usable mock purchase references.`,
+    preCartStatus: `${preCartReadyCount}/${cartItems.length} items have usable purchase references.`,
   };
 }
