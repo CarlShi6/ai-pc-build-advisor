@@ -4,7 +4,11 @@ import {
   getPartPowerRequirement,
   getPartSummarySpecs,
 } from "@/lib/build-advisor";
-import { calculateBuildTotal, deriveCompatibilityStatus, evaluateCompatibility } from "@/lib/compatibility";
+import {
+  calculateBuildTotal,
+  deriveCompatibilityStatus,
+  evaluateCompatibility,
+} from "@/lib/compatibility";
 import { canUseFeature } from "@/lib/monetization";
 import { searchProducts as searchProductsApi, trackAffiliateClick } from "@/lib/apiClient";
 import { productSearchResultToPart } from "@/lib/product-search/search-service";
@@ -13,7 +17,7 @@ import type { Build } from "@/types/build";
 import type { AffiliateLink, PlanType, UsageStatus } from "@/types/monetization";
 import type { Part, PartCategory } from "@/types/parts";
 import type { ProductSearchResult } from "@/lib/product-search/types";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
 import {
   Drawer,
   DrawerContent,
@@ -98,7 +102,9 @@ function formatStockStatus(value: ProductSearchResult["stockStatus"]) {
 }
 
 function buildCandidate(build: Build, replacement: Part) {
-  const parts = build.parts.map((part) => (part.category === replacement.category ? replacement : part));
+  const parts = build.parts.map((part) =>
+    part.category === replacement.category ? replacement : part,
+  );
   const candidate: Build = {
     ...build,
     parts,
@@ -179,11 +185,9 @@ function getComparisonDeltaBadges(build: Build, part: Part, selectedPart: Part) 
   const badges: Array<{ label: string; tone: "success" | "warning" | "neutral" }> = [];
   const priceDelta = getDisplayPrice(part) - getDisplayPrice(selectedPart);
   const gamingDelta =
-    getNumberSpec(part, ["gaming4kScore", "gaming1440pScore", "gamingScore"]) ??
-    null;
+    getNumberSpec(part, ["gaming4kScore", "gaming1440pScore", "gamingScore"]) ?? null;
   const selectedGaming =
-    getNumberSpec(selectedPart, ["gaming4kScore", "gaming1440pScore", "gamingScore"]) ??
-    null;
+    getNumberSpec(selectedPart, ["gaming4kScore", "gaming1440pScore", "gamingScore"]) ?? null;
   const productivityDelta = getNumberSpec(part, ["productivityScore"]);
   const selectedProductivity = getNumberSpec(selectedPart, ["productivityScore"]);
   const powerDelta = getNumberSpec(part, ["powerDrawW", "tdpW", "wattageW"]);
@@ -210,7 +214,11 @@ function getComparisonDeltaBadges(build: Build, part: Part, selectedPart: Part) 
     });
   }
 
-  if (productivityDelta !== null && selectedProductivity !== null && productivityDelta !== selectedProductivity) {
+  if (
+    productivityDelta !== null &&
+    selectedProductivity !== null &&
+    productivityDelta !== selectedProductivity
+  ) {
     badges.push({
       label: `Productivity ${formatSignedNumber(productivityDelta - selectedProductivity)}`,
       tone: productivityDelta >= selectedProductivity ? "success" : "warning",
@@ -260,7 +268,9 @@ function sortParts(parts: Part[], selectedPart: Part, mode: string) {
     }
 
     if (mode === "performance") {
-      return (getPerformanceFit(right) ?? 0) - (getPerformanceFit(left) ?? 0) || right.price - left.price;
+      return (
+        (getPerformanceFit(right) ?? 0) - (getPerformanceFit(left) ?? 0) || right.price - left.price
+      );
     }
 
     if (mode === "value") {
@@ -344,6 +354,10 @@ export function CompareDrawer({
   );
   const [isProductSearching, setIsProductSearching] = useState(false);
   const [productSearchError, setProductSearchError] = useState<string | null>(null);
+  const [isPreviewPanelHighlighted, setIsPreviewPanelHighlighted] = useState(false);
+  const drawerBodyRef = useRef<HTMLDivElement | null>(null);
+  const compareTrayRef = useRef<HTMLDivElement | null>(null);
+  const previewPanelRef = useRef<HTMLElement | null>(null);
 
   const selectedPart = build?.parts.find((part) => part.category === category);
   const sectionTitle = selectedPart ? categoryLabels[selectedPart.category] : "Part";
@@ -446,6 +460,55 @@ export function CompareDrawer({
     };
   }, [activeTab, build, includeRetailerResults, open, searchQuery, selectedPart]);
 
+  useEffect(() => {
+    if (!previewPart) {
+      setIsPreviewPanelHighlighted(false);
+      return;
+    }
+
+    setIsPreviewPanelHighlighted(true);
+
+    const scrollFrame = window.requestAnimationFrame(() => {
+      const drawerBody = drawerBodyRef.current;
+      const previewPanel = previewPanelRef.current;
+
+      if (!drawerBody || !previewPanel) {
+        return;
+      }
+
+      const drawerBodyRect = drawerBody.getBoundingClientRect();
+      const compareTrayHeight = compareTrayRef.current?.getBoundingClientRect().height ?? 0;
+      const stickyHeaderOffset = 0;
+      const panelTopWithinBody =
+        previewPanel.getBoundingClientRect().top - drawerBodyRect.top + drawerBody.scrollTop;
+      const panelBottomWithinBody = panelTopWithinBody + previewPanel.offsetHeight;
+      const topPadding = 16;
+      const bottomPadding = compareTrayHeight + 16;
+      const maxScrollTop = Math.max(0, drawerBody.scrollHeight - drawerBody.clientHeight);
+      const targetScrollTop = Math.min(
+        maxScrollTop,
+        Math.max(0, panelTopWithinBody - stickyHeaderOffset - topPadding),
+      );
+      const bottomSafeScrollTop = Math.min(
+        maxScrollTop,
+        Math.max(0, panelBottomWithinBody - drawerBody.clientHeight + bottomPadding),
+      );
+
+      drawerBody.scrollTo({
+        top: Math.max(targetScrollTop, bottomSafeScrollTop),
+        behavior: "smooth",
+      });
+    });
+    const highlightTimer = window.setTimeout(() => {
+      setIsPreviewPanelHighlighted(false);
+    }, 1400);
+
+    return () => {
+      window.cancelAnimationFrame(scrollFrame);
+      window.clearTimeout(highlightTimer);
+    };
+  }, [previewPart]);
+
   if (!build || !category || !selectedPart) {
     return null;
   }
@@ -488,6 +551,10 @@ export function CompareDrawer({
     setActiveTab("recommended");
   }
 
+  function previewSwap(part: Part) {
+    setPreviewPart(part);
+  }
+
   function confirmPreviewSwap() {
     if (!previewPart || previewPart.id === currentSelectedPart.id) {
       return;
@@ -513,8 +580,12 @@ export function CompareDrawer({
               </div>
             </div>
             <div className="rounded-xl border border-border bg-card px-4 py-3 text-right">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">Current total</p>
-              <p className="font-mono text-2xl font-bold text-primary">{formatMoney(build.totalPrice)}</p>
+              <p className="text-xs uppercase tracking-widest text-muted-foreground">
+                Current total
+              </p>
+              <p className="font-mono text-2xl font-bold text-primary">
+                {formatMoney(build.totalPrice)}
+              </p>
             </div>
           </div>
 
@@ -557,12 +628,13 @@ export function CompareDrawer({
           </div>
         </DrawerHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-20 pt-4">
+        <div ref={drawerBodyRef} className="min-h-0 flex-1 overflow-y-auto px-6 pb-20 pt-4">
           <CurrentSelection build={build} part={selectedPart} plan={plan} onUpgraded={onUpgraded} />
 
           {recommendedReplacementId && (
             <div className="mt-4 rounded-xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
-              A recommended review option is highlighted because it may address the selected compatibility warning.
+              A recommended review option is highlighted because it may address the selected
+              compatibility warning.
             </div>
           )}
 
@@ -585,7 +657,7 @@ export function CompareDrawer({
                 selectedIds={selectedIds}
                 recommendedReplacementId={recommendedReplacementId}
                 onToggleCompare={toggleComparePart}
-                onPreviewSwap={setPreviewPart}
+                onPreviewSwap={previewSwap}
               />
             ) : displayedTab === "search" ? (
               <section className="space-y-4">
@@ -642,7 +714,7 @@ export function CompareDrawer({
                     selectedIds={selectedIds}
                     recommendedReplacementId={recommendedReplacementId}
                     onToggleCompare={toggleComparePart}
-                    onPreviewSwap={setPreviewPart}
+                    onPreviewSwap={previewSwap}
                     emptyMessage="No local mock parts match that search."
                     isSearchEmpty={searchQuery.trim().length > 0}
                     onAddCustom={() => setShowCustomPartForm(true)}
@@ -676,7 +748,7 @@ export function CompareDrawer({
                       selectedIds={selectedIds}
                       compareDisabled={selectedIds.length >= 4}
                       onToggleCompare={toggleComparePart}
-                      onPreviewSwap={setPreviewPart}
+                      onPreviewSwap={previewSwap}
                     />
                   )}
                 </SearchSection>
@@ -686,7 +758,8 @@ export function CompareDrawer({
                   description={productSearchDisclaimer}
                 >
                   <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-sm text-muted-foreground">
-                    External live search coming later. No retailer websites are scraped in this preview.
+                    External live search coming later. No retailer websites are scraped in this
+                    preview.
                   </div>
                 </SearchSection>
               </section>
@@ -697,7 +770,7 @@ export function CompareDrawer({
                 selectedPart={selectedPart}
                 plan={plan}
                 isReplacing={isReplacing}
-                onPreviewSwap={setPreviewPart}
+                onPreviewSwap={previewSwap}
                 onUpgraded={onUpgraded}
               />
             )}
@@ -710,6 +783,8 @@ export function CompareDrawer({
               previewPart={previewPart}
               plan={plan}
               isReplacing={isReplacing}
+              isHighlighted={isPreviewPanelHighlighted}
+              panelRef={previewPanelRef}
               onCancel={() => setPreviewPart(null)}
               onConfirm={confirmPreviewSwap}
               canReplacePart={canReplacePart}
@@ -719,6 +794,7 @@ export function CompareDrawer({
         </div>
 
         <CompareTray
+          trayRef={compareTrayRef}
           parts={selectedCompareParts}
           selectedPart={selectedPart}
           onRemove={(part) => setSelectedIds((current) => current.filter((id) => id !== part.id))}
@@ -754,15 +830,22 @@ function CurrentSelection({
             </Badge>
             <CompatibilityBadge build={build} />
           </div>
-          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">Current selection</p>
+          <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Current selection
+          </p>
           <h3 className="mt-1 truncate text-lg font-bold">{part.displayName}</h3>
           <div className="mt-2 flex flex-wrap items-center gap-3">
             <p className="font-mono text-xl font-bold text-primary">{formatMoney(part.price)}</p>
-            {getPartSummarySpecs(part).slice(0, 3).map((spec) => (
-              <span key={spec} className="rounded-md border border-border bg-background/60 px-2.5 py-1 text-xs">
-                {spec}
-              </span>
-            ))}
+            {getPartSummarySpecs(part)
+              .slice(0, 3)
+              .map((spec) => (
+                <span
+                  key={spec}
+                  className="rounded-md border border-border bg-background/60 px-2.5 py-1 text-xs"
+                >
+                  {spec}
+                </span>
+              ))}
           </div>
         </div>
         <div className="space-y-2 rounded-xl border border-border bg-card p-3">
@@ -872,6 +955,7 @@ function RetailerResultCard({
   const candidateBuild = buildCandidate(build, part);
   const priceLabel = result.price === null ? "Price unknown" : formatMoney(result.price);
   const affiliateLink = part.affiliateLinks?.[0];
+  const [dealMessage, setDealMessage] = useState<string | null>(null);
 
   async function handleCheckPrice() {
     const url = result.affiliateUrl ?? result.productUrl;
@@ -880,12 +964,26 @@ function RetailerResultCard({
       await trackAffiliateClick({
         partId: part.id,
         merchant: affiliateLink.merchant,
-        url,
+        url: url ?? affiliateLink.url,
         buildId: build.id,
       });
     }
 
-    window.open(url, "_blank", "noopener,noreferrer");
+    if (!url) {
+      setDealMessage("We do not have a deal link for this mock result yet.");
+      return;
+    }
+
+    const openedWindow = window.open(url, "_blank", "noopener,noreferrer");
+
+    if (!openedWindow) {
+      setDealMessage(
+        "Your browser blocked the new tab. Please allow popups for this site and try again.",
+      );
+      return;
+    }
+
+    setDealMessage(null);
   }
 
   return (
@@ -921,7 +1019,10 @@ function RetailerResultCard({
       {candidateBuild.compatibilityWarnings.length > 0 && (
         <div className="mt-3 space-y-1.5">
           {candidateBuild.compatibilityWarnings.slice(0, 2).map((warning) => (
-            <div key={warning.id} className="rounded-md border border-warning/30 bg-warning/10 px-2.5 py-2 text-xs text-warning">
+            <div
+              key={warning.id}
+              className="rounded-md border border-warning/30 bg-warning/10 px-2.5 py-2 text-xs text-warning"
+            >
               {warning.message}
             </div>
           ))}
@@ -954,6 +1055,11 @@ function RetailerResultCard({
             <ShoppingBag className="mr-2 size-4" />
             Check price
           </Button>
+          {dealMessage && (
+            <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              {dealMessage}
+            </p>
+          )}
         </div>
       </div>
     </article>
@@ -1062,7 +1168,9 @@ function PartCard({
         <div className="min-w-0 flex-1">
           <div className="mb-2 flex flex-wrap gap-2">
             {isCurrent && <Badge className="rounded-md bg-primary/15 text-primary">Current</Badge>}
-            {part.owned && <Badge className="rounded-md bg-success/15 text-success">Already owned</Badge>}
+            {part.owned && (
+              <Badge className="rounded-md bg-success/15 text-success">Already owned</Badge>
+            )}
             {isRecommendedFix && (
               <Badge className="rounded-md border border-success/30 bg-success/15 text-success">
                 <Sparkles className="mr-1 size-3" /> Review
@@ -1078,20 +1186,25 @@ function PartCard({
             {part.owned
               ? "Already owned"
               : isCurrent
-              ? "Current baseline"
-              : delta < 0
-                ? `${formatMoney(Math.abs(delta))} cheaper`
-                : `+${formatMoney(delta)}`}
+                ? "Current baseline"
+                : delta < 0
+                  ? `${formatMoney(Math.abs(delta))} cheaper`
+                  : `+${formatMoney(delta)}`}
           </p>
         </div>
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
-        {getPartSummarySpecs(part).slice(0, 3).map((spec) => (
-          <span key={spec} className="rounded-md border border-border bg-background/60 px-2 py-1 text-[11px] text-muted-foreground">
-            {spec}
-          </span>
-        ))}
+        {getPartSummarySpecs(part)
+          .slice(0, 3)
+          .map((spec) => (
+            <span
+              key={spec}
+              className="rounded-md border border-border bg-background/60 px-2 py-1 text-[11px] text-muted-foreground"
+            >
+              {spec}
+            </span>
+          ))}
       </div>
 
       <div className="mt-3 flex flex-wrap gap-1.5">
@@ -1118,11 +1231,7 @@ function PartCard({
               </>
             )}
           </Button>
-          <Button
-            className="rounded-xl"
-            disabled={isCurrent}
-            onClick={onPreviewSwap}
-          >
+          <Button className="rounded-xl" disabled={isCurrent} onClick={onPreviewSwap}>
             <ArrowRightLeft className="mr-2 size-4" />
             Preview swap
           </Button>
@@ -1145,7 +1254,9 @@ function CustomPartForm({
 }) {
   const [brand, setBrand] = useState("");
   const [model, setModel] = useState(initialName);
-  const [color, setColor] = useState(typeof selectedPart.specs.color === "string" ? selectedPart.specs.color : "");
+  const [color, setColor] = useState(
+    typeof selectedPart.specs.color === "string" ? selectedPart.specs.color : "",
+  );
   const [notes, setNotes] = useState("");
 
   function handleAdd() {
@@ -1290,7 +1401,9 @@ function ComparisonTable({
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="border-b border-border bg-secondary/40 px-4 py-3">
         <h3 className="text-base font-semibold">Side-by-side comparison</h3>
-        <p className="text-xs text-muted-foreground">Basic fields stay visible. Build Pro unlocks deeper reasoning.</p>
+        <p className="text-xs text-muted-foreground">
+          Basic fields stay visible. Build Pro unlocks deeper reasoning.
+        </p>
       </div>
       <div className="overflow-x-auto">
         <table className="w-full min-w-[900px] text-left text-sm">
@@ -1301,16 +1414,22 @@ function ComparisonTable({
                 <th key={part.id} className="min-w-56 px-4 py-3 align-top font-medium">
                   <div className="space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
-                      <span className="normal-case tracking-normal text-foreground">{part.displayName}</span>
-                      {part.id === selectedPart.id && <Badge className="rounded-md bg-primary/15 text-primary">Current</Badge>}
+                      <span className="normal-case tracking-normal text-foreground">
+                        {part.displayName}
+                      </span>
+                      {part.id === selectedPart.id && (
+                        <Badge className="rounded-md bg-primary/15 text-primary">Current</Badge>
+                      )}
                     </div>
                     <p className="font-mono text-lg font-bold text-primary">
                       {part.owned ? "$0 · Already owned" : formatMoney(part.price)}
                     </p>
                     <div className="flex flex-wrap gap-1">
-                      {getComparisonDeltaBadges(build, part, selectedPart).slice(0, 3).map((badge) => (
-                        <DeltaBadge key={badge.label} {...badge} />
-                      ))}
+                      {getComparisonDeltaBadges(build, part, selectedPart)
+                        .slice(0, 3)
+                        .map((badge) => (
+                          <DeltaBadge key={badge.label} {...badge} />
+                        ))}
                     </div>
                   </div>
                 </th>
@@ -1355,7 +1474,9 @@ function ComparisonTable({
               featureLabel="Performance fit"
               onUpgraded={onUpgraded}
               values={parts.map((part) =>
-                getPerformanceFit(part) !== null ? `${getPerformanceFit(part)}/100` : "Category fit",
+                getPerformanceFit(part) !== null
+                  ? `${getPerformanceFit(part)}/100`
+                  : "Category fit",
               )}
             />
             <tr>
@@ -1370,7 +1491,8 @@ function ComparisonTable({
                         {candidateBuild.compatibilityWarnings.length > 0 && (
                           <p className="mt-2 text-xs text-muted-foreground">
                             {candidateBuild.compatibilityWarnings.length} item
-                            {candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} need review.
+                            {candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} need
+                            review.
                           </p>
                         )}
                       </>
@@ -1391,9 +1513,14 @@ function ComparisonTable({
               {parts.map((part) => (
                 <td key={part.id} className="px-4 py-3 text-muted-foreground">
                   {hasAdvancedCompare ? (
-                    part.recommendationReason ?? "Configured in the local mock catalog."
+                    (part.recommendationReason ?? "Configured in the local mock catalog.")
                   ) : (
-                    <ProFeatureLock feature="ai_reasoning" label="AI reasoning" showUpgrade={false} onUpgraded={onUpgraded} />
+                    <ProFeatureLock
+                      feature="ai_reasoning"
+                      label="AI reasoning"
+                      showUpgrade={false}
+                      onUpgraded={onUpgraded}
+                    />
                   )}
                 </td>
               ))}
@@ -1403,7 +1530,11 @@ function ComparisonTable({
               {parts.map((part) => (
                 <td key={part.id} className="px-4 py-3">
                   {hasAdvancedCompare ? (
-                    part.id === selectedPart.id ? "Keep as the balanced baseline." : "Preview the swap before replacing."
+                    part.id === selectedPart.id ? (
+                      "Keep as the balanced baseline."
+                    ) : (
+                      "Preview the swap before replacing."
+                    )
                   ) : (
                     <ProFeatureLock
                       feature="advanced_compare"
@@ -1471,13 +1602,7 @@ function AdvancedRow({
   );
 }
 
-function DeltaBadge({
-  label,
-  tone,
-}: {
-  label: string;
-  tone: "success" | "warning" | "neutral";
-}) {
+function DeltaBadge({ label, tone }: { label: string; tone: "success" | "warning" | "neutral" }) {
   return (
     <span
       className={cn(
@@ -1499,6 +1624,8 @@ function PreviewSwapPanel({
   plan,
   isReplacing,
   canReplacePart,
+  isHighlighted,
+  panelRef,
   onCancel,
   onConfirm,
   onUpgraded,
@@ -1509,6 +1636,8 @@ function PreviewSwapPanel({
   plan: PlanType;
   isReplacing?: boolean;
   canReplacePart: boolean;
+  isHighlighted: boolean;
+  panelRef: RefObject<HTMLElement | null>;
   onCancel: () => void;
   onConfirm: () => void;
   onUpgraded?: () => void;
@@ -1517,6 +1646,7 @@ function PreviewSwapPanel({
   const delta = getDisplayPrice(previewPart) - getDisplayPrice(currentPart);
   const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
   const affiliateLink = previewPart.affiliateLinks?.[0];
+  const [dealMessage, setDealMessage] = useState<string | null>(null);
 
   async function handlePreviewAffiliateClick(link: AffiliateLink) {
     await trackAffiliateClick({
@@ -1525,19 +1655,41 @@ function PreviewSwapPanel({
       url: link.url,
       buildId: build.id,
     });
-    window.open(link.url, "_blank", "noopener,noreferrer");
+
+    if (!link.url) {
+      setDealMessage("We do not have a deal link for this part yet.");
+      return;
+    }
+
+    const openedWindow = window.open(link.url, "_blank", "noopener,noreferrer");
+
+    if (!openedWindow) {
+      setDealMessage(
+        "Your browser blocked the new tab. Please allow popups for this site and try again.",
+      );
+      return;
+    }
+
+    setDealMessage(null);
   }
 
   return (
-    <section className="mt-5 rounded-xl border border-primary/25 bg-primary/5 p-4">
+    <section
+      ref={panelRef}
+      className={cn(
+        "mt-5 rounded-xl border border-primary/25 bg-primary/5 p-4 transition-all duration-500",
+        isHighlighted && "border-primary/70 bg-primary/10 ring-2 ring-primary/25 shadow-glow",
+      )}
+    >
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Badge className="mb-3 rounded-md border border-primary/30 bg-primary/15 text-primary">
-            <ArrowRightLeft className="mr-1 size-3" /> Preview Swap
+            <ArrowRightLeft className="mr-1 size-3" /> Swap Preview
           </Badge>
           <h3 className="text-lg font-bold">{previewPart.displayName}</h3>
           <p className="mt-1 text-sm text-muted-foreground">
-            Review the price and compatibility impact before replacing the current {categoryLabels[currentPart.category].toLowerCase()}.
+            Review the price and compatibility impact before replacing the current{" "}
+            {categoryLabels[currentPart.category].toLowerCase()}.
           </p>
         </div>
         <button
@@ -1553,7 +1705,13 @@ function PreviewSwapPanel({
       <div className="mt-4 grid gap-3 lg:grid-cols-4">
         <InfoRow
           label="Price change"
-          value={previewPart.owned ? "$0 · Already owned" : delta < 0 ? `-${formatMoney(Math.abs(delta))}` : `+${formatMoney(delta)}`}
+          value={
+            previewPart.owned
+              ? "$0 · Already owned"
+              : delta < 0
+                ? `-${formatMoney(Math.abs(delta))}`
+                : `+${formatMoney(delta)}`
+          }
           valueClass={delta <= 0 ? "text-success" : "text-warning"}
         />
         <InfoRow label="New build total" value={formatMoney(candidateBuild.totalPrice)} />
@@ -1596,7 +1754,10 @@ function PreviewSwapPanel({
       {candidateBuild.compatibilityWarnings.length > 0 && (
         <div className="mt-4 space-y-2">
           {candidateBuild.compatibilityWarnings.slice(0, 3).map((warning) => (
-            <div key={warning.id} className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning">
+            <div
+              key={warning.id}
+              className="rounded-xl border border-warning/30 bg-warning/10 px-3 py-2 text-sm text-warning"
+            >
               {warning.message}
             </div>
           ))}
@@ -1616,18 +1777,27 @@ function PreviewSwapPanel({
               {affiliateLink.label ?? "Check price"}
             </Button>
           )}
-        <Button variant="secondary" className="rounded-xl" onClick={onCancel}>
-          Keep current part
-        </Button>
-        <Button className="rounded-xl shadow-glow" disabled={isReplacing || !canReplacePart} onClick={onConfirm}>
-          {isReplacing ? (
-            <>
-              <LoaderCircle className="mr-2 size-4 animate-spin" /> Replacing
-            </>
-          ) : (
-            "Replace with this part"
+          {dealMessage && (
+            <p className="basis-full rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
+              {dealMessage}
+            </p>
           )}
-        </Button>
+          <Button variant="secondary" className="rounded-xl" onClick={onCancel}>
+            Keep current part
+          </Button>
+          <Button
+            className="rounded-xl shadow-glow"
+            disabled={isReplacing || !canReplacePart}
+            onClick={onConfirm}
+          >
+            {isReplacing ? (
+              <>
+                <LoaderCircle className="mr-2 size-4 animate-spin" /> Replacing
+              </>
+            ) : (
+              "Replace with this part"
+            )}
+          </Button>
         </div>
       </div>
     </section>
@@ -1635,12 +1805,14 @@ function PreviewSwapPanel({
 }
 
 function CompareTray({
+  trayRef,
   parts,
   selectedPart,
   onRemove,
   onClear,
   onCompare,
 }: {
+  trayRef: RefObject<HTMLDivElement | null>;
   parts: Part[];
   selectedPart: Part;
   onRemove: (part: Part) => void;
@@ -1648,7 +1820,10 @@ function CompareTray({
   onCompare: () => void;
 }) {
   return (
-    <div className="sticky bottom-0 z-20 border-t border-border bg-background/95 px-6 py-2 backdrop-blur">
+    <div
+      ref={trayRef}
+      className="sticky bottom-0 z-20 border-t border-border bg-background/95 px-6 py-2 backdrop-blur"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">
           <Badge className="rounded-md border border-primary/30 bg-primary/10 text-primary">
@@ -1664,7 +1839,10 @@ function CompareTray({
                 className="inline-flex max-w-[180px] items-center gap-2 rounded-full border border-border bg-card px-2.5 py-1 text-xs"
                 onClick={() => onRemove(part)}
               >
-                <span className="truncate">{part.id === selectedPart.id ? "Current: " : ""}{part.displayName}</span>
+                <span className="truncate">
+                  {part.id === selectedPart.id ? "Current: " : ""}
+                  {part.displayName}
+                </span>
                 <X className="size-3 shrink-0 text-muted-foreground" />
               </button>
             ))
@@ -1713,7 +1891,11 @@ function PartVisual({ part, featured = false }: { part: Part; featured?: boolean
 
 function CompatibilityBadge({ build }: { build: Build }) {
   if (build.compatibilityStatus === "pass") {
-    return <Badge className="rounded-md bg-success/15 text-success"><CheckCircle2 className="mr-1 size-3" /> Pass</Badge>;
+    return (
+      <Badge className="rounded-md bg-success/15 text-success">
+        <CheckCircle2 className="mr-1 size-3" /> Pass
+      </Badge>
+    );
   }
 
   if (build.compatibilityStatus === "warning") {
