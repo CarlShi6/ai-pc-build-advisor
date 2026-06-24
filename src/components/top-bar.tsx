@@ -1,13 +1,31 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import type { AuthSession } from "@/lib/persistence/types";
+import type { Entitlement } from "@/types/monetization";
 
 const MODES = [
   { label: "Configuration", to: "/consult" as const },
   { label: "Purchase References", to: "/cart" as const },
 ];
 
-export function TopBar({ onSavedBuildsClick }: { onSavedBuildsClick?: () => void }) {
+export function TopBar({
+  authSession,
+  entitlement,
+  onSavedBuildsClick,
+  onSignInClick,
+  onSignOutClick,
+}: {
+  authSession?: AuthSession | null;
+  entitlement?: Entitlement | null;
+  onSavedBuildsClick?: () => void;
+  onSignInClick?: () => void;
+  onSignOutClick?: () => void;
+}) {
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const isSignedIn = authSession?.status === "authenticated";
+  const accountLabel = isSignedIn ? "Signed in" : "Guest mode";
+  const planLabel = entitlement?.active && entitlement.plan === "build_pro" ? "Build Pro active" : "Free";
+
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
       <Link to="/" className="flex items-center gap-3">
@@ -56,9 +74,28 @@ export function TopBar({ onSavedBuildsClick }: { onSavedBuildsClick?: () => void
             Saved Builds
           </Link>
         )}
-        <div className="hidden text-right sm:block">
-          <p className="text-xs text-muted-foreground">Advisor Mode</p>
-          <p className="font-mono text-sm">B2C MVP</p>
+        <div className="hidden text-right md:block">
+          <p className="text-xs text-muted-foreground">{accountLabel}</p>
+          <p className="font-mono text-sm">{planLabel}</p>
+        </div>
+        <div className="hidden items-center gap-2 lg:flex">
+          {isSignedIn ? (
+            <button
+              type="button"
+              className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              onClick={onSignOutClick}
+            >
+              Sign out
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              onClick={onSignInClick}
+            >
+              Sign in
+            </button>
+          )}
         </div>
         <div className="size-10 rounded-full border border-border bg-secondary" />
       </div>

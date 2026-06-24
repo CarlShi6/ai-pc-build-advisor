@@ -9,7 +9,8 @@ import {
 } from "@/lib/build-advisor";
 import { getAdvisorResponse } from "@/lib/ai/advisor-service";
 import { normalizeAdvisorActions } from "@/lib/ai/types";
-import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
+import { getPersistenceStore } from "@/lib/persistence";
+import { clearSessionCookie, createSessionCookie } from "@/lib/persistence/mock-store";
 import { searchProducts } from "@/lib/product-search/search-service";
 import { createStripeCheckoutSession } from "@/lib/stripe.server";
 import type {
@@ -41,9 +42,13 @@ import type {
   SavedBuildResponse,
   SavedBuildsResponse,
   UsageStatusResponse,
+  AuthSessionResponse,
+  SignInPayload,
+  SignInResponse,
+  SignOutApiResponse,
+  SignUpPayload,
+  SignUpResponse,
 } from "@/types/api";
-import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
-import type { Build, SavedBuild, SavedBuildSummary } from "@/types/build";
 
 class ApiRouteError extends Error {
   status: number;
@@ -55,217 +60,7 @@ class ApiRouteError extends Error {
   }
 }
 
-const MOCK_USER_ID = "mock-user";
 const MOCK_BUILD_ID = "mock-build";
-
-type MockMonetizationState = {
-  entitlement: Entitlement;
-  aiQuestionsUsedToday: number;
-  aiQuestionsUsedForBuild: number;
-  replacementsUsedForBuild: number;
-  affiliateClicks: AffiliateClickEvent[];
-  savedBuilds: SavedBuild[];
-};
-
-const mockState: MockMonetizationState = {
-  entitlement: {
-    userId: MOCK_USER_ID,
-    plan: "free",
-    active: true,
-    startedAt: new Date().toISOString(),
-  },
-  aiQuestionsUsedToday: 0,
-  aiQuestionsUsedForBuild: 0,
-  replacementsUsedForBuild: 0,
-  affiliateClicks: [],
-  savedBuilds: [],
-};
-
-function createFreeEntitlement(): Entitlement {
-  return {
-    userId: MOCK_USER_ID,
-    plan: "free",
-    active: true,
-    startedAt: new Date().toISOString(),
-    paymentProvider: "mock",
-  };
-}
-
-function resetMockMonetizationState() {
-  mockState.entitlement = createFreeEntitlement();
-  mockState.aiQuestionsUsedToday = 0;
-  mockState.aiQuestionsUsedForBuild = 0;
-  mockState.replacementsUsedForBuild = 0;
-  mockState.affiliateClicks = [];
-  mockState.savedBuilds = [];
-}
-
-function getCurrentPlan(): PlanType {
-  return mockState.entitlement.active ? mockState.entitlement.plan : "free";
-}
-
-function activateBuildProEntitlement({
-  paymentProvider,
-  buildId = MOCK_BUILD_ID,
-  checkoutSessionId,
-  userId = MOCK_USER_ID,
-}: {
-  paymentProvider: "mock" | "stripe";
-  buildId?: string;
-  checkoutSessionId?: string;
-  userId?: string;
-}) {
-  const now = new Date().toISOString();
-  mockState.entitlement = {
-    userId,
-    plan: "build_pro",
-    buildId,
-    active: true,
-    startedAt: mockState.entitlement.startedAt || now,
-    paymentProvider,
-    checkoutSessionId,
-    activatedAt: now,
-  };
-
-  return mockState.entitlement;
-}
-
-function getSavedBuildLimit() {
-  return getCurrentPlan() === "build_pro" ? 10 : 1;
-}
-
-function createSavedBuildSummary(savedBuild: SavedBuild): SavedBuildSummary {
-  return {
-    id: savedBuild.id,
-    name: savedBuild.name,
-    createdAt: savedBuild.createdAt,
-    updatedAt: savedBuild.updatedAt,
-    totalPrice: savedBuild.totalPrice,
-    compatibilityStatus: savedBuild.compatibilityStatus,
-    ownedParts: savedBuild.ownedParts,
-    targetUseCase: savedBuild.targetUseCase,
-    cpuName: savedBuild.build.parts.find((part) => part.category === "cpu")?.displayName,
-    gpuName: savedBuild.build.parts.find((part) => part.category === "gpu")?.displayName,
-  };
-}
-
-function getSavedBuildSummaries() {
-  return [...mockState.savedBuilds]
-    .sort((left, right) => Date.parse(right.updatedAt) - Date.parse(left.updatedAt))
-    .map(createSavedBuildSummary);
-}
-
-function createSavedBuild({
-  id,
-  name,
-  build,
-  buildNeeds,
-}: SaveBuildRequest): SavedBuild {
-  const now = new Date().toISOString();
-  const existing = id ? mockState.savedBuilds.find((item) => item.id === id) : undefined;
-  const safeBuild = recalculateBuild(build);
-
-  return {
-    id: existing?.id ?? `saved-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-    name: name.trim() || safeBuild.name,
-    build: safeBuild,
-    buildNeeds,
-    createdAt: existing?.createdAt ?? now,
-    updatedAt: now,
-    totalPrice: safeBuild.totalPrice,
-    compatibilityStatus: safeBuild.compatibilityStatus,
-    ownedParts: safeBuild.parts.filter((part) => part.owned).length,
-    targetUseCase: safeBuild.targetUseCase,
-  };
-}
-
-function getUsageStatus(): UsageStatus {
-  const plan = getCurrentPlan();
-  const replacementLimit =
-    plan === "build_pro"
-      ? BUILD_PRO_PLAN.replacementLimit ?? 25
-      : FREE_PLAN.replacementLimit ?? 3;
-  const remainingReplacements = Math.max(0, replacementLimit - mockState.replacementsUsedForBuild);
-
-  if (plan === "build_pro") {
-    const limit = BUILD_PRO_PLAN.aiQuestionsPerBuild ?? 50;
-    const remaining = Math.max(0, limit - mockState.aiQuestionsUsedForBuild);
-
-    return {
-      userId: MOCK_USER_ID,
-      plan,
-      aiQuestionsUsedToday: mockState.aiQuestionsUsedToday,
-      aiQuestionsUsedForBuild: mockState.aiQuestionsUsedForBuild,
-      aiQuestionsLimitForBuild: limit,
-      remainingAiQuestions: remaining,
-      canAskAiQuestion: remaining > 0,
-      replacementLimit,
-      replacementsUsed: mockState.replacementsUsedForBuild,
-      remainingReplacements,
-      canReplacePart: remainingReplacements > 0,
-    };
-  }
-
-  const limit = FREE_PLAN.aiQuestionsPerDay ?? 5;
-  const remaining = Math.max(0, limit - mockState.aiQuestionsUsedToday);
-
-  return {
-    userId: MOCK_USER_ID,
-    plan,
-    aiQuestionsUsedToday: mockState.aiQuestionsUsedToday,
-    aiQuestionsLimitToday: limit,
-    remainingAiQuestions: remaining,
-    canAskAiQuestion: remaining > 0,
-    replacementLimit,
-    replacementsUsed: mockState.replacementsUsedForBuild,
-    remainingReplacements,
-    canReplacePart: remainingReplacements > 0,
-  };
-}
-
-function consumeAiUsage(): ConsumeUsageResponse {
-  const usage = getUsageStatus();
-
-  if (!usage.canAskAiQuestion) {
-    return {
-      usage,
-      consumed: false,
-      message:
-        "You have used the Free advisor questions for today. Build Pro unlocks 50 AI questions per build.",
-    };
-  }
-
-  if (usage.plan === "build_pro") {
-    mockState.aiQuestionsUsedForBuild += 1;
-  } else {
-    mockState.aiQuestionsUsedToday += 1;
-  }
-
-  return {
-    usage: getUsageStatus(),
-    consumed: true,
-  };
-}
-
-function consumeReplacementUsage(): ConsumeReplacementResponse {
-  const usage = getUsageStatus();
-
-  if (!usage.canReplacePart) {
-    return {
-      usage,
-      consumed: false,
-      message:
-        "You have used the Free hardware replacements for this build. Build Pro unlocks 25 replacements.",
-    };
-  }
-
-  mockState.replacementsUsedForBuild += 1;
-
-  return {
-    usage: getUsageStatus(),
-    consumed: true,
-  };
-}
 
 function jsonResponse(payload: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(payload), {
@@ -328,12 +123,63 @@ async function readJson<T>(request: Request): Promise<T> {
 export async function handleInternalApiRequest(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
   const pathname = normalizeApiPath(url.pathname);
+  const store = getPersistenceStore();
 
   if (!pathname.startsWith("/api")) {
     return null;
   }
 
   try {
+    if (pathname === "/api/auth/session") {
+      if (request.method !== "GET") {
+        return methodNotAllowed(["GET"]);
+      }
+
+      const payload: AuthSessionResponse = { session: await store.getSession(request) };
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/auth/sign-in") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const input = await readJson<SignInPayload>(request);
+
+      if (!input.email?.trim() || !input.password?.trim()) {
+        throw new ApiRouteError(400, "Sign in requires email and password.");
+      }
+
+      const session = await store.signIn(input);
+      const payload: SignInResponse = { session };
+      return jsonResponse(payload, { headers: { "Set-Cookie": createSessionCookie(session) } });
+    }
+
+    if (pathname === "/api/auth/sign-up") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const input = await readJson<SignUpPayload>(request);
+
+      if (!input.email?.trim() || !input.password?.trim()) {
+        throw new ApiRouteError(400, "Sign up requires email and password.");
+      }
+
+      const session = await store.signUp(input);
+      const payload: SignUpResponse = { session };
+      return jsonResponse(payload, { headers: { "Set-Cookie": createSessionCookie(session) } });
+    }
+
+    if (pathname === "/api/auth/sign-out") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const payload: SignOutApiResponse = await store.signOut(request);
+      return jsonResponse(payload, { headers: { "Set-Cookie": clearSessionCookie() } });
+    }
+
     if (pathname === "/api/parts") {
       if (request.method !== "GET") {
         return methodNotAllowed(["GET"]);
@@ -404,10 +250,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["GET"]);
       }
 
-      const payload: SavedBuildsResponse = {
-        builds: getSavedBuildSummaries(),
-        limit: getSavedBuildLimit(),
-      };
+      const actor = await store.getActor(request);
+      const payload: SavedBuildsResponse = await store.listSavedBuilds(actor);
       return jsonResponse(payload);
     }
 
@@ -422,43 +266,27 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         throw new ApiRouteError(400, "Saving a build requires a name and build.");
       }
 
-      const existingIndex = input.id
-        ? mockState.savedBuilds.findIndex((savedBuild) => savedBuild.id === input.id)
-        : -1;
-      const limit = getSavedBuildLimit();
-
-      if (existingIndex === -1 && mockState.savedBuilds.length >= limit) {
+      const actor = await store.getActor(request);
+      let payload: SaveBuildResponse;
+      try {
+        payload = await store.saveBuild(actor, input);
+      } catch (error) {
         throw new ApiRouteError(
           403,
-          getCurrentPlan() === "build_pro"
-            ? "You can save up to 10 builds with Build Pro."
-            : "Your Free saved build slot is full. Build Pro unlocks up to 10 saved builds plus full export.",
+          error instanceof Error ? error.message : "This saved build could not be stored.",
         );
       }
-
-      const savedBuild = createSavedBuild(input);
-
-      if (existingIndex >= 0) {
-        mockState.savedBuilds[existingIndex] = savedBuild;
-      } else {
-        mockState.savedBuilds.unshift(savedBuild);
-      }
-
-      const payload: SaveBuildResponse = {
-        savedBuild,
-        summary: createSavedBuildSummary(savedBuild),
-        builds: getSavedBuildSummaries(),
-        limit,
-      };
       return jsonResponse(payload);
     }
 
     const savedBuildMatch = pathname.match(/^\/api\/builds\/([^/]+)$/);
     if (savedBuildMatch) {
       const id = decodeURIComponent(savedBuildMatch[1]);
-      const savedBuild = mockState.savedBuilds.find((item) => item.id === id);
+      const actor = await store.getActor(request);
 
       if (request.method === "GET") {
+        const savedBuild = await store.getSavedBuild(actor, id);
+
         if (!savedBuild) {
           throw new ApiRouteError(404, "Saved build not found.");
         }
@@ -468,11 +296,11 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       }
 
       if (request.method === "DELETE") {
-        mockState.savedBuilds = mockState.savedBuilds.filter((item) => item.id !== id);
+        const result = await store.deleteSavedBuild(actor, id);
         const payload: DeleteSavedBuildResponse = {
           success: true,
-          builds: getSavedBuildSummaries(),
-          limit: getSavedBuildLimit(),
+          builds: result.builds,
+          limit: result.limit,
         };
         return jsonResponse(payload);
       }
@@ -492,7 +320,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         throw new ApiRouteError(400, "Advisor request requires a user message.");
       }
 
-      const usageBefore = getUsageStatus();
+      const actor = await store.getActor(request);
+      const usageBefore = await store.getUsageStatus(actor);
 
       if (!usageBefore.canAskAiQuestion) {
         const responsePayload: AdvisorResponsePayload = {
@@ -511,12 +340,13 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return jsonResponse(responsePayload);
       }
 
-      const usageResult = consumeAiUsage();
+      const usageResult = await store.consumeAiUsage(actor);
+      const entitlement = await store.getEntitlement(actor);
       const advisorResponse = await getAdvisorResponse({
         message,
         currentBuild: payload.currentBuild ?? null,
         collectedNeeds: payload.collectedNeeds ?? {},
-        plan: getCurrentPlan(),
+        plan: entitlement.active ? entitlement.plan : "free",
         usageStatus: usageResult.usage,
       });
 
@@ -569,7 +399,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["GET"]);
       }
 
-      const payload: UsageStatusResponse = { usage: getUsageStatus() };
+      const actor = await store.getActor(request);
+      const payload: UsageStatusResponse = { usage: await store.getUsageStatus(actor) };
       return jsonResponse(payload);
     }
 
@@ -578,7 +409,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["POST"]);
       }
 
-      const payload = consumeAiUsage();
+      const actor = await store.getActor(request);
+      const payload = await store.consumeAiUsage(actor);
       return jsonResponse(payload, { status: payload.consumed ? 200 : 429 });
     }
 
@@ -587,7 +419,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["POST"]);
       }
 
-      const payload = consumeReplacementUsage();
+      const actor = await store.getActor(request);
+      const payload = await store.consumeReplacementUsage(actor);
       return jsonResponse(payload, { status: payload.consumed ? 200 : 429 });
     }
 
@@ -596,7 +429,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["GET"]);
       }
 
-      const payload: EntitlementStatusResponse = { entitlement: mockState.entitlement };
+      const actor = await store.getActor(request);
+      const payload: EntitlementStatusResponse = { entitlement: await store.getEntitlement(actor) };
       return jsonResponse(payload);
     }
 
@@ -605,7 +439,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["POST"]);
       }
 
-      const entitlement = activateBuildProEntitlement({ paymentProvider: "mock" });
+      const actor = await store.getActor(request);
+      const entitlement = await store.activateBuildPro(actor, { paymentProvider: "mock" });
 
       const payload: CheckoutResponse = {
         success: true,
@@ -627,10 +462,11 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         throw new ApiRouteError(400, "Only Build Pro checkout is supported.");
       }
 
+      const actor = await store.getActor(request);
       const stripeResult = await createStripeCheckoutSession({
         plan: input.plan,
         buildId: input.buildId ?? MOCK_BUILD_ID,
-        userId: input.userId ?? MOCK_USER_ID,
+        userId: input.userId ?? actor.userId ?? actor.sessionId,
       });
       const payload: CreateCheckoutSessionApiResponse = {
         checkoutUrl: stripeResult.checkoutUrl,
@@ -668,18 +504,22 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         const plan = session?.metadata?.plan;
 
         if (session && plan === "build_pro") {
-          activateBuildProEntitlement({
+          const webhookActor = {
+            userId: session.metadata?.userId,
+            sessionId: session.metadata?.userId ?? "stripe-webhook-session",
+          };
+          await store.activateBuildPro(webhookActor, {
             paymentProvider: "stripe",
             buildId: session.metadata?.buildId ?? MOCK_BUILD_ID,
-            userId: session.metadata?.userId ?? MOCK_USER_ID,
             checkoutSessionId: session.id,
           });
         }
       }
 
+      const actor = await store.getActor(request);
       return jsonResponse({
         received: true,
-        entitlement: mockState.entitlement,
+        entitlement: await store.getEntitlement(actor),
         message: "Stripe webhook placeholder received.",
       });
     }
@@ -695,13 +535,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         throw new ApiRouteError(400, "Affiliate click requires partId, merchant, and url.");
       }
 
-      const clickEvent: AffiliateClickEvent = {
-        ...event,
-        userId: event.userId ?? MOCK_USER_ID,
-        buildId: event.buildId ?? MOCK_BUILD_ID,
-        clickedAt: event.clickedAt ?? new Date().toISOString(),
-      };
-      mockState.affiliateClicks.push(clickEvent);
+      const actor = await store.getActor(request);
+      const clickEvent = await store.trackAffiliateClick(actor, event);
 
       const payload: AffiliateClickResponse = {
         success: true,
@@ -715,12 +550,13 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["POST"]);
       }
 
-      resetMockMonetizationState();
+      const actor = await store.getActor(request);
+      const result = await store.resetActor(actor);
 
       const payload: ResetMonetizationResponse = {
         success: true,
-        entitlement: mockState.entitlement,
-        usage: getUsageStatus(),
+        entitlement: result.entitlement,
+        usage: result.usage,
         message: "Demo state reset. Free limits, usage, Pro access, and saved builds are back to the starting point.",
       };
       return jsonResponse(payload);

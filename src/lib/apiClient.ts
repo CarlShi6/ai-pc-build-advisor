@@ -20,15 +20,22 @@ import type {
   AdvisorRequestPayload,
   AdvisorResponsePayload,
   DeleteSavedBuildResponse,
+  AuthSessionResponse,
   ProductSearchRequest,
   ProductsSearchResponse,
   SaveBuildRequest,
   SaveBuildResponse,
   SavedBuildResponse,
   SavedBuildsResponse,
+  SignInPayload,
+  SignInResponse,
+  SignOutApiResponse,
+  SignUpPayload,
+  SignUpResponse,
 } from "@/types/api";
 import type { Build, SavedBuild, SavedBuildSummary, StoreEmployeeSummary } from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, UsageStatus } from "@/types/monetization";
+import type { AuthSession } from "@/lib/persistence/types";
 import type { Part } from "@/types/parts";
 
 class ApiClientError extends Error {
@@ -77,6 +84,37 @@ export async function getRecommendedBuild(input?: RecommendedBuildInput): Promis
   });
 
   return response.build;
+}
+
+export async function getAuthSession(): Promise<AuthSession> {
+  const response = await requestJson<AuthSessionResponse>("/api/auth/session");
+
+  return response.session;
+}
+
+export async function signIn(payload: SignInPayload): Promise<AuthSession> {
+  const response = await requestJson<SignInResponse>("/api/auth/sign-in", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return response.session;
+}
+
+export async function signUp(payload: SignUpPayload): Promise<AuthSession> {
+  const response = await requestJson<SignUpResponse>("/api/auth/sign-up", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+
+  return response.session;
+}
+
+export async function signOut(): Promise<SignOutApiResponse> {
+  return requestJson<SignOutApiResponse>("/api/auth/sign-out", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
 }
 
 export async function getPartsByCategory(category: string): Promise<Part[]> {

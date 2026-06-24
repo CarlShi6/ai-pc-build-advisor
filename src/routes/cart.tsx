@@ -56,7 +56,7 @@ function CartPage() {
       setEntitlement(await getEntitlementStatus());
     } catch {
       setEntitlement({
-        userId: "mock-user",
+        userId: "mock-guest-session",
         plan: "free",
         active: true,
         startedAt: new Date().toISOString(),
