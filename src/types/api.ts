@@ -20,6 +20,12 @@ import type {
   ProductSearchQuery,
   ProductSearchResponse,
 } from "@/lib/product-search/types";
+import type {
+  AuthSession,
+  SignInRequest,
+  SignOutResponse,
+  SignUpRequest,
+} from "@/lib/persistence/types";
 
 export type AppearancePreference = "black" | "white" | "rgb";
 export type ExperienceLevel = "beginner" | "intermediate" | "expert";
@@ -168,3 +174,21 @@ export interface DeleteSavedBuildResponse {
 export type AdvisorRequestPayload = AdvisorApiRequest;
 
 export type AdvisorResponsePayload = AdvisorApiResponse;
+
+export interface AuthSessionResponse {
+  session: AuthSession;
+}
+
+export type SignInPayload = SignInRequest;
+
+export type SignUpPayload = SignUpRequest;
+
+export interface SignInResponse {
+  session: AuthSession;
+}
+
+export interface SignUpResponse {
+  session: AuthSession;
+}
+
+export type SignOutApiResponse = SignOutResponse;

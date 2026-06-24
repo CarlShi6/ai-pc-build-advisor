@@ -12,6 +12,7 @@ import { categoryLabels } from "@/data/seedParts";
 import {
   askAdvisor,
   deleteSavedBuild,
+  getAuthSession,
   getEntitlementStatus,
   getCartPreview,
   getCompareParts,
@@ -25,6 +26,8 @@ import {
   resetMockMonetizationState,
   replaceBuildPart,
   saveCurrentBuild,
+  signIn,
+  signOut,
   trackAffiliateClick,
   ApiClientError,
 } from "@/lib/apiClient";
@@ -43,6 +46,7 @@ import type {
   StoreEmployeeSummary as StoreEmployeeSummaryModel,
 } from "@/types/build";
 import type { Entitlement, UsageStatus } from "@/types/monetization";
+import type { AuthSession } from "@/lib/persistence/types";
 import type { Part } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -357,6 +361,7 @@ function ConsultPage() {
   const [toast, setToast] = useState<{ message: string; tone: "success" | "error" | "notice" } | null>(null);
   const [usageStatus, setUsageStatus] = useState<UsageStatus | null>(null);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [showUsageUpgrade, setShowUsageUpgrade] = useState(false);
   const [expandedWarningIds, setExpandedWarningIds] = useState<Set<string>>(new Set());
   const [advisorUpdatedFields, setAdvisorUpdatedFields] = useState<Set<keyof CustomerNeeds>>(new Set());
@@ -433,6 +438,7 @@ function ConsultPage() {
   }, []);
 
   useEffect(() => {
+    void refreshAuthState();
     void refreshMonetizationState();
   }, []);
 
@@ -478,11 +484,54 @@ function ConsultPage() {
       }
     } catch {
       setEntitlement({
-        userId: "mock-user",
+        userId: "mock-guest-session",
         plan: "free",
         active: true,
         startedAt: new Date().toISOString(),
       });
+    }
+  }
+
+  async function refreshAuthState() {
+    try {
+      setAuthSession(await getAuthSession());
+    } catch {
+      setAuthSession({
+        status: "guest",
+        sessionId: "mock-guest-session",
+        userId: "mock-guest-session",
+        isMock: true,
+      });
+    }
+  }
+
+  async function handleSignIn() {
+    const email = window.prompt("Email for local mock sign in")?.trim();
+
+    if (!email) {
+      return;
+    }
+
+    try {
+      const session = await signIn({ email, password: "local-mock-password" });
+      setAuthSession(session);
+      await refreshMonetizationState();
+      await refreshSavedBuilds();
+      setToast({ message: `Signed in as ${session.user?.email ?? email}.`, tone: "success" });
+    } catch {
+      setToast({ message: "Could not sign in right now.", tone: "error" });
+    }
+  }
+
+  async function handleSignOut() {
+    try {
+      const result = await signOut();
+      setAuthSession(result.session);
+      await refreshMonetizationState();
+      await refreshSavedBuilds();
+      setToast({ message: result.message, tone: "success" });
+    } catch {
+      setToast({ message: "Could not sign out right now.", tone: "error" });
     }
   }
 
@@ -1023,7 +1072,13 @@ function ConsultPage() {
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      <TopBar onSavedBuildsClick={handleOpenSavedBuilds} />
+      <TopBar
+        authSession={authSession}
+        entitlement={entitlement}
+        onSavedBuildsClick={handleOpenSavedBuilds}
+        onSignInClick={() => void handleSignIn()}
+        onSignOutClick={() => void handleSignOut()}
+      />
 
       <main className="grid h-[calc(100vh-4rem)] min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_410px]">
         <section className="min-h-0 min-w-0 overflow-y-auto bg-card/30">

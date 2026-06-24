@@ -25,6 +25,9 @@ export function getServerConfig() {
     stripeSecretKey: process.env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
     stripeBuildProPriceId: process.env.STRIPE_BUILD_PRO_PRICE_ID,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseAnonKey: process.env.SUPABASE_ANON_KEY,
+    supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
     publicAppUrl: process.env.PUBLIC_APP_URL ?? "http://localhost:5173",
   };
 }
