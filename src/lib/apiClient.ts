@@ -8,8 +8,27 @@ import type {
   PartsResponse,
   RecommendBuildResponse,
   RecommendedBuildInput,
+  UsageStatusResponse,
+  EntitlementStatusResponse,
+  ConsumeUsageResponse,
+  CheckoutResponse,
+  CreateCheckoutSessionApiResponse,
+  CreateCheckoutSessionPayload,
+  ConsumeReplacementResponse,
+  AffiliateClickResponse,
+  ResetMonetizationResponse,
+  AdvisorRequestPayload,
+  AdvisorResponsePayload,
+  DeleteSavedBuildResponse,
+  ProductSearchRequest,
+  ProductsSearchResponse,
+  SaveBuildRequest,
+  SaveBuildResponse,
+  SavedBuildResponse,
+  SavedBuildsResponse,
 } from "@/types/api";
-import type { Build, StoreEmployeeSummary } from "@/types/build";
+import type { Build, SavedBuild, SavedBuildSummary, StoreEmployeeSummary } from "@/types/build";
+import type { AffiliateClickEvent, Entitlement, UsageStatus } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 
 class ApiClientError extends Error {
@@ -76,6 +95,15 @@ export async function getCompareParts(ids: string[]): Promise<Part[]> {
   return response.parts;
 }
 
+export async function searchProducts(
+  payload: ProductSearchRequest,
+): Promise<ProductsSearchResponse> {
+  return requestJson<ProductsSearchResponse>("/api/products/search", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function checkCompatibility(build: Build): Promise<Build> {
   const response = await requestJson<CompatibilityCheckResponse>("/api/build/compatibility-check", {
     method: "POST",
@@ -98,6 +126,142 @@ export async function getOffers(partId: string): Promise<PartOffer[]> {
   );
 
   return response.offers;
+}
+
+export async function getUsageStatus(): Promise<UsageStatus> {
+  const response = await requestJson<UsageStatusResponse>("/api/usage/status");
+
+  return response.usage;
+}
+
+export async function consumeAiUsage(): Promise<ConsumeUsageResponse> {
+  try {
+    return await requestJson<ConsumeUsageResponse>("/api/usage/consume", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 429) {
+      const usage = await getUsageStatus();
+      return {
+        usage,
+        consumed: false,
+        message:
+          "You have used the Free advisor questions for today. Build Pro unlocks 50 AI questions per build.",
+      };
+    }
+
+    throw error;
+  }
+}
+
+export async function consumeReplacementUsage(): Promise<ConsumeReplacementResponse> {
+  try {
+    return await requestJson<ConsumeReplacementResponse>("/api/usage/replacement/consume", {
+      method: "POST",
+      body: JSON.stringify({}),
+    });
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 429) {
+      const usage = await getUsageStatus();
+      return {
+        usage,
+        consumed: false,
+        message:
+          "You have used the Free hardware replacements for this build. Build Pro unlocks 25 replacements.",
+      };
+    }
+
+    throw error;
+  }
+}
+
+export async function getEntitlementStatus(): Promise<Entitlement> {
+  const response = await requestJson<EntitlementStatusResponse>("/api/entitlement/status");
+
+  return response.entitlement;
+}
+
+export async function mockUpgradeToPro(): Promise<CheckoutResponse> {
+  return requestJson<CheckoutResponse>("/api/checkout/mock-upgrade", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function createCheckoutSession(
+  payload: CreateCheckoutSessionPayload,
+): Promise<CreateCheckoutSessionApiResponse> {
+  return requestJson<CreateCheckoutSessionApiResponse>("/api/checkout/create-session", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function trackAffiliateClick(
+  event: Omit<AffiliateClickEvent, "clickedAt"> & { clickedAt?: string },
+): Promise<AffiliateClickEvent | null> {
+  try {
+    const response = await requestJson<AffiliateClickResponse>("/api/affiliate/click", {
+      method: "POST",
+      body: JSON.stringify({ event }),
+    });
+
+    return response.event;
+  } catch {
+    return null;
+  }
+}
+
+export async function resetMockMonetizationState(): Promise<ResetMonetizationResponse> {
+  return requestJson<ResetMonetizationResponse>("/api/monetization/reset", {
+    method: "POST",
+    body: JSON.stringify({}),
+  });
+}
+
+export async function askAdvisor(
+  payload: AdvisorRequestPayload,
+): Promise<AdvisorResponsePayload> {
+  return requestJson<AdvisorResponsePayload>("/api/ai/advisor", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSavedBuilds(): Promise<{ builds: SavedBuildSummary[]; limit: number }> {
+  return requestJson<SavedBuildsResponse>("/api/builds/saved");
+}
+
+export async function saveCurrentBuild(
+  payload: SaveBuildRequest,
+): Promise<SaveBuildResponse> {
+  return requestJson<SaveBuildResponse>("/api/builds/save", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function getSavedBuild(id: string): Promise<SavedBuild> {
+  const response = await requestJson<SavedBuildResponse>(
+    `/api/builds/${encodeURIComponent(id)}`,
+  );
+
+  return response.savedBuild;
+}
+
+export async function deleteSavedBuild(
+  id: string,
+): Promise<{ builds: SavedBuildSummary[]; limit: number }> {
+  const response = await requestJson<DeleteSavedBuildResponse>(
+    `/api/builds/${encodeURIComponent(id)}`,
+    { method: "DELETE" },
+  );
+
+  return {
+    builds: response.builds,
+    limit: response.limit,
+  };
 }
 
 export async function replaceBuildPart(

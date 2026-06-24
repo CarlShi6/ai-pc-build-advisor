@@ -4,16 +4,33 @@ import { BuildCard } from "@/components/build-card";
 import { ChatPanel, type ChatMessage } from "@/components/chat-panel";
 import { CompareDrawer } from "@/components/compare-drawer";
 import { TopBar } from "@/components/top-bar";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
+import { ProFeatureLock } from "@/components/ProFeatureLock";
+import { UpgradeCard } from "@/components/UpgradeCard";
+import { UsageBadge } from "@/components/UsageBadge";
 import { categoryLabels } from "@/data/seedParts";
 import {
+  askAdvisor,
+  deleteSavedBuild,
+  getEntitlementStatus,
   getCartPreview,
   getCompareParts,
+  getSavedBuild,
+  getSavedBuilds,
   getPartsByCategory,
   getRecommendedBuild,
   getRecommendedReplacementForWarning,
+  getUsageStatus,
+  consumeReplacementUsage,
+  resetMockMonetizationState,
   replaceBuildPart,
+  saveCurrentBuild,
+  trackAffiliateClick,
+  ApiClientError,
 } from "@/lib/apiClient";
-import { hasUsefulNeedInfo, mergeCustomerNeeds, parseCustomerNeeds } from "@/lib/needParser";
+import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
+import { mergeCustomerNeeds } from "@/lib/needParser";
+import type { AdvisorSuggestedAction } from "@/lib/ai/types";
 import type {
   CustomerNeeds,
   RecommendedBuildInput,
@@ -22,20 +39,29 @@ import type {
   Build as BuildModel,
   CartPreviewItem as CartPreviewItemModel,
   CompatibilityWarning as CompatibilityWarningModel,
+  SavedBuildSummary,
   StoreEmployeeSummary as StoreEmployeeSummaryModel,
 } from "@/types/build";
+import type { Entitlement, UsageStatus } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   AlertTriangle,
   ArrowRightLeft,
+  ChevronDown,
   CheckCircle2,
   ClipboardList,
+  Copy,
+  Download,
+  FileJson,
+  FolderOpen,
   LoaderCircle,
+  Save,
   ShieldCheck,
   Sparkles,
   ShoppingBag,
+  Trash2,
   Wrench,
 } from "lucide-react";
 
@@ -60,13 +86,31 @@ const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   },
 ];
 
+const PRO_PURCHASE_CHECKLIST = [
+  "Confirm CPU and motherboard socket compatibility",
+  "Confirm RAM type",
+  "Confirm PSU wattage",
+  "Confirm GPU clearance",
+  "Confirm case and cooler fit",
+  "Confirm storage slots",
+  "Confirm Windows/license plan",
+  "Confirm monitor resolution target",
+];
+
+const AI_LIMIT_UPGRADE_COPY =
+  "You have used the Free advisor questions for today. Your build is still here, and Build Pro unlocks 50 AI questions per build.";
+const REPLACEMENT_LIMIT_UPGRADE_COPY =
+  "You have used the Free hardware replacements for this build. Build Pro unlocks 25 replacements so you can keep tuning parts.";
+const SAVED_BUILD_LIMIT_UPGRADE_COPY =
+  "Your Free saved build slot is full. Build Pro unlocks up to 10 saved builds plus full export.";
+
 export const Route = createFileRoute("/consult")({
   head: () => ({
     meta: [
-      { title: "Customer Consultation | AI PC Build Advisor" },
+      { title: "Build Advisor | AI PC Build Advisor" },
       {
         name: "description",
-        content: "Chat with the AI advisor to collect customer needs and generate a live PC build.",
+        content: "Chat with the AI advisor to collect your PC needs and generate a live build.",
       },
     ],
   }),
@@ -223,6 +267,74 @@ function buildAssistantReply({
   return `Noted ${responseBits.join(", ")}. I refreshed the recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. ${followUp}`;
 }
 
+function formatMoney(value: number) {
+  return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatDate(value: string) {
+  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(
+    new Date(value),
+  );
+}
+
+function formatCompatibilityStatus(status: BuildModel["compatibilityStatus"]) {
+  if (status === "pass") {
+    return "Ready";
+  }
+
+  return "Needs review";
+}
+
+function createBuildExportText({
+  build,
+  buildNeeds,
+  cartPreview,
+}: {
+  build: BuildModel;
+  buildNeeds: CustomerNeeds;
+  cartPreview: CartPreviewItemModel[];
+}) {
+  const lines = [
+    `# ${build.name}`,
+    "",
+    `Estimated total: ${formatMoney(build.totalPrice)}`,
+    `Compatibility: ${formatCompatibilityStatus(build.compatibilityStatus)}`,
+    `Target use case: ${build.targetUseCase.join(" + ") || "Not specified"}`,
+    `Budget: ${buildNeeds.budget ? formatMoney(buildNeeds.budget) : "Still collecting"}`,
+    `Appearance: ${formatAppearancePreference(buildNeeds.appearancePreference)}`,
+    `Experience: ${formatExperienceLevel(buildNeeds.experienceLevel)}`,
+    `Brand preference: ${formatBrandPreference(buildNeeds)}`,
+    "",
+    "## Parts",
+    ...build.parts.map((part) => {
+      const price = part.owned ? "$0 - Already owned" : formatMoney(part.price);
+      return `- ${part.category.toUpperCase()}: ${part.displayName} (${price})`;
+    }),
+    "",
+    "## Purchase References",
+    ...cartPreview.map((item) => {
+      const price = item.estimatedPrice === 0 ? "$0" : formatMoney(item.estimatedPrice);
+      return `- ${item.displayName}: ${price} at ${item.retailer}. ${item.note ?? ""}`.trim();
+    }),
+    "",
+    "Some links may earn us a commission at no extra cost to you.",
+  ];
+
+  return lines.join("\n");
+}
+
+function downloadTextFile(filename: string, content: string, type: string) {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function ConsultPage() {
   const [build, setBuild] = useState<BuildModel | null>(null);
   const [buildError, setBuildError] = useState<string | null>(null);
@@ -242,7 +354,23 @@ function ConsultPage() {
   const [customerNeeds, setCustomerNeeds] = useState<CustomerNeeds>({});
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
   const [chatInput, setChatInput] = useState("");
-  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" } | null>(null);
+  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" | "notice" } | null>(null);
+  const [usageStatus, setUsageStatus] = useState<UsageStatus | null>(null);
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const [showUsageUpgrade, setShowUsageUpgrade] = useState(false);
+  const [expandedWarningIds, setExpandedWarningIds] = useState<Set<string>>(new Set());
+  const [advisorUpdatedFields, setAdvisorUpdatedFields] = useState<Set<keyof CustomerNeeds>>(new Set());
+  const [openOwnedPartForm, setOpenOwnedPartForm] = useState(false);
+  const [ownedPartHint, setOwnedPartHint] = useState<string | null>(null);
+  const [savedBuilds, setSavedBuilds] = useState<SavedBuildSummary[]>([]);
+  const [savedBuildLimit, setSavedBuildLimit] = useState(1);
+  const [isSavedBuildsOpen, setIsSavedBuildsOpen] = useState(false);
+  const [isLoadingSavedBuilds, setIsLoadingSavedBuilds] = useState(false);
+  const [isSavingBuild, setIsSavingBuild] = useState(false);
+  const [saveBuildName, setSaveBuildName] = useState("");
+  const plan = getPlanForEntitlement(entitlement);
+  const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
+  const hasFullExport = canUseFeature(plan, "build_export");
 
   useEffect(() => {
     let active = true;
@@ -305,6 +433,16 @@ function ConsultPage() {
   }, []);
 
   useEffect(() => {
+    void refreshMonetizationState();
+  }, []);
+
+  useEffect(() => {
+    if (build && !saveBuildName.trim()) {
+      setSaveBuildName(build.name);
+    }
+  }, [build, saveBuildName]);
+
+  useEffect(() => {
     if (!toast) {
       return;
     }
@@ -321,8 +459,196 @@ function ConsultPage() {
       setCompareParts([]);
       setCompareError(null);
       setRecommendedReplacementId(null);
+      setOpenOwnedPartForm(false);
+      setOwnedPartHint(null);
       setIsLoadingCompare(false);
     }
+  }
+
+  async function refreshMonetizationState() {
+    try {
+      const [nextEntitlement, nextUsage] = await Promise.all([
+        getEntitlementStatus(),
+        getUsageStatus(),
+      ]);
+      setEntitlement(nextEntitlement);
+      setUsageStatus(nextUsage);
+      if (nextUsage.canAskAiQuestion) {
+        setShowUsageUpgrade(false);
+      }
+    } catch {
+      setEntitlement({
+        userId: "mock-user",
+        plan: "free",
+        active: true,
+        startedAt: new Date().toISOString(),
+      });
+    }
+  }
+
+  async function handleResetMonetization() {
+    try {
+      const result = await resetMockMonetizationState();
+      setEntitlement(result.entitlement);
+      setUsageStatus(result.usage);
+      setShowUsageUpgrade(false);
+      setToast({
+        message: result.message,
+        tone: "success",
+      });
+    } catch {
+      setToast({
+        message: "Could not reset mock monetization state right now.",
+        tone: "error",
+      });
+    }
+  }
+
+  async function refreshSavedBuilds() {
+    setIsLoadingSavedBuilds(true);
+
+    try {
+      const result = await getSavedBuilds();
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+    } catch {
+      setToast({ message: "Could not load saved builds right now.", tone: "error" });
+    } finally {
+      setIsLoadingSavedBuilds(false);
+    }
+  }
+
+  function handleOpenSavedBuilds() {
+    setIsSavedBuildsOpen(true);
+    void refreshSavedBuilds();
+  }
+
+  async function handleSaveBuild(id?: string, overrideName?: string) {
+    if (!build) {
+      return;
+    }
+
+    const name = (overrideName ?? saveBuildName).trim() || build.name;
+    setIsSavingBuild(true);
+
+    try {
+      const result = await saveCurrentBuild({
+        id,
+        name,
+        build,
+        buildNeeds: customerNeeds,
+      });
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+      setSaveBuildName(result.savedBuild.name);
+      setToast({ message: `"${result.savedBuild.name}" saved.`, tone: "success" });
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 403) {
+        setShowUsageUpgrade(true);
+        setToast({
+          message: SAVED_BUILD_LIMIT_UPGRADE_COPY,
+          tone: "notice",
+        });
+      } else {
+        setToast({ message: "Could not save this build right now.", tone: "error" });
+      }
+    } finally {
+      setIsSavingBuild(false);
+    }
+  }
+
+  async function handleLoadSavedBuild(id: string) {
+    setIsLoadingSavedBuilds(true);
+
+    try {
+      const savedBuild = await getSavedBuild(id);
+      const preview = await getCartPreview(savedBuild.build);
+      setBuild(savedBuild.build);
+      setCustomerNeeds(savedBuild.buildNeeds);
+      setCartPreview(preview.items);
+      setEmployeeSummary(preview.employeeSummary);
+      setSaveBuildName(savedBuild.name);
+      setIsSavedBuildsOpen(false);
+      handleDrawerOpenChange(false);
+      setToast({ message: `"${savedBuild.name}" loaded.`, tone: "success" });
+    } catch {
+      setToast({ message: "Could not load that saved build.", tone: "error" });
+    } finally {
+      setIsLoadingSavedBuilds(false);
+    }
+  }
+
+  async function handleDeleteSavedBuild(id: string) {
+    try {
+      const result = await deleteSavedBuild(id);
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+      setToast({ message: "Saved build deleted.", tone: "success" });
+    } catch {
+      setToast({ message: "Could not delete that saved build.", tone: "error" });
+    }
+  }
+
+  async function handleRenameSavedBuild(summary: SavedBuildSummary) {
+    const nextName = window.prompt("Rename saved build", summary.name)?.trim();
+
+    if (!nextName || nextName === summary.name) {
+      return;
+    }
+
+    try {
+      const savedBuild = await getSavedBuild(summary.id);
+      const result = await saveCurrentBuild({
+        id: savedBuild.id,
+        name: nextName,
+        build: savedBuild.build,
+        buildNeeds: savedBuild.buildNeeds,
+      });
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+      setToast({ message: "Saved build renamed.", tone: "success" });
+    } catch {
+      setToast({ message: "Could not rename that saved build.", tone: "error" });
+    }
+  }
+
+  async function handleCopyExport() {
+    if (!build) {
+      return;
+    }
+
+    const content = createBuildExportText({ build, buildNeeds: customerNeeds, cartPreview });
+
+    try {
+      await navigator.clipboard.writeText(content);
+      setToast({ message: "Build summary copied.", tone: "success" });
+    } catch {
+      setToast({ message: "Clipboard copy was blocked by the browser.", tone: "error" });
+    }
+  }
+
+  function handleDownloadJson() {
+    if (!build) {
+      return;
+    }
+
+    downloadTextFile(
+      `${build.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "pc-build"}.json`,
+      JSON.stringify({ build, buildNeeds: customerNeeds, purchaseReferences: cartPreview }, null, 2),
+      "application/json",
+    );
+  }
+
+  function handleDownloadMarkdown() {
+    if (!build) {
+      return;
+    }
+
+    downloadTextFile(
+      `${build.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "pc-build"}.md`,
+      createBuildExportText({ build, buildNeeds: customerNeeds, cartPreview }),
+      "text/markdown",
+    );
   }
 
   async function openCompare(category: string, nextRecommendedReplacementId?: string | null) {
@@ -369,6 +695,18 @@ function ConsultPage() {
     setDetailsError(null);
 
     try {
+      const replacementUsage = await consumeReplacementUsage();
+      setUsageStatus(replacementUsage.usage);
+
+      if (!replacementUsage.consumed) {
+        setShowUsageUpgrade(true);
+        setToast({
+          message: replacementUsage.message ?? REPLACEMENT_LIMIT_UPGRADE_COPY,
+          tone: "notice",
+        });
+        return;
+      }
+
       const nextState = await replaceBuildPart(build, part);
       setBuild(nextState.build);
       setCartPreview(nextState.cartPreview);
@@ -427,51 +765,47 @@ function ConsultPage() {
     setChatMessages((current) => [...current, userMessage]);
     setChatInput("");
 
-    const parsed = parseCustomerNeeds(message);
-    const mergedNeeds = mergeCustomerNeeds(customerNeeds, parsed.parsedNeeds);
-
-    setCustomerNeeds(mergedNeeds);
-
-    if (!hasUsefulNeedInfo(parsed)) {
-      setChatMessages((current) => [
-        ...current,
-        {
-          id: createMessageId(),
-          role: "assistant",
-          text: buildAssistantReply({ matchedFields: parsed.matchedFields, needs: mergedNeeds }),
-        },
-      ]);
-      return;
-    }
-
-      setIsGeneratingRecommendation(true);
-      setIsLoadingDetails(true);
-      setDetailsError(null);
+    setIsGeneratingRecommendation(true);
+    setDetailsError(null);
 
     try {
-      const nextState = await refreshBuildAndDetails(mergedNeeds);
-      setBuild(nextState.build);
-      setCartPreview(nextState.cartPreview);
-      setEmployeeSummary(nextState.employeeSummary);
-      handleDrawerOpenChange(false);
+      const advisorResponse = await askAdvisor({
+        message,
+        currentBuild: build,
+        collectedNeeds: customerNeeds,
+        plan,
+        usageStatus,
+      });
+
+      setUsageStatus(advisorResponse.usage);
+      setShowUsageUpgrade(Boolean(advisorResponse.upgradeRequired));
+      if (advisorResponse.upgradeRequired) {
+        setToast({
+          message: AI_LIMIT_UPGRADE_COPY,
+          tone: "notice",
+        });
+      }
       setChatMessages((current) => [
         ...current,
         {
           id: createMessageId(),
           role: "assistant",
-          text: buildAssistantReply({
-            build: nextState.build,
-            matchedFields: parsed.matchedFields,
-            needs: mergedNeeds,
-          }),
+          text: advisorResponse.assistantMessage,
+          actions: advisorResponse.suggestedActions,
+          warnings: advisorResponse.warnings,
+          fallbackUsed: advisorResponse.fallbackUsed,
         },
       ]);
+
+      if (!advisorResponse.usageConsumed) {
+        return;
+      }
     } catch {
       setDetailsError(
-        "The recommendation could not be refreshed from the internal API. The previous build is still shown.",
+        "The advisor could not complete the request. The previous build is still shown.",
       );
       setToast({
-        message: "Could not refresh the build recommendation right now. Please try again.",
+        message: "Could not reach the advisor right now. Please try again.",
         tone: "error",
       });
       setChatMessages((current) => [
@@ -479,13 +813,125 @@ function ConsultPage() {
         {
           id: createMessageId(),
           role: "assistant",
-          text: "I parsed the request, but the internal recommendation API did not refresh the build this time. Please try sending the request again.",
+          text: "I could not reach the advisor service this time. Your current build is unchanged, and compatibility checks remain available.",
         },
       ]);
     } finally {
       setIsGeneratingRecommendation(false);
       setIsLoadingDetails(false);
     }
+  }
+
+  async function applyAdvisorNeedsUpdate(nextNeeds: CustomerNeeds, updatedFields: Array<keyof CustomerNeeds>) {
+    const mergedNeeds = mergeCustomerNeeds(customerNeeds, nextNeeds);
+    setCustomerNeeds(mergedNeeds);
+    setAdvisorUpdatedFields((current) => {
+      const next = new Set(current);
+      updatedFields.forEach((field) => next.add(field));
+      return next;
+    });
+    setIsLoadingDetails(true);
+
+    try {
+      const nextState = await refreshBuildAndDetails(mergedNeeds);
+      setBuild(nextState.build);
+      setCartPreview(nextState.cartPreview);
+      setEmployeeSummary(nextState.employeeSummary);
+      handleDrawerOpenChange(false);
+      setToast({ message: "Build needs updated from advisor action.", tone: "success" });
+    } catch {
+      setDetailsError("The build needs were updated, but the recommendation could not refresh right now.");
+      setToast({ message: "Could not refresh the build after updating needs.", tone: "error" });
+    } finally {
+      setIsLoadingDetails(false);
+    }
+  }
+
+  async function handleAdvisorAction(action: AdvisorSuggestedAction) {
+    switch (action.type) {
+      case "update_budget":
+        await applyAdvisorNeedsUpdate({ budget: action.budget }, ["budget"]);
+        return;
+      case "update_use_case":
+        await applyAdvisorNeedsUpdate({ targetUseCase: action.targetUseCase }, ["targetUseCase"]);
+        return;
+      case "update_appearance":
+        await applyAdvisorNeedsUpdate(
+          { appearancePreference: action.appearancePreference },
+          ["appearancePreference"],
+        );
+        return;
+      case "update_brand_preference":
+        await applyAdvisorNeedsUpdate(
+          {
+            ...(action.cpuBrandPreference ? { cpuBrandPreference: action.cpuBrandPreference } : {}),
+            ...(action.gpuBrandPreference ? { gpuBrandPreference: action.gpuBrandPreference } : {}),
+          },
+          [
+            ...(action.cpuBrandPreference ? (["cpuBrandPreference"] as const) : []),
+            ...(action.gpuBrandPreference ? (["gpuBrandPreference"] as const) : []),
+          ],
+        );
+        return;
+      case "update_experience_level":
+        await applyAdvisorNeedsUpdate(
+          { experienceLevel: action.experienceLevel },
+          ["experienceLevel"],
+        );
+        return;
+      case "add_owned_part": {
+        const category = action.category ?? "gpu";
+        setOpenOwnedPartForm(true);
+        setOwnedPartHint(action.partHint ?? categoryLabels[category]);
+        await openCompare(category);
+        return;
+      }
+      case "open_part_explorer":
+        setOpenOwnedPartForm(false);
+        setOwnedPartHint(null);
+        await openCompare(action.category);
+        return;
+      case "explain_current_build": {
+        const partSummary = build
+          ? build.parts
+              .slice(0, 4)
+              .map((part) => `${categoryLabels[part.category]}: ${part.displayName}`)
+              .join(". ")
+          : "The build is still loading.";
+        setChatMessages((current) => [
+          ...current,
+          {
+            id: createMessageId(),
+            role: "assistant",
+            text: `${build?.name ?? "Current build"} is at ${build ? `$${build.totalPrice.toLocaleString()}` : "the current budget"}. ${partSummary}. Compatibility remains checked by local rules.`,
+          },
+        ]);
+        return;
+      }
+      case "ask_clarifying_question":
+        setChatMessages((current) => [
+          ...current,
+          {
+            id: createMessageId(),
+            role: "assistant",
+            text: action.question,
+          },
+        ]);
+        return;
+    }
+  }
+
+  async function handleAffiliateClick(
+    item: CartPreviewItemModel,
+    link: NonNullable<CartPreviewItemModel["affiliateLinks"]>[number],
+  ) {
+    await trackAffiliateClick({
+      partId: item.partId,
+      merchant: link.merchant,
+      url: link.url,
+      buildId: build?.id,
+    });
+    window.open(link.url, "_blank", "noopener,noreferrer");
   }
 
   function renderWarningActions(warning: CompatibilityWarningModel) {
@@ -509,7 +955,7 @@ function ConsultPage() {
           <div>
             <div className="flex items-center gap-2 text-sm font-semibold text-primary">
               <Wrench className="size-4" />
-              Fix Now
+              Review options
             </div>
             <p className="mt-1 text-sm text-muted-foreground">{getFixNowDescription(category)}</p>
           </div>
@@ -541,9 +987,21 @@ function ConsultPage() {
     );
   }
 
+  function toggleWarningDetails(id: string) {
+    setExpandedWarningIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  }
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
-      <TopBar />
+      <TopBar onSavedBuildsClick={handleOpenSavedBuilds} />
 
       <main className="grid h-[calc(100vh-4rem)] min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_410px]">
         <section className="min-h-0 min-w-0 overflow-y-auto bg-card/30">
@@ -566,6 +1024,23 @@ function ConsultPage() {
                   Loading recommended build
                 </div>
               )}
+              <div className="flex flex-wrap items-center gap-2">
+                <UsageBadge usage={usageStatus} />
+                {plan === "build_pro" && (
+                  <Badge className="rounded-md border border-success/25 bg-success/10 text-success">
+                    <ShieldCheck className="mr-1 size-3" />
+                    Build Pro active
+                  </Badge>
+                )}
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-md"
+                  onClick={() => void handleResetMonetization()}
+                >
+                  Reset mock access
+                </Button>
+              </div>
             </div>
 
             {buildError ? (
@@ -575,7 +1050,7 @@ function ConsultPage() {
               </div>
             ) : build ? (
               <>
-                <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                  <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -602,19 +1077,55 @@ function ConsultPage() {
                           ? `$${customerNeeds.budget.toLocaleString()}`
                           : "Still collecting"
                       }
+                      updated={advisorUpdatedFields.has("budget")}
                     />
-                    <NeedsCard label="Use case" value={formatNeedsList(customerNeeds.targetUseCase)} />
+                    <NeedsCard
+                      label="Use case"
+                      value={formatNeedsList(customerNeeds.targetUseCase)}
+                      updated={advisorUpdatedFields.has("targetUseCase")}
+                    />
                     <NeedsCard
                       label="Appearance"
                       value={formatAppearancePreference(customerNeeds.appearancePreference)}
+                      updated={advisorUpdatedFields.has("appearancePreference")}
                     />
                     <NeedsCard
                       label="Experience"
                       value={formatExperienceLevel(customerNeeds.experienceLevel)}
+                      updated={advisorUpdatedFields.has("experienceLevel")}
                     />
-                    <NeedsCard label="Brand preference" value={formatBrandPreference(customerNeeds)} />
+                    <NeedsCard
+                      label="Brand preference"
+                      value={formatBrandPreference(customerNeeds)}
+                      updated={
+                        advisorUpdatedFields.has("cpuBrandPreference") ||
+                        advisorUpdatedFields.has("gpuBrandPreference")
+                      }
+                    />
                   </div>
                 </section>
+
+                {showUsageUpgrade && (
+                  <section className="rounded-2xl border border-warning/25 bg-warning/10 p-5">
+                    <div className="mb-4 flex items-start gap-3">
+                      <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-warning/30 bg-background text-warning">
+                        <Sparkles className="size-4" />
+                      </div>
+                      <div>
+                        <h2 className="text-base font-bold">Keep building with Build Pro</h2>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          Free planning limits are designed for a first pass. Build Pro unlocks more advisor questions,
+                          more hardware replacements, saved builds, and full export.
+                        </p>
+                      </div>
+                    </div>
+                    <UpgradeCard
+                      compact
+                      onUpgraded={() => void refreshMonetizationState()}
+                      className="border-warning/25 bg-background/70"
+                    />
+                  </section>
+                )}
 
                 <BuildCard
                   build={build}
@@ -630,71 +1141,82 @@ function ConsultPage() {
                 )}
 
                 <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-                  <section className="rounded-2xl border border-border bg-card p-6">
-                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <ShieldCheck className="size-4 text-primary" />
-                          <h2 className="text-xl font-bold">Compatibility Warnings</h2>
+                  {build.compatibilityWarnings.length === 0 ? (
+                    <section className="rounded-2xl border border-success/20 bg-success/10 p-4">
+                      <div className="flex items-center gap-3 text-success">
+                        <ShieldCheck className="size-5" />
+                        <div>
+                          <h2 className="text-base font-bold">Compatibility checks passed</h2>
+                          <p className="text-sm">No rule-based issues found in the current build.</p>
                         </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                          Every warning stays visible and includes a fix path when local mock data can support it.
-                        </p>
                       </div>
-                      <Badge
-                        className={
-                          build.compatibilityStatus === "pass"
-                            ? "bg-success/15 text-success"
-                            : build.compatibilityStatus === "warning"
-                              ? "bg-warning/15 text-warning"
-                              : "bg-destructive/15 text-destructive"
-                        }
-                      >
-                        {build.compatibilityStatus === "pass"
-                          ? "All checks passed"
-                          : `${build.compatibilityWarnings.length} active`}
-                      </Badge>
-                    </div>
+                    </section>
+                  ) : (
+                    <section className="rounded-2xl border border-border bg-card p-4">
+                      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-2">
+                          <AlertTriangle className="size-4 text-warning" />
+                          <h2 className="text-lg font-bold">Compatibility needs review</h2>
+                        </div>
+                        <Badge className="bg-warning/15 text-warning">
+                          {build.compatibilityWarnings.length} item{build.compatibilityWarnings.length === 1 ? "" : "s"}
+                        </Badge>
+                      </div>
+                      <div className="space-y-2">
+                        {build.compatibilityWarnings.map((warning) => {
+                          const expanded = expandedWarningIds.has(warning.id);
+                          const affectedNames = warning.affectedPartIds
+                            .map((partId) => build.parts.find((part) => part.id === partId)?.displayName)
+                            .filter(Boolean)
+                            .join(" + ");
 
-                    {build.compatibilityWarnings.length === 0 ? (
-                      <div className="rounded-2xl border border-success/20 bg-success/10 p-4 text-sm text-success">
-                        Every current part passes the local mock compatibility rules.
-                      </div>
-                    ) : (
-                      <div className="space-y-3">
-                        {build.compatibilityWarnings.map((warning) => (
-                          <div
-                            key={warning.id}
-                            className="rounded-2xl border border-border bg-background/60 p-4 transition-colors hover:border-primary/20"
-                          >
-                            <div className="flex items-start gap-3">
-                              <AlertTriangle
-                                className={
-                                  warning.severity === "error"
-                                    ? "mt-0.5 size-4 shrink-0 text-destructive"
-                                    : "mt-0.5 size-4 shrink-0 text-warning"
-                                }
-                              />
-                              <div className="flex-1">
-                                <div className="flex flex-wrap items-center gap-2">
-                                  <p className="font-medium">{warning.message}</p>
-                                  {getWarningTargetCategory(warning) && (
-                                    <Badge className="bg-primary/15 text-primary">Fix Now</Badge>
-                                  )}
+                          return (
+                            <div key={warning.id} className="rounded-xl border border-border bg-background/60 p-3">
+                              <div className="flex flex-wrap items-center justify-between gap-3">
+                                <div className="min-w-0 flex-1">
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <Badge
+                                      className={
+                                        warning.severity === "error"
+                                          ? "bg-destructive/15 text-destructive"
+                                          : "bg-warning/15 text-warning"
+                                      }
+                                    >
+                                      {warning.severity === "error" ? "Needs review" : "Warning"}
+                                    </Badge>
+                                    {affectedNames && (
+                                      <span className="truncate text-sm text-muted-foreground">
+                                        {affectedNames}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="mt-1 text-sm font-medium">{warning.message}</p>
                                 </div>
-                                {warning.suggestedFix && (
-                                  <p className="mt-1 text-sm text-muted-foreground">
-                                    Suggested fix: {warning.suggestedFix}
-                                  </p>
-                                )}
-                                {renderWarningActions(warning)}
+                                <Button
+                                  size="sm"
+                                  variant="secondary"
+                                  className="rounded-md"
+                                  onClick={() => toggleWarningDetails(warning.id)}
+                                >
+                                  View details <ChevronDown className={`ml-1 size-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                                </Button>
                               </div>
+                              {expanded && (
+                                <div className="mt-3 border-t border-border pt-3">
+                                  {warning.suggestedFix && (
+                                    <p className="text-sm text-muted-foreground">
+                                      Suggested fix: {warning.suggestedFix}
+                                    </p>
+                                  )}
+                                  {renderWarningActions(warning)}
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
-                    )}
-                  </section>
+                    </section>
+                  )}
 
                   <section className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
                     <div className="mb-4 flex items-center justify-between gap-3">
@@ -718,7 +1240,7 @@ function ConsultPage() {
                           value={employeeSummary.recommendedBuildLogic}
                         />
                         <SummaryList
-                          label="Key selling points"
+                          label="Why these parts fit"
                           values={employeeSummary.keySellingPoints}
                         />
                         <SummaryBlock
@@ -756,7 +1278,27 @@ function ConsultPage() {
                         Mock retailer references only. No checkout, payment, or live stock integration yet.
                       </p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <AffiliateDisclosure />
+                      <input
+                        value={saveBuildName}
+                        onChange={(event) => setSaveBuildName(event.target.value)}
+                        className="h-9 w-48 rounded-md border border-border bg-background px-3 text-sm outline-none focus:ring-2 focus:ring-primary/25"
+                        placeholder="Build name"
+                      />
+                      <Button
+                        size="sm"
+                        className="rounded-md"
+                        disabled={isSavingBuild}
+                        onClick={() => void handleSaveBuild()}
+                      >
+                        {isSavingBuild ? (
+                          <LoaderCircle className="mr-2 size-4 animate-spin" />
+                        ) : (
+                          <Save className="mr-2 size-4" />
+                        )}
+                        Save Build
+                      </Button>
                       {isLoadingDetails && (
                         <div className="inline-flex items-center gap-2 rounded-full border border-border bg-background px-3 py-1 text-xs text-muted-foreground">
                           <LoaderCircle className="size-3.5 animate-spin" />
@@ -787,6 +1329,7 @@ function ConsultPage() {
                             <th className="px-4 py-3 font-medium">Retailer</th>
                             <th className="px-4 py-3 font-medium">Note</th>
                             <th className="px-4 py-3 text-right font-medium">Price</th>
+                            <th className="px-4 py-3 text-right font-medium">Deal</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-border">
@@ -798,10 +1341,23 @@ function ConsultPage() {
                               <td className="px-4 py-3 text-right font-mono">
                                 ${item.estimatedPrice.toFixed(2)}
                               </td>
+                              <td className="px-4 py-3 text-right">
+                                {(item.affiliateLinks ?? []).slice(0, 1).map((link) => (
+                                  <Button
+                                    key={`${item.partId}-${link.merchant}`}
+                                    size="sm"
+                                    variant="secondary"
+                                    className="rounded-md"
+                                    onClick={() => void handleAffiliateClick(item, link)}
+                                  >
+                                    {link.label ?? "Check price"}
+                                  </Button>
+                                ))}
+                              </td>
                             </tr>
                           ))}
                           <tr className="bg-background/70">
-                            <td colSpan={3} className="px-4 py-3 text-right font-semibold">
+                            <td colSpan={4} className="px-4 py-3 text-right font-semibold">
                               Total
                             </td>
                             <td className="px-4 py-3 text-right font-mono text-base font-bold text-primary">
@@ -812,6 +1368,92 @@ function ConsultPage() {
                       </table>
                     )}
                   </div>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6">
+                  <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Download className="size-4 text-primary" />
+                        <h2 className="text-xl font-bold">Export Build Plan</h2>
+                      </div>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        Preview is available for everyone. Full export is included with Build Pro.
+                      </p>
+                    </div>
+                    {hasFullExport && (
+                      <div className="flex flex-wrap gap-2">
+                        <Button size="sm" variant="secondary" className="rounded-md" onClick={() => void handleCopyExport()}>
+                          <Copy className="mr-2 size-4" />
+                          Copy
+                        </Button>
+                        <Button size="sm" variant="secondary" className="rounded-md" onClick={handleDownloadJson}>
+                          <FileJson className="mr-2 size-4" />
+                          JSON
+                        </Button>
+                        <Button size="sm" className="rounded-md" onClick={handleDownloadMarkdown}>
+                          <Download className="mr-2 size-4" />
+                          Markdown
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                    <pre className="max-h-72 overflow-auto rounded-xl border border-border bg-background/70 p-4 text-xs leading-relaxed text-muted-foreground">
+                      {createBuildExportText({ build, buildNeeds: customerNeeds, cartPreview })}
+                    </pre>
+                    {hasFullExport ? (
+                      <div className="rounded-xl border border-success/20 bg-success/10 p-4 text-sm text-success">
+                        <CheckCircle2 className="mb-3 size-5" />
+                        Build Pro export is active. Copy the summary or download JSON/Markdown for your purchase planning.
+                      </div>
+                    ) : (
+                      <ProFeatureLock
+                        feature="build_export"
+                        label="Full export and saved builds"
+                        onUpgraded={() => void refreshMonetizationState()}
+                      />
+                    )}
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-border bg-card p-6">
+                  <div className="mb-4 flex items-center gap-2">
+                    <ClipboardList className="size-4 text-primary" />
+                    <h2 className="text-xl font-bold">Purchase Checklist</h2>
+                  </div>
+                  {hasPurchaseChecklist ? (
+                    <ul className="grid gap-2 md:grid-cols-2">
+                      {PRO_PURCHASE_CHECKLIST.map((item) => (
+                        <li
+                          key={item}
+                          className="flex items-center gap-3 rounded-xl border border-border bg-background/60 p-3 text-sm"
+                        >
+                          <CheckCircle2 className="size-4 shrink-0 text-success" />
+                          <span>{item}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <div className="grid gap-4 lg:grid-cols-[1fr_320px]">
+                      <div className="grid gap-2 md:grid-cols-2">
+                        {PRO_PURCHASE_CHECKLIST.slice(0, 4).map((item) => (
+                          <div
+                            key={item}
+                            className="rounded-xl border border-border bg-background/40 p-3 text-sm text-muted-foreground"
+                          >
+                            {item}
+                          </div>
+                        ))}
+                      </div>
+                      <ProFeatureLock
+                        feature="purchase_checklist"
+                        label="Full purchase checklist"
+                        onUpgraded={() => void refreshMonetizationState()}
+                      />
+                    </div>
+                  )}
                 </section>
               </>
             ) : (
@@ -834,8 +1476,15 @@ function ConsultPage() {
           isGenerating={isGeneratingRecommendation}
           messages={chatMessages}
           quickReplies={QUICK_REPLIES}
+          usageSlot={<UsageBadge usage={usageStatus} />}
+          limitSlot={
+            showUsageUpgrade ? (
+              <UpgradeCard compact onUpgraded={() => void refreshMonetizationState()} />
+            ) : undefined
+          }
           onInputChange={setChatInput}
           onSend={(value) => void handleChatSend(value)}
+          onActionClick={(action) => void handleAdvisorAction(action)}
         />
       </main>
 
@@ -849,8 +1498,28 @@ function ConsultPage() {
           isReplacing={isReplacingPart}
           errorMessage={compareError}
           recommendedReplacementId={recommendedReplacementId}
+          plan={plan}
+          usageStatus={usageStatus}
+          startWithOwnedPartForm={openOwnedPartForm}
+          ownedPartHint={ownedPartHint}
+          onUpgraded={() => void refreshMonetizationState()}
           onOpenChange={handleDrawerOpenChange}
           onReplace={(part) => void handleReplacePart(part)}
+        />
+      )}
+
+      {isSavedBuildsOpen && (
+        <SavedBuildsPanel
+          builds={savedBuilds}
+          limit={savedBuildLimit}
+          isLoading={isLoadingSavedBuilds}
+          plan={plan}
+          onClose={() => setIsSavedBuildsOpen(false)}
+          onRefresh={() => void refreshSavedBuilds()}
+          onLoad={(id) => void handleLoadSavedBuild(id)}
+          onRename={(summary) => void handleRenameSavedBuild(summary)}
+          onDelete={(id) => void handleDeleteSavedBuild(id)}
+          onUpgraded={() => void refreshMonetizationState()}
         />
       )}
 
@@ -860,11 +1529,15 @@ function ConsultPage() {
             className={`pointer-events-auto flex items-center gap-3 rounded-xl px-4 py-3 text-sm shadow-glow backdrop-blur ${
               toast.tone === "error"
                 ? "border border-destructive/30 bg-destructive/10 text-destructive"
+                : toast.tone === "notice"
+                  ? "border border-warning/30 bg-warning/10 text-warning"
                 : "border border-primary/30 bg-card/95"
             }`}
           >
             {toast.tone === "error" ? (
               <AlertTriangle className="size-4" />
+            ) : toast.tone === "notice" ? (
+              <Sparkles className="size-4" />
             ) : (
               <CheckCircle2 className="size-4 text-primary" />
             )}
@@ -879,11 +1552,153 @@ function ConsultPage() {
   );
 }
 
-function NeedsCard({ label, value }: { label: string; value: string }) {
+function NeedsCard({ label, value, updated }: { label: string; value: string; updated?: boolean }) {
   return (
     <div className="rounded-2xl border border-primary/15 bg-background/60 p-4">
-      <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
+        {updated && (
+          <Badge className="rounded-md border border-primary/20 bg-primary/10 text-[10px] text-primary">
+            Updated
+          </Badge>
+        )}
+      </div>
       <p className="mt-2 text-sm leading-relaxed">{value}</p>
+    </div>
+  );
+}
+
+function SavedBuildsPanel({
+  builds,
+  limit,
+  isLoading,
+  plan,
+  onClose,
+  onRefresh,
+  onLoad,
+  onRename,
+  onDelete,
+  onUpgraded,
+}: {
+  builds: SavedBuildSummary[];
+  limit: number;
+  isLoading: boolean;
+  plan: "free" | "build_pro";
+  onClose: () => void;
+  onRefresh: () => void;
+  onLoad: (id: string) => void;
+  onRename: (summary: SavedBuildSummary) => void;
+  onDelete: (id: string) => void;
+  onUpgraded: () => void;
+}) {
+  return (
+    <div className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm">
+      <div className="absolute right-0 top-0 flex h-full w-full max-w-xl flex-col border-l border-border bg-background shadow-2xl">
+        <div className="shrink-0 border-b border-border p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2 text-primary">
+                <FolderOpen className="size-5" />
+                <h2 className="text-xl font-bold">Saved Builds</h2>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {builds.length} of {limit} saved locally for this session.
+              </p>
+            </div>
+            <Button size="sm" variant="secondary" className="rounded-md" onClick={onClose}>
+              Close
+            </Button>
+          </div>
+          <div className="mt-4 flex items-center justify-between gap-3">
+            <Badge className="rounded-md border border-primary/20 bg-primary/10 text-primary">
+              {plan === "build_pro" ? "Build Pro: 10 saves" : "Free: 1 save"}
+            </Badge>
+            <Button size="sm" variant="ghost" className="rounded-md" onClick={onRefresh}>
+              Refresh
+            </Button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-5">
+          {isLoading ? (
+            <div className="flex items-center gap-2 rounded-xl border border-border bg-card p-4 text-sm text-muted-foreground">
+              <LoaderCircle className="size-4 animate-spin" />
+              Loading saved builds
+            </div>
+          ) : builds.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-sm text-muted-foreground">
+              Save the current build to keep a purchase-ready snapshot here.
+            </div>
+          ) : (
+            builds.map((savedBuild) => (
+              <article key={savedBuild.id} className="rounded-xl border border-border bg-card p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate font-semibold">{savedBuild.name}</h3>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Saved {formatDate(savedBuild.createdAt)} · Updated {formatDate(savedBuild.updatedAt)}
+                    </p>
+                  </div>
+                  <Badge
+                    className={
+                      savedBuild.compatibilityStatus === "pass"
+                        ? "bg-success/15 text-success"
+                        : "bg-warning/15 text-warning"
+                    }
+                  >
+                    {formatCompatibilityStatus(savedBuild.compatibilityStatus)}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 grid gap-2 text-sm">
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Total</span>
+                    <span className="font-mono font-semibold">{formatMoney(savedBuild.totalPrice)}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">CPU</span>
+                    <span className="text-right">{savedBuild.cpuName ?? "Not saved"}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">GPU</span>
+                    <span className="text-right">{savedBuild.gpuName ?? "Not saved"}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-muted-foreground">Owned parts</span>
+                    <span>{savedBuild.ownedParts}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    {savedBuild.targetUseCase.join(" + ") || "No use case saved"}
+                  </p>
+                </div>
+
+                <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <Button size="sm" variant="secondary" className="rounded-md" onClick={() => onRename(savedBuild)}>
+                    Rename
+                  </Button>
+                  <Button size="sm" variant="secondary" className="rounded-md" onClick={() => onLoad(savedBuild.id)}>
+                    Load build
+                  </Button>
+                  <Button size="sm" variant="ghost" className="rounded-md text-destructive" onClick={() => onDelete(savedBuild.id)}>
+                    <Trash2 className="mr-2 size-4" />
+                    Delete
+                  </Button>
+                </div>
+              </article>
+            ))
+          )}
+        </div>
+
+        {plan === "free" && (
+          <div className="shrink-0 border-t border-border p-5">
+            <ProFeatureLock
+              feature="build_export"
+              label="Save up to 10 builds"
+              onUpgraded={onUpgraded}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

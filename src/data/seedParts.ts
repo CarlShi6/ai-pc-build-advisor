@@ -9,9 +9,22 @@ function createSearchUrl(brand: string, model: string) {
 }
 
 function createPart(part: PartSeed): Part {
+  const searchUrl = createSearchUrl(part.brand, part.model);
+
   return {
     ...part,
-    searchUrl: createSearchUrl(part.brand, part.model),
+    source: part.source ?? "catalog",
+    color: part.color ?? (typeof part.specs.color === "string" ? part.specs.color : undefined),
+    searchUrl,
+    affiliateLinks: part.affiliateLinks ?? [
+      {
+        merchant: "newegg",
+        url: searchUrl,
+        price: part.price,
+        inStock: part.availability !== "out_of_stock",
+        label: "Check price",
+      },
+    ],
   };
 }
 

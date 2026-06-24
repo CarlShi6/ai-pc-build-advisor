@@ -19,8 +19,12 @@ import process from "node:process";
 export function getServerConfig() {
   return {
     nodeEnv: process.env.NODE_ENV,
-    // Add server-only values here, e.g.:
-    //   databaseUrl: process.env.DATABASE_URL,
-    //   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+    openAiApiKey: process.env.OPENAI_API_KEY,
+    aiProviderApiKey: process.env.AI_PROVIDER_API_KEY,
+    aiProviderModel: process.env.AI_PROVIDER_MODEL ?? "gpt-4.1-mini",
+    stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+    stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+    stripeBuildProPriceId: process.env.STRIPE_BUILD_PRO_PRICE_ID,
+    publicAppUrl: process.env.PUBLIC_APP_URL ?? "http://localhost:5173",
   };
 }

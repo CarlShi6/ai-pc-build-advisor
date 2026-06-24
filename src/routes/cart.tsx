@@ -1,9 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { TopBar } from "@/components/top-bar";
-import { SAMPLE_BUILD } from "@/components/build-card";
+import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
+import { ProFeatureLock } from "@/components/ProFeatureLock";
+import { UpgradeCard } from "@/components/UpgradeCard";
+import { recommendedBuildPartIds, seedParts } from "@/data/seedParts";
+import { getEntitlementStatus, trackAffiliateClick } from "@/lib/apiClient";
+import { getPlanForEntitlement, canUseFeature } from "@/lib/monetization";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import type { AffiliateLink, Entitlement } from "@/types/monetization";
+import type { Part } from "@/types/parts";
 import { Check, ClipboardList, Cpu, MonitorPlay, ShieldCheck, ShoppingBag, Star } from "lucide-react";
 
 export const Route = createFileRoute("/cart")({
@@ -17,20 +24,51 @@ export const Route = createFileRoute("/cart")({
 });
 
 const CHECKLIST = [
-  "Confirm your budget and use case",
-  "Check current retailer listings for each part",
-  "Review compatibility warnings before buying",
-  "Save or print the parts list",
-  "Decide whether you need assembly help",
+  "Confirm CPU and motherboard socket compatibility",
+  "Confirm RAM type",
+  "Confirm PSU wattage",
+  "Confirm GPU clearance",
+  "Confirm case and cooler fit",
+  "Confirm storage slots",
+  "Confirm Windows/license plan",
+  "Confirm monitor resolution target",
 ];
 
+const purchaseParts = Object.entries(recommendedBuildPartIds)
+  .map(([, id]) => seedParts.find((part) => part.id === id))
+  .filter((part): part is Part => Boolean(part));
+
 function CartPage() {
-  const total = SAMPLE_BUILD.reduce((sum, part) => sum + part.price, 0);
-  const cpu = SAMPLE_BUILD.find((part) => part.category === "CPU")!;
-  const gpu = SAMPLE_BUILD.find((part) => part.category === "GPU")!;
+  const total = purchaseParts.reduce((sum, part) => sum + part.price, 0);
+  const cpu = purchaseParts.find((part) => part.category === "cpu")!;
+  const gpu = purchaseParts.find((part) => part.category === "gpu")!;
   const [checked, setChecked] = useState<Set<number>>(new Set([0, 2]));
+  const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
+  const plan = getPlanForEntitlement(entitlement);
+  const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
+
+  useEffect(() => {
+    void refreshEntitlement();
+  }, []);
+
+  async function refreshEntitlement() {
+    try {
+      setEntitlement(await getEntitlementStatus());
+    } catch {
+      setEntitlement({
+        userId: "mock-user",
+        plan: "free",
+        active: true,
+        startedAt: new Date().toISOString(),
+      });
+    }
+  }
 
   function toggle(index: number) {
+    if (!hasPurchaseChecklist) {
+      return;
+    }
+
     setChecked((current) => {
       const next = new Set(current);
       if (next.has(index)) {
@@ -42,14 +80,24 @@ function CartPage() {
     });
   }
 
+  async function handleAffiliateClick(part: Part, link: AffiliateLink) {
+    await trackAffiliateClick({
+      partId: part.id,
+      merchant: link.merchant,
+      url: link.url,
+      buildId: "build-production-master-pro",
+    });
+    window.open(link.url, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       <TopBar />
       <main className="mx-auto max-w-6xl space-y-6 px-6 py-6">
         <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
           <div className="flex flex-wrap items-stretch gap-0 divide-y divide-border md:divide-y-0 md:divide-x">
-            <BuildStripItem icon={<Cpu className="size-4.5" />} label="CPU" value={cpu.name} />
-            <BuildStripItem icon={<MonitorPlay className="size-4.5" />} label="GPU" value={gpu.name} highlight />
+            <BuildStripItem icon={<Cpu className="size-4.5" />} label="CPU" value={cpu.displayName} />
+            <BuildStripItem icon={<MonitorPlay className="size-4.5" />} label="GPU" value={gpu.displayName} highlight />
             <BuildStripItem icon={<ShieldCheck className="size-4.5" />} label="Compatibility" value="All passed" success />
             <div className="flex basis-[170px] flex-col items-start justify-center p-4 md:items-end">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
@@ -70,6 +118,9 @@ function CartPage() {
               <p className="mt-1 text-sm text-muted-foreground">
                 Use this as a planning list only. Prices and availability are mock data, not live checkout.
               </p>
+              <div className="mt-3">
+                <AffiliateDisclosure />
+              </div>
             </div>
 
             <div className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -81,21 +132,35 @@ function CartPage() {
                     <th className="px-6 py-3 font-medium">Part</th>
                     <th className="px-6 py-3 font-medium">Retailer</th>
                     <th className="px-6 py-3 text-right font-medium">Estimated Price</th>
+                    <th className="px-6 py-3 text-right font-medium">Deal</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {SAMPLE_BUILD.map((part, index) => (
-                    <tr key={part.category}>
+                  {purchaseParts.map((part, index) => (
+                    <tr key={part.id}>
                       <td className="px-6 py-4 font-mono text-xs text-muted-foreground">
                         REF-{(1000 + index).toString()}
                       </td>
-                      <td className="px-6 py-4">{part.name}</td>
-                      <td className="px-6 py-4 text-muted-foreground">Newegg</td>
+                      <td className="px-6 py-4">{part.displayName}</td>
+                      <td className="px-6 py-4 text-muted-foreground">{part.retailer ?? "Partner retailer"}</td>
                       <td className="px-6 py-4 text-right font-mono">${part.price.toFixed(2)}</td>
+                      <td className="px-6 py-4 text-right">
+                        {(part.affiliateLinks ?? []).slice(0, 1).map((link) => (
+                          <Button
+                            key={`${part.id}-${link.merchant}`}
+                            size="sm"
+                            variant="secondary"
+                            className="rounded-md"
+                            onClick={() => void handleAffiliateClick(part, link)}
+                          >
+                            {link.label ?? "View deal"}
+                          </Button>
+                        ))}
+                      </td>
                     </tr>
                   ))}
                   <tr>
-                    <td colSpan={3} className="px-6 py-4 text-right text-sm font-semibold">
+                    <td colSpan={4} className="px-6 py-4 text-right text-sm font-semibold">
                       Total
                     </td>
                     <td className="px-6 py-4 text-right font-mono text-lg font-bold text-primary">
@@ -112,28 +177,48 @@ function CartPage() {
               <h3 className="mb-3 flex items-center gap-2 text-base font-semibold">
                 <ClipboardList className="size-4 text-primary" /> Buyer Checklist
               </h3>
-              <ul className="space-y-2">
-                {CHECKLIST.map((item, index) => {
-                  const isOn = checked.has(index);
-                  return (
-                    <li key={item}>
-                      <button
-                        onClick={() => toggle(index)}
-                        className="flex w-full items-center gap-3 rounded-xl border border-border bg-background/50 p-3 text-left text-sm transition-colors hover:border-primary/40"
-                      >
-                        <span
-                          className={`flex size-5 items-center justify-center rounded-md border ${
-                            isOn ? "border-primary bg-primary text-primary-foreground" : "border-border"
-                          }`}
+              {hasPurchaseChecklist ? (
+                <ul className="space-y-2">
+                  {CHECKLIST.map((item, index) => {
+                    const isOn = checked.has(index);
+                    return (
+                      <li key={item}>
+                        <button
+                          onClick={() => toggle(index)}
+                          className="flex w-full items-center gap-3 rounded-xl border border-border bg-background/50 p-3 text-left text-sm transition-colors hover:border-primary/40"
                         >
-                          {isOn && <Check className="size-3" />}
-                        </span>
-                        <span className={isOn ? "text-muted-foreground line-through" : ""}>{item}</span>
-                      </button>
-                    </li>
-                  );
-                })}
-              </ul>
+                          <span
+                            className={`flex size-5 items-center justify-center rounded-md border ${
+                              isOn ? "border-primary bg-primary text-primary-foreground" : "border-border"
+                            }`}
+                          >
+                            {isOn && <Check className="size-3" />}
+                          </span>
+                          <span className={isOn ? "text-muted-foreground line-through" : ""}>{item}</span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : (
+                <div className="space-y-3">
+                  <div className="space-y-2">
+                    {CHECKLIST.slice(0, 4).map((item) => (
+                      <div
+                        key={item}
+                        className="rounded-xl border border-border bg-background/40 p-3 text-sm text-muted-foreground"
+                      >
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                  <ProFeatureLock
+                    feature="purchase_checklist"
+                    label="Full purchase checklist"
+                    onUpgraded={() => void refreshEntitlement()}
+                  />
+                </div>
+              )}
             </div>
 
             <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
@@ -146,11 +231,15 @@ function CartPage() {
                 <dt className="text-muted-foreground">Budget Room</dt>
                 <dd className="text-right font-mono">$342.10</dd>
                 <dt className="text-muted-foreground">Items</dt>
-                <dd className="text-right font-mono">{SAMPLE_BUILD.length}</dd>
+                <dd className="text-right font-mono">{purchaseParts.length}</dd>
                 <dt className="text-muted-foreground">Compatibility</dt>
                 <dd className="text-right font-semibold text-success">Ready</dd>
               </dl>
-              <Button className="mt-5 w-full rounded-xl py-5 shadow-glow">Save Reference List</Button>
+              {plan === "build_pro" ? (
+                <Button className="mt-5 w-full rounded-xl py-5 shadow-glow">Save Reference List</Button>
+              ) : (
+                <UpgradeCard className="mt-5" compact onUpgraded={() => void refreshEntitlement()} />
+              )}
             </div>
           </aside>
         </div>

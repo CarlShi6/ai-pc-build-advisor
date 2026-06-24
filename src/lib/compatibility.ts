@@ -21,7 +21,7 @@ function splitListSpec(part: Part | undefined, key: string) {
 }
 
 export function calculateBuildTotal(parts: Part[]) {
-  return parts.reduce((total, part) => total + part.price, 0);
+  return parts.reduce((total, part) => total + (part.owned ? 0 : part.price), 0);
 }
 
 export function estimateSystemPower(build: Build) {
