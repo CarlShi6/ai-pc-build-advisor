@@ -468,6 +468,12 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         buildId: input.buildId ?? MOCK_BUILD_ID,
         userId: input.userId ?? actor.userId ?? actor.sessionId,
       });
+      await store.recordCheckoutSession(actor, {
+        plan: input.plan,
+        paymentProvider: stripeResult.fallbackUsed ? "mock" : "stripe",
+        checkoutSessionId: stripeResult.checkoutSessionId,
+        status: stripeResult.fallbackUsed ? "failed" : "created",
+      });
       const payload: CreateCheckoutSessionApiResponse = {
         checkoutUrl: stripeResult.checkoutUrl,
         fallbackUsed: stripeResult.fallbackUsed,

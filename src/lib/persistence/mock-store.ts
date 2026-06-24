@@ -4,6 +4,7 @@ import type { SavedBuild, SavedBuildSummary } from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
 import type {
   AuthSession,
+  CheckoutSessionRecord,
   PersistenceActor,
   PersistenceStore,
   SaveBuildInput,
@@ -23,6 +24,7 @@ type ActorState = {
   aiQuestionsUsedForBuild: number;
   replacementsUsedForBuild: number;
   affiliateClicks: AffiliateClickEvent[];
+  checkoutSessions: CheckoutSessionRecord[];
   savedBuilds: SavedBuild[];
 };
 
@@ -177,8 +179,40 @@ export class MockPersistenceStore implements PersistenceStore {
       checkoutSessionId: input.checkoutSessionId,
       activatedAt: now,
     };
+    await this.recordCheckoutSession(actor, {
+      plan: "build_pro",
+      paymentProvider: input.paymentProvider,
+      checkoutSessionId: input.checkoutSessionId ?? `mock-checkout-${Date.now()}`,
+      status: "completed",
+    });
 
     return state.entitlement;
+  }
+
+  async recordCheckoutSession(
+    actor: PersistenceActor,
+    input: {
+      plan: PlanType;
+      paymentProvider: "mock" | "stripe";
+      checkoutSessionId?: string;
+      status: CheckoutSessionRecord["status"];
+    },
+  ): Promise<CheckoutSessionRecord> {
+    const state = this.getActorState(actor);
+    const now = nowIso();
+    const record: CheckoutSessionRecord = {
+      id: createId("checkout"),
+      userId: actor.userId,
+      sessionId: actor.sessionId,
+      plan: input.plan,
+      paymentProvider: input.paymentProvider,
+      checkoutSessionId: input.checkoutSessionId,
+      status: input.status,
+      createdAt: now,
+      updatedAt: now,
+    };
+    state.checkoutSessions.unshift(record);
+    return record;
   }
 
   async getUsageStatus(actor: PersistenceActor): Promise<UsageStatus> {
@@ -385,6 +419,7 @@ export class MockPersistenceStore implements PersistenceStore {
       aiQuestionsUsedForBuild: 0,
       replacementsUsedForBuild: 0,
       affiliateClicks: [],
+      checkoutSessions: [],
       savedBuilds: [],
     };
   }
@@ -439,7 +474,9 @@ export class MockPersistenceStore implements PersistenceStore {
 }
 
 export function createSessionCookie(session: AuthSession) {
-  return `${SESSION_COOKIE}=${encodeURIComponent(session.sessionId)}; Path=/; SameSite=Lax; HttpOnly; Max-Age=2592000`;
+  const cookieValue =
+    (session as AuthSession & { __cookieValue?: string }).__cookieValue ?? session.sessionId;
+  return `${SESSION_COOKIE}=${encodeURIComponent(cookieValue)}; Path=/; SameSite=Lax; HttpOnly; Max-Age=2592000`;
 }
 
 export function clearSessionCookie() {

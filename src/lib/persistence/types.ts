@@ -158,6 +158,12 @@ export interface PersistenceStore {
     buildId?: string;
     checkoutSessionId?: string;
   }): Promise<Entitlement>;
+  recordCheckoutSession(actor: PersistenceActor, input: {
+    plan: PlanType;
+    paymentProvider: "mock" | "stripe";
+    checkoutSessionId?: string;
+    status: CheckoutSessionRecord["status"];
+  }): Promise<CheckoutSessionRecord>;
   getUsageStatus(actor: PersistenceActor): Promise<UsageStatus>;
   consumeAiUsage(actor: PersistenceActor): Promise<{
     usage: UsageStatus;
