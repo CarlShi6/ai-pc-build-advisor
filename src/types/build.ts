@@ -31,6 +31,26 @@ export interface BuildConfidenceScore {
   failCount: number;
 }
 
+export interface PartDecisionMetadata {
+  partId: string;
+  bestValue: boolean;
+  bestPerformance: boolean;
+  bestBudgetFit: boolean;
+  beginnerFriendly: boolean;
+  compatibilityImpact: {
+    status: Build["compatibilityStatus"];
+    confidenceScore: number;
+    warningCount: number;
+    failCount: number;
+    summary: string;
+  };
+  totalPriceAfterSwap: number;
+  recommendationReason: string;
+  tradeOffSummary: string;
+  valueScore: number;
+  performanceScore: number | null;
+}
+
 export interface Build {
   id: string;
   name: string;

@@ -4,6 +4,7 @@ import {
   getPartPowerRequirement,
   getPartSummarySpecs,
 } from "@/lib/build-advisor";
+import { getPartDecisionMetadata } from "@/lib/decision-metadata";
 import {
   calculateBuildConfidenceScore,
   calculateBuildTotal,
@@ -15,7 +16,7 @@ import { canUseFeature } from "@/lib/monetization";
 import { searchProducts as searchProductsApi, trackAffiliateClick } from "@/lib/apiClient";
 import { productSearchResultToPart } from "@/lib/product-search/search-service";
 import { cn } from "@/lib/utils";
-import type { Build } from "@/types/build";
+import type { Build, PartDecisionMetadata } from "@/types/build";
 import type { AffiliateLink, PlanType, UsageStatus } from "@/types/monetization";
 import type { Part, PartCategory } from "@/types/parts";
 import type { ProductSearchResult } from "@/lib/product-search/types";
@@ -584,12 +585,13 @@ export function CompareDrawer({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="space-y-3">
               <Badge className="w-fit rounded-md border border-primary/30 bg-primary/10 text-primary">
-                <GitCompare className="mr-1 size-3" /> Part Explorer
+                <GitCompare className="mr-1 size-3" /> Decision Drawer
               </Badge>
               <div>
-                <DrawerTitle className="text-xl">Explore {sectionTitle} options</DrawerTitle>
+                <DrawerTitle className="text-xl">Compare {sectionTitle} decisions</DrawerTitle>
                 <DrawerDescription className="mt-1 max-w-2xl">
-                  Pick alternatives, compare only what you choose, then preview before replacing.
+                  See which option best fits your budget, performance needs, compatibility, and
+                  beginner risk before replacing anything.
                 </DrawerDescription>
               </div>
             </div>
@@ -1378,17 +1380,63 @@ function CompareTab({
     );
   }
 
+  const decisionMetadata = getPartDecisionMetadata(build, parts, selectedPart);
+
   return (
-    <ComparisonTable
-      build={build}
-      fields={getCategoryComparisonFields(selectedPart.category)}
-      parts={parts}
-      selectedPart={selectedPart}
-      plan={plan}
-      isReplacing={isReplacing}
-      onPreviewSwap={onPreviewSwap}
-      onUpgraded={onUpgraded}
-    />
+    <div className="space-y-4">
+      <DecisionSummary parts={parts} decisions={decisionMetadata} />
+      <ComparisonTable
+        build={build}
+        fields={getCategoryComparisonFields(selectedPart.category)}
+        parts={parts}
+        selectedPart={selectedPart}
+        decisions={decisionMetadata}
+        plan={plan}
+        isReplacing={isReplacing}
+        onPreviewSwap={onPreviewSwap}
+        onUpgraded={onUpgraded}
+      />
+    </div>
+  );
+}
+
+function DecisionSummary({
+  parts,
+  decisions,
+}: {
+  parts: Part[];
+  decisions: PartDecisionMetadata[];
+}) {
+  return (
+    <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+      <div className="mb-3">
+        <h3 className="text-base font-semibold">Decision guide</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Rule-based labels from price, budget, performance, power, and compatibility checks.
+        </p>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        {decisions.map((decision) => {
+          const part = parts.find((candidate) => candidate.id === decision.partId);
+
+          if (!part) {
+            return null;
+          }
+
+          return (
+            <article key={decision.partId} className="rounded-xl border border-border bg-card p-3">
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                <DecisionBadges decision={decision} />
+              </div>
+              <h4 className="text-sm font-semibold leading-snug">{part.displayName}</h4>
+              <p className="mt-2 text-xs text-muted-foreground">
+                {decision.recommendationReason}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
@@ -1397,6 +1445,7 @@ function ComparisonTable({
   fields,
   parts,
   selectedPart,
+  decisions,
   plan,
   isReplacing,
   onPreviewSwap,
@@ -1406,19 +1455,24 @@ function ComparisonTable({
   fields: ReturnType<typeof getCategoryComparisonFields>;
   parts: Part[];
   selectedPart: Part;
+  decisions: PartDecisionMetadata[];
   plan: PlanType;
   isReplacing?: boolean;
   onPreviewSwap: (part: Part) => void;
   onUpgraded?: () => void;
 }) {
   const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
+  const getDecision = (part: Part) =>
+    decisions.find((decision) => decision.partId === part.id) ??
+    getPartDecisionMetadata(build, [part], selectedPart)[0];
 
   return (
     <div className="overflow-hidden rounded-xl border border-border bg-card">
       <div className="border-b border-border bg-secondary/40 px-4 py-3">
-        <h3 className="text-base font-semibold">Side-by-side comparison</h3>
+        <h3 className="text-base font-semibold">Explainable decision comparison</h3>
         <p className="text-xs text-muted-foreground">
-          Basic fields stay visible. Build Pro unlocks deeper reasoning.
+          Decision labels are deterministic and use the current build, budget, compatibility checks,
+          and part scores.
         </p>
       </div>
       <div className="overflow-x-auto">
@@ -1441,8 +1495,9 @@ function ComparisonTable({
                       {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
                     </p>
                     <div className="flex flex-wrap gap-1">
+                      <DecisionBadges decision={getDecision(part)} />
                       {getComparisonDeltaBadges(build, part, selectedPart)
-                        .slice(0, 3)
+                        .slice(0, 2)
                         .map((badge) => (
                           <DeltaBadge key={badge.label} {...badge} />
                         ))}
@@ -1453,6 +1508,40 @@ function ComparisonTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-border">
+            <tr>
+              <td className="px-4 py-3 text-muted-foreground">Decision badges</td>
+              {parts.map((part) => (
+                <td key={part.id} className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1.5">
+                    <DecisionBadges decision={getDecision(part)} />
+                  </div>
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <td className="px-4 py-3 text-muted-foreground">Recommendation reason</td>
+              {parts.map((part) => (
+                <td key={part.id} className="px-4 py-3 text-muted-foreground">
+                  {getDecision(part).recommendationReason}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <td className="px-4 py-3 text-muted-foreground">Trade-off summary</td>
+              {parts.map((part) => (
+                <td key={part.id} className="px-4 py-3 text-muted-foreground">
+                  {getDecision(part).tradeOffSummary}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <td className="px-4 py-3 text-muted-foreground">Total after swap</td>
+              {parts.map((part) => (
+                <td key={part.id} className="px-4 py-3 font-mono font-semibold">
+                  {formatMoney(getDecision(part).totalPriceAfterSwap)}
+                </td>
+              ))}
+            </tr>
             <tr>
               <td className="px-4 py-3 text-muted-foreground">Beginner deltas</td>
               {parts.map((part) => {
@@ -1482,7 +1571,7 @@ function ComparisonTable({
               unlocked={hasAdvancedCompare}
               featureLabel="Value analysis"
               onUpgraded={onUpgraded}
-              values={parts.map((part) => `${getValueRating(part)}/100 value score`)}
+              values={parts.map((part) => `${getDecision(part).valueScore}/100 value score`)}
             />
             <AdvancedRow
               label="Performance fit"
@@ -1490,77 +1579,45 @@ function ComparisonTable({
               featureLabel="Performance fit"
               onUpgraded={onUpgraded}
               values={parts.map((part) =>
-                getPerformanceFit(part) !== null
-                  ? `${getPerformanceFit(part)}/100`
+                getDecision(part).performanceScore !== null
+                  ? `${getDecision(part).performanceScore}/100`
                   : "Category fit",
               )}
             />
             <tr>
               <td className="px-4 py-3 text-muted-foreground">Compatibility impact</td>
               {parts.map((part) => {
-                const candidateBuild = buildCandidate(build, part);
+                const decision = getDecision(part);
                 return (
                   <td key={part.id} className="px-4 py-3">
-                    {hasAdvancedCompare ? (
-                      <>
-                        <CompatibilityBadge build={candidateBuild} />
-                        {candidateBuild.compatibilityWarnings.length > 0 && (
-                          <p className="mt-2 text-xs text-muted-foreground">
-                            {candidateBuild.compatibilityWarnings.length} item
-                            {candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} need
-                            review.
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <ProFeatureLock
-                        feature="advanced_compare"
-                        label="Compatibility impact"
-                        showUpgrade={false}
-                        onUpgraded={onUpgraded}
-                      />
-                    )}
+                    <CompatibilityImpactBadge impact={decision.compatibilityImpact} />
+                    <p className="mt-2 text-xs text-muted-foreground">
+                      {decision.compatibilityImpact.summary}
+                    </p>
                   </td>
                 );
               })}
             </tr>
             <tr>
-              <td className="px-4 py-3 text-muted-foreground">AI recommendation reason</td>
-              {parts.map((part) => (
-                <td key={part.id} className="px-4 py-3 text-muted-foreground">
-                  {hasAdvancedCompare ? (
-                    (part.recommendationReason ?? "Configured in the local demo catalog.")
-                  ) : (
-                    <ProFeatureLock
-                      feature="ai_reasoning"
-                      label="AI reasoning"
-                      showUpgrade={false}
-                      onUpgraded={onUpgraded}
-                    />
-                  )}
-                </td>
-              ))}
-            </tr>
-            <tr>
               <td className="px-4 py-3 text-muted-foreground">Final recommendation</td>
-              {parts.map((part) => (
-                <td key={part.id} className="px-4 py-3">
-                  {hasAdvancedCompare ? (
-                    part.id === selectedPart.id ? (
-                      "Keep as the balanced baseline."
-                    ) : (
-                      "Preview the swap before replacing."
-                    )
-                  ) : (
-                    <ProFeatureLock
-                      feature="advanced_compare"
-                      label="Final recommendation"
-                      showUpgrade={false}
-                      onUpgraded={onUpgraded}
-                    />
-                  )}
-                </td>
-              ))}
+              {parts.map((part) => {
+                const decision = getDecision(part);
+                const isStrongPick =
+                  decision.bestBudgetFit ||
+                  decision.bestValue ||
+                  decision.bestPerformance ||
+                  decision.beginnerFriendly;
+
+                return (
+                  <td key={part.id} className="px-4 py-3">
+                    {part.id === selectedPart.id
+                      ? "Keep if you are already satisfied with the current build."
+                      : isStrongPick
+                        ? "Preview this swap before replacing."
+                        : "Compare carefully before choosing this over the labeled picks."}
+                  </td>
+                );
+              })}
             </tr>
             <tr>
               <td className="px-4 py-3 text-muted-foreground">Action</td>
@@ -1633,6 +1690,57 @@ function DeltaBadge({ label, tone }: { label: string; tone: "success" | "warning
   );
 }
 
+function DecisionBadges({ decision }: { decision: PartDecisionMetadata }) {
+  const badges = [
+    decision.bestValue && { label: "Best Value", tone: "success" as const },
+    decision.bestPerformance && { label: "Best Performance", tone: "neutral" as const },
+    decision.bestBudgetFit && { label: "Best Budget Fit", tone: "success" as const },
+    decision.beginnerFriendly && { label: "Beginner Friendly", tone: "success" as const },
+  ].filter((badge): badge is { label: string; tone: "success" | "warning" | "neutral" } =>
+    Boolean(badge),
+  );
+
+  if (badges.length === 0) {
+    return <DeltaBadge label="Compare carefully" tone="neutral" />;
+  }
+
+  return (
+    <>
+      {badges.map((badge) => (
+        <DeltaBadge key={badge.label} {...badge} />
+      ))}
+    </>
+  );
+}
+
+function CompatibilityImpactBadge({
+  impact,
+}: {
+  impact: PartDecisionMetadata["compatibilityImpact"];
+}) {
+  if (impact.status === "pass") {
+    return (
+      <Badge className="rounded-md bg-success/15 text-success">
+        <CheckCircle2 className="mr-1 size-3" /> Compatibility Impact: Pass
+      </Badge>
+    );
+  }
+
+  if (impact.status === "warning") {
+    return (
+      <Badge className="rounded-md bg-warning/15 text-warning">
+        Compatibility Impact: Review
+      </Badge>
+    );
+  }
+
+  return (
+    <Badge className="rounded-md bg-destructive/15 text-destructive">
+      <AlertTriangle className="mr-1 size-3" /> Compatibility Impact: Fix first
+    </Badge>
+  );
+}
+
 function PreviewSwapPanel({
   build,
   currentPart,
@@ -1662,6 +1770,10 @@ function PreviewSwapPanel({
   const delta = getDisplayPrice(previewPart) - getDisplayPrice(currentPart);
   const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
   const affiliateLink = previewPart.affiliateLinks?.[0];
+  const decision =
+    getPartDecisionMetadata(build, [currentPart, previewPart], currentPart).find(
+      (item) => item.partId === previewPart.id,
+    ) ?? getPartDecisionMetadata(build, [previewPart], currentPart)[0];
   const [dealMessage, setDealMessage] = useState<string | null>(null);
 
   async function handlePreviewAffiliateClick(link: AffiliateLink) {
@@ -1742,12 +1854,19 @@ function PreviewSwapPanel({
         <InfoRow label="Power requirement" value={getPartPowerRequirement(previewPart)} />
       </div>
 
+      <div className="mt-4 rounded-xl border border-border bg-background/60 p-4">
+        <div className="flex flex-wrap gap-1.5">
+          <DecisionBadges decision={decision} />
+          <CompatibilityImpactBadge impact={decision.compatibilityImpact} />
+        </div>
+        <p className="mt-3 text-sm font-medium">{decision.recommendationReason}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{decision.tradeOffSummary}</p>
+      </div>
+
       <div className="mt-4">
         {hasAdvancedCompare ? (
           <div className="rounded-xl border border-border bg-background/60 p-4 text-sm text-muted-foreground">
-            {delta < 0
-              ? "This swap lowers cost. Check the listed specs and compatibility status to decide whether the savings are worth the tradeoff."
-              : "This swap raises the build total. Choose it if the added performance or fit matters for your target workload."}
+            {decision.compatibilityImpact.summary}
           </div>
         ) : (
           <ProFeatureLock
