@@ -1,7 +1,7 @@
 import { categoryLabels, seedParts } from "@/data/seedParts";
 import { getPartSummarySpecs } from "@/lib/build-advisor";
 import { cn } from "@/lib/utils";
-import type { Build, SubstitutionSuggestion } from "@/types/build";
+import type { Build, BuildFeedbackDifficulty, PostBuildFeedbackSummary, SubstitutionSuggestion } from "@/types/build";
 import type { Part } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -41,6 +41,8 @@ type BuildCardProps = {
   onCompare?: (category: string) => void;
   substitutions?: SubstitutionSuggestion[];
   onApplySubstitution?: (part: Part, suggestion: SubstitutionSuggestion) => void;
+  feedbackSummary?: PostBuildFeedbackSummary;
+  onReportBuildResult?: () => void;
   compact?: boolean;
 };
 
@@ -103,6 +105,8 @@ export function BuildCard({
   onCompare,
   substitutions,
   onApplySubstitution,
+  feedbackSummary,
+  onReportBuildResult,
   compact = false,
 }: BuildCardProps) {
   return (
@@ -114,6 +118,8 @@ export function BuildCard({
       onCompare={onCompare}
       substitutions={substitutions}
       onApplySubstitution={onApplySubstitution}
+      feedbackSummary={feedbackSummary}
+      onReportBuildResult={onReportBuildResult}
       compact={compact}
     />
   );
@@ -127,6 +133,8 @@ export function BuildCardInner({
   onCompare,
   substitutions = [],
   onApplySubstitution,
+  feedbackSummary,
+  onReportBuildResult,
   compact = false,
 }: BuildCardProps) {
   const rows = normalizeRows(build, parts);
@@ -191,8 +199,20 @@ export function BuildCardInner({
           <PerfStat label="Budget Use" value={`${Math.round((total / (build?.budget ?? 2800)) * 100)}%`} pct={Math.min(Math.round((total / (build?.budget ?? 2800)) * 100), 100)} />
           <PerfStat label="Compatibility" value={status === "pass" ? "Ready" : status === "warning" ? "Review" : "Needs review"} pct={status === "pass" ? 100 : status === "warning" ? 72 : 38} tone={status === "fail" ? "primary" : "success"} />
           <PerfStat label="Confidence" value={`${confidenceScore}/100`} pct={confidenceScore} tone={status === "fail" ? "primary" : "success"} />
-          <PerfStat label="Parts Selected" value={`${rows.length}`} pct={Math.min(rows.length * 12, 100)} />
+          <PerfStat
+            label={feedbackSummary ? "Build Completed" : "Parts Selected"}
+            value={feedbackSummary ? "Reported" : `${rows.length}`}
+            pct={feedbackSummary ? 100 : Math.min(rows.length * 12, 100)}
+            tone={feedbackSummary ? "success" : "primary"}
+          />
         </div>
+      )}
+
+      {!compact && (feedbackSummary || onReportBuildResult) && (
+        <PostBuildFeedbackSummaryCard
+          summary={feedbackSummary}
+          onReportBuildResult={onReportBuildResult}
+        />
       )}
 
       {!compact && build && substitutions.length > 0 && (
@@ -370,9 +390,73 @@ export function BuildCardInner({
             <Button className="flex-1 rounded-xl py-6 font-semibold shadow-glow">
               View Purchase References
             </Button>
+            {onReportBuildResult && (
+              <Button
+                variant="secondary"
+                className="flex-1 rounded-xl py-6 font-semibold"
+                onClick={onReportBuildResult}
+              >
+                Report Build Result
+              </Button>
+            )}
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function formatFeedbackDifficulty(value: BuildFeedbackDifficulty) {
+  const labels: Record<BuildFeedbackDifficulty, string> = {
+    easy: "Easy",
+    manageable: "Manageable",
+    hard: "Hard",
+    not_sure: "Not sure",
+  };
+
+  return labels[value];
+}
+
+function PostBuildFeedbackSummaryCard({
+  summary,
+  onReportBuildResult,
+}: {
+  summary?: PostBuildFeedbackSummary;
+  onReportBuildResult?: () => void;
+}) {
+  return (
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h3 className="text-base font-bold">Post-Build Result</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Real installation feedback is saved for this build only.
+          </p>
+        </div>
+        {onReportBuildResult && (
+          <Button size="sm" className="rounded-md" onClick={onReportBuildResult}>
+            Report Build Result
+          </Button>
+        )}
+      </div>
+      <div className="mt-4 grid gap-3 sm:grid-cols-4">
+        <FeedbackMetric label="Build completed" value={summary ? "Yes" : "Not reported"} />
+        <FeedbackMetric label="Issues reported" value={summary ? String(summary.issuesReported) : "None yet"} />
+        <FeedbackMetric label="Satisfaction score" value={summary ? `${summary.satisfactionScore}/5` : "Not rated"} />
+        <FeedbackMetric
+          label="Beginner difficulty"
+          value={summary ? formatFeedbackDifficulty(summary.beginnerDifficulty) : "Not reported"}
+        />
+      </div>
+    </section>
+  );
+}
+
+function FeedbackMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border bg-background/60 p-3">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-semibold">{value}</p>
     </div>
   );
 }

@@ -1,5 +1,10 @@
 import type { CustomerNeeds } from "@/types/api";
-import type { Build } from "@/types/build";
+import type {
+  Build,
+  BuildFeedbackBoolean,
+  BuildFeedbackDifficulty,
+  BuildFeedbackIssueLevel,
+} from "@/types/build";
 import type { AffiliateMerchant, PlanType } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 
@@ -131,6 +136,35 @@ export interface Database {
           id?: string;
         };
         Update: Partial<Omit<Database["public"]["Tables"]["owned_parts"]["Row"], "id">>;
+        Relationships: [];
+      };
+      post_build_feedback: {
+        Row: {
+          id: string;
+          user_id: string | null;
+          session_id: string;
+          build_id: string;
+          completed_at: string;
+          boot_success: BuildFeedbackBoolean;
+          installation_difficulty: BuildFeedbackDifficulty;
+          compatibility_issues: BuildFeedbackIssueLevel;
+          thermal_experience: BuildFeedbackIssueLevel;
+          noise_experience: BuildFeedbackIssueLevel;
+          cable_management_experience: BuildFeedbackIssueLevel;
+          gpu_clearance_issue: BuildFeedbackIssueLevel;
+          cooler_fit_issue: BuildFeedbackIssueLevel;
+          bios_update_needed: BuildFeedbackBoolean;
+          driver_issue: BuildFeedbackIssueLevel;
+          overall_satisfaction: number;
+          would_recommend: BuildFeedbackBoolean;
+          notes: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Omit<Database["public"]["Tables"]["post_build_feedback"]["Row"], "id"> & {
+          id?: string;
+        };
+        Update: Partial<Omit<Database["public"]["Tables"]["post_build_feedback"]["Row"], "id">>;
         Relationships: [];
       };
       affiliate_clicks: {

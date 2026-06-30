@@ -2,6 +2,8 @@ import type {
   Build,
   CartPreviewItem,
   CompatibilityWarning,
+  PostBuildFeedback,
+  PostBuildFeedbackInput,
   SavedBuild,
   SavedBuildSummary,
   StoreEmployeeSummary,
@@ -163,6 +165,19 @@ export interface SaveBuildResponse {
 
 export interface SavedBuildResponse {
   savedBuild: SavedBuild;
+}
+
+export interface PostBuildFeedbackRequest {
+  feedback: PostBuildFeedbackInput;
+}
+
+export interface PostBuildFeedbackResponse {
+  success: boolean;
+  feedback: PostBuildFeedback;
+  savedBuild: SavedBuild;
+  summary: SavedBuildSummary;
+  builds: SavedBuildSummary[];
+  limit: number;
 }
 
 export interface DeleteSavedBuildResponse {

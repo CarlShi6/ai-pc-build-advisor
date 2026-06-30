@@ -145,6 +145,8 @@ export interface SavedBuild {
   name: string;
   build: Build;
   buildNeeds: CustomerNeeds;
+  feedback: PostBuildFeedback[];
+  feedbackSummary?: PostBuildFeedbackSummary;
   createdAt: string;
   updatedAt: string;
   totalPrice: number;
@@ -164,4 +166,59 @@ export interface SavedBuildSummary {
   targetUseCase: string[];
   cpuName?: string;
   gpuName?: string;
+  feedbackSummary?: PostBuildFeedbackSummary;
+}
+
+export type BuildFeedbackIssueLevel = "no_issue" | "minor_issue" | "major_issue" | "not_sure";
+export type BuildFeedbackDifficulty = "easy" | "manageable" | "hard" | "not_sure";
+export type BuildFeedbackBoolean = "yes" | "no" | "not_sure";
+
+export interface PostBuildFeedback {
+  id: string;
+  buildId: string;
+  userId?: string;
+  sessionId: string;
+  completedAt: string;
+  bootSuccess: BuildFeedbackBoolean;
+  installationDifficulty: BuildFeedbackDifficulty;
+  compatibilityIssues: BuildFeedbackIssueLevel;
+  thermalExperience: BuildFeedbackIssueLevel;
+  noiseExperience: BuildFeedbackIssueLevel;
+  cableManagementExperience: BuildFeedbackIssueLevel;
+  gpuClearanceIssue: BuildFeedbackIssueLevel;
+  coolerFitIssue: BuildFeedbackIssueLevel;
+  biosUpdateNeeded: BuildFeedbackBoolean;
+  driverIssue: BuildFeedbackIssueLevel;
+  overallSatisfaction: number;
+  wouldRecommend: BuildFeedbackBoolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PostBuildFeedbackInput {
+  buildId: string;
+  completedAt?: string;
+  bootSuccess: BuildFeedbackBoolean;
+  installationDifficulty: BuildFeedbackDifficulty;
+  compatibilityIssues: BuildFeedbackIssueLevel;
+  thermalExperience: BuildFeedbackIssueLevel;
+  noiseExperience: BuildFeedbackIssueLevel;
+  cableManagementExperience: BuildFeedbackIssueLevel;
+  gpuClearanceIssue: BuildFeedbackIssueLevel;
+  coolerFitIssue: BuildFeedbackIssueLevel;
+  biosUpdateNeeded: BuildFeedbackBoolean;
+  driverIssue: BuildFeedbackIssueLevel;
+  overallSatisfaction: number;
+  wouldRecommend: BuildFeedbackBoolean;
+  notes?: string;
+}
+
+export interface PostBuildFeedbackSummary {
+  completedAt: string;
+  reportCount: number;
+  issuesReported: number;
+  satisfactionScore: number;
+  beginnerDifficulty: BuildFeedbackDifficulty;
+  latestFeedbackId: string;
 }
