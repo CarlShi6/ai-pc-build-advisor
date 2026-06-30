@@ -1,5 +1,11 @@
 import type { CustomerNeeds } from "@/types/api";
-import type { Build, SavedBuild, SavedBuildSummary } from "@/types/build";
+import type {
+  Build,
+  PostBuildFeedback,
+  PostBuildFeedbackInput,
+  SavedBuild,
+  SavedBuildSummary,
+} from "@/types/build";
 import type {
   AffiliateClickEvent,
   Entitlement,
@@ -115,6 +121,8 @@ export interface AffiliateClickRecord extends AffiliateClickEvent {
   clickedAt: string;
 }
 
+export interface PostBuildFeedbackRecord extends PostBuildFeedback {}
+
 export interface CheckoutSessionRecord {
   id: string;
   userId?: string;
@@ -140,6 +148,14 @@ export interface SaveBuildInput {
 }
 
 export interface SaveBuildResult {
+  savedBuild: SavedBuild;
+  summary: SavedBuildSummary;
+  builds: SavedBuildSummary[];
+  limit: number;
+}
+
+export interface SavePostBuildFeedbackResult {
+  feedback: PostBuildFeedback;
   savedBuild: SavedBuild;
   summary: SavedBuildSummary;
   builds: SavedBuildSummary[];
@@ -185,6 +201,10 @@ export interface PersistenceStore {
     builds: SavedBuildSummary[];
     limit: number;
   }>;
+  savePostBuildFeedback(
+    actor: PersistenceActor,
+    input: PostBuildFeedbackInput,
+  ): Promise<SavePostBuildFeedbackResult>;
   trackAffiliateClick(
     actor: PersistenceActor,
     event: Omit<AffiliateClickEvent, "clickedAt"> & { clickedAt?: string },

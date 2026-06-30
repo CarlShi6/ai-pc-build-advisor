@@ -6,6 +6,7 @@ import { CompareDrawer } from "@/components/compare-drawer";
 import { TopBar } from "@/components/top-bar";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { ProFeatureLock } from "@/components/ProFeatureLock";
+import { PostBuildFeedbackForm } from "@/components/post-build-feedback-form";
 import { UpgradeCard } from "@/components/UpgradeCard";
 import { UsageBadge } from "@/components/UsageBadge";
 import { categoryLabels } from "@/data/seedParts";
@@ -26,6 +27,7 @@ import {
   resetMockMonetizationState,
   replaceBuildPart,
   saveCurrentBuild,
+  savePostBuildFeedback,
   signIn,
   signOut,
   trackAffiliateClick,
@@ -43,6 +45,7 @@ import type {
   Build as BuildModel,
   CartPreviewItem as CartPreviewItemModel,
   CompatibilityWarning as CompatibilityWarningModel,
+  PostBuildFeedbackInput,
   SavedBuildSummary,
   StoreEmployeeSummary as StoreEmployeeSummaryModel,
 } from "@/types/build";
@@ -295,6 +298,17 @@ function formatCompatibilityStatus(status: BuildModel["compatibilityStatus"]) {
   return "Needs review";
 }
 
+function formatFeedbackDifficulty(value: NonNullable<SavedBuildSummary["feedbackSummary"]>["beginnerDifficulty"]) {
+  const labels: Record<typeof value, string> = {
+    easy: "Easy",
+    manageable: "Manageable",
+    hard: "Hard",
+    not_sure: "Not sure",
+  };
+
+  return labels[value];
+}
+
 function createBuildExportText({
   build,
   buildNeeds,
@@ -383,6 +397,10 @@ function ConsultPage() {
   const [isLoadingSavedBuilds, setIsLoadingSavedBuilds] = useState(false);
   const [isSavingBuild, setIsSavingBuild] = useState(false);
   const [saveBuildName, setSaveBuildName] = useState("");
+  const [currentSavedBuildId, setCurrentSavedBuildId] = useState<string | null>(null);
+  const [currentFeedbackSummary, setCurrentFeedbackSummary] = useState<SavedBuildSummary["feedbackSummary"]>();
+  const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; name: string } | null>(null);
+  const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const plan = getPlanForEntitlement(entitlement);
   const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
   const hasFullExport = canUseFeature(plan, "build_export");
@@ -408,6 +426,8 @@ function ConsultPage() {
         }
 
         setBuild(recommendedBuild);
+        setCurrentSavedBuildId(null);
+        setCurrentFeedbackSummary(undefined);
         setIsLoadingBuild(false);
         setIsLoadingDetails(true);
 
@@ -606,6 +626,8 @@ function ConsultPage() {
       setSavedBuilds(result.builds);
       setSavedBuildLimit(result.limit);
       setSaveBuildName(result.savedBuild.name);
+      setCurrentSavedBuildId(result.savedBuild.id);
+      setCurrentFeedbackSummary(result.savedBuild.feedbackSummary);
       setToast({ message: `"${result.savedBuild.name}" saved.`, tone: "success" });
     } catch (error) {
       if (error instanceof ApiClientError && error.status === 403) {
@@ -633,6 +655,8 @@ function ConsultPage() {
       setCartPreview(preview.items);
       setEmployeeSummary(preview.employeeSummary);
       setSaveBuildName(savedBuild.name);
+      setCurrentSavedBuildId(savedBuild.id);
+      setCurrentFeedbackSummary(savedBuild.feedbackSummary);
       setIsSavedBuildsOpen(false);
       handleDrawerOpenChange(false);
       setToast({ message: `"${savedBuild.name}" loaded.`, tone: "success" });
@@ -648,6 +672,10 @@ function ConsultPage() {
       const result = await deleteSavedBuild(id);
       setSavedBuilds(result.builds);
       setSavedBuildLimit(result.limit);
+      if (currentSavedBuildId === id) {
+        setCurrentSavedBuildId(null);
+        setCurrentFeedbackSummary(undefined);
+      }
       setToast({ message: "Saved build deleted.", tone: "success" });
     } catch {
       setToast({ message: "Could not delete that saved build.", tone: "error" });
@@ -671,9 +699,73 @@ function ConsultPage() {
       });
       setSavedBuilds(result.builds);
       setSavedBuildLimit(result.limit);
+      if (currentSavedBuildId === savedBuild.id) {
+        setSaveBuildName(result.savedBuild.name);
+        setCurrentFeedbackSummary(result.savedBuild.feedbackSummary);
+      }
       setToast({ message: "Saved build renamed.", tone: "success" });
     } catch {
       setToast({ message: "Could not rename that saved build.", tone: "error" });
+    }
+  }
+
+  async function handleOpenFeedbackForCurrentBuild() {
+    if (!build) {
+      return;
+    }
+
+    if (currentSavedBuildId) {
+      setFeedbackTarget({ id: currentSavedBuildId, name: saveBuildName || build.name });
+      return;
+    }
+
+    const name = saveBuildName.trim() || build.name;
+    setIsSavingBuild(true);
+
+    try {
+      const result = await saveCurrentBuild({
+        name,
+        build,
+        buildNeeds: customerNeeds,
+      });
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+      setSaveBuildName(result.savedBuild.name);
+      setCurrentSavedBuildId(result.savedBuild.id);
+      setCurrentFeedbackSummary(result.savedBuild.feedbackSummary);
+      setFeedbackTarget({ id: result.savedBuild.id, name: result.savedBuild.name });
+    } catch (error) {
+      if (error instanceof ApiClientError && error.status === 403) {
+        setShowUsageUpgrade(true);
+        setToast({ message: SAVED_BUILD_LIMIT_UPGRADE_COPY, tone: "notice" });
+      } else {
+        setToast({ message: "Save this build before reporting a build result.", tone: "error" });
+      }
+    } finally {
+      setIsSavingBuild(false);
+    }
+  }
+
+  function handleOpenFeedbackForSavedBuild(summary: SavedBuildSummary) {
+    setFeedbackTarget({ id: summary.id, name: summary.name });
+  }
+
+  async function handleSubmitPostBuildFeedback(feedback: PostBuildFeedbackInput) {
+    setIsSavingFeedback(true);
+
+    try {
+      const result = await savePostBuildFeedback(feedback);
+      setSavedBuilds(result.builds);
+      setSavedBuildLimit(result.limit);
+      if (currentSavedBuildId === result.savedBuild.id) {
+        setCurrentFeedbackSummary(result.savedBuild.feedbackSummary);
+      }
+      setFeedbackTarget(null);
+      setToast({ message: "Build result saved.", tone: "success" });
+    } catch {
+      setToast({ message: "Could not save build feedback right now.", tone: "error" });
+    } finally {
+      setIsSavingFeedback(false);
     }
   }
 
@@ -785,6 +877,8 @@ function ConsultPage() {
       setBuild(nextState.build);
       setCartPreview(nextState.cartPreview);
       setEmployeeSummary(nextState.employeeSummary);
+      setCurrentSavedBuildId(null);
+      setCurrentFeedbackSummary(undefined);
       handleDrawerOpenChange(false);
       setToast({
         message:
@@ -911,6 +1005,8 @@ function ConsultPage() {
       setBuild(nextState.build);
       setCartPreview(nextState.cartPreview);
       setEmployeeSummary(nextState.employeeSummary);
+      setCurrentSavedBuildId(null);
+      setCurrentFeedbackSummary(undefined);
       handleDrawerOpenChange(false);
       setToast({ message: "Build needs updated from advisor action.", tone: "success" });
     } catch {
@@ -1224,6 +1320,8 @@ function ConsultPage() {
                   onFocus={(category) => void openCompare(category)}
                   onCompare={(category) => void openCompare(category)}
                   substitutions={substitutionSuggestions}
+                  feedbackSummary={currentFeedbackSummary}
+                  onReportBuildResult={() => void handleOpenFeedbackForCurrentBuild()}
                   onApplySubstitution={(part, suggestion) =>
                     void handleReplacePart(
                       part,
@@ -1619,10 +1717,24 @@ function ConsultPage() {
           onRefresh={() => void refreshSavedBuilds()}
           onLoad={(id) => void handleLoadSavedBuild(id)}
           onRename={(summary) => void handleRenameSavedBuild(summary)}
+          onReportFeedback={handleOpenFeedbackForSavedBuild}
           onDelete={(id) => void handleDeleteSavedBuild(id)}
           onUpgraded={() => void refreshMonetizationState()}
         />
       )}
+
+      <PostBuildFeedbackForm
+        buildId={feedbackTarget?.id ?? null}
+        buildName={feedbackTarget?.name}
+        open={Boolean(feedbackTarget)}
+        isSubmitting={isSavingFeedback}
+        onOpenChange={(open) => {
+          if (!open) {
+            setFeedbackTarget(null);
+          }
+        }}
+        onSubmit={(feedback) => void handleSubmitPostBuildFeedback(feedback)}
+      />
 
       {toast && (
         <div className="pointer-events-none fixed inset-x-0 bottom-6 z-50 flex justify-center px-4">
@@ -1678,6 +1790,7 @@ function SavedBuildsPanel({
   onRefresh,
   onLoad,
   onRename,
+  onReportFeedback,
   onDelete,
   onUpgraded,
 }: {
@@ -1689,6 +1802,7 @@ function SavedBuildsPanel({
   onRefresh: () => void;
   onLoad: (id: string) => void;
   onRename: (summary: SavedBuildSummary) => void;
+  onReportFeedback: (summary: SavedBuildSummary) => void;
   onDelete: (id: string) => void;
   onUpgraded: () => void;
 }) {
@@ -1773,7 +1887,41 @@ function SavedBuildsPanel({
                   </p>
                 </div>
 
+                <div className="mt-4 grid gap-2 rounded-xl border border-border bg-background/60 p-3 text-xs sm:grid-cols-4">
+                  <div>
+                    <p className="text-muted-foreground">Build completed</p>
+                    <p className="mt-1 font-semibold">
+                      {savedBuild.feedbackSummary ? "Yes" : "Not reported"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Issues reported</p>
+                    <p className="mt-1 font-semibold">
+                      {savedBuild.feedbackSummary?.issuesReported ?? "None yet"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Satisfaction score</p>
+                    <p className="mt-1 font-semibold">
+                      {savedBuild.feedbackSummary
+                        ? `${savedBuild.feedbackSummary.satisfactionScore}/5`
+                        : "Not rated"}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Beginner difficulty</p>
+                    <p className="mt-1 font-semibold">
+                      {savedBuild.feedbackSummary
+                        ? formatFeedbackDifficulty(savedBuild.feedbackSummary.beginnerDifficulty)
+                        : "Not reported"}
+                    </p>
+                  </div>
+                </div>
+
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
+                  <Button size="sm" className="rounded-md" onClick={() => onReportFeedback(savedBuild)}>
+                    Report Build Result
+                  </Button>
                   <Button size="sm" variant="secondary" className="rounded-md" onClick={() => onRename(savedBuild)}>
                     Rename
                   </Button>

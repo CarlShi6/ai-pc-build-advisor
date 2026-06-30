@@ -1,13 +1,14 @@
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import { recalculateBuild } from "@/lib/build-advisor";
 import { MockPersistenceStore } from "@/lib/persistence/mock-store";
+import { createPostBuildFeedbackSummary } from "@/lib/post-build-feedback";
 import {
   createSupabaseAuthClient,
   createSupabaseServiceClient,
   isSupabasePersistenceEnabled,
 } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
-import type { SavedBuild, SavedBuildSummary } from "@/types/build";
+import type { PostBuildFeedback, PostBuildFeedbackInput, SavedBuild, SavedBuildSummary } from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
 import type {
   AuthSession,
@@ -31,6 +32,7 @@ type SavedBuildRow = Database["public"]["Tables"]["saved_builds"]["Row"];
 type EntitlementRow = Database["public"]["Tables"]["entitlements"]["Row"];
 type UsageCounterRow = Database["public"]["Tables"]["usage_counters"]["Row"];
 type ReplacementCounterRow = Database["public"]["Tables"]["replacement_counters"]["Row"];
+type PostBuildFeedbackRow = Database["public"]["Tables"]["post_build_feedback"]["Row"];
 
 function nowIso() {
   return new Date().toISOString();
@@ -69,6 +71,9 @@ function createFreeEntitlement(actor: PersistenceActor): Entitlement {
 }
 
 function createSavedBuildSummary(savedBuild: SavedBuild): SavedBuildSummary {
+  const feedbackSummary =
+    savedBuild.feedbackSummary ?? createPostBuildFeedbackSummary(savedBuild.feedback);
+
   return {
     id: savedBuild.id,
     name: savedBuild.name,
@@ -80,6 +85,7 @@ function createSavedBuildSummary(savedBuild: SavedBuild): SavedBuildSummary {
     targetUseCase: savedBuild.targetUseCase,
     cpuName: savedBuild.build.parts.find((part) => part.category === "cpu")?.displayName,
     gpuName: savedBuild.build.parts.find((part) => part.category === "gpu")?.displayName,
+    feedbackSummary,
   };
 }
 
@@ -100,12 +106,39 @@ function toSavedBuild(row: SavedBuildRow): SavedBuild {
     name: row.name,
     build: safeBuild,
     buildNeeds: row.build_needs,
+    feedback: [],
+    feedbackSummary: undefined,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     totalPrice: safeBuild.totalPrice,
     compatibilityStatus: safeBuild.compatibilityStatus,
     ownedParts: safeBuild.parts.filter((part) => part.owned).length,
     targetUseCase: safeBuild.targetUseCase.length > 0 ? safeBuild.targetUseCase : row.target_use_case,
+  };
+}
+
+function toPostBuildFeedback(row: PostBuildFeedbackRow): PostBuildFeedback {
+  return {
+    id: row.id,
+    buildId: row.build_id,
+    userId: row.user_id ?? undefined,
+    sessionId: row.session_id,
+    completedAt: row.completed_at,
+    bootSuccess: row.boot_success,
+    installationDifficulty: row.installation_difficulty,
+    compatibilityIssues: row.compatibility_issues,
+    thermalExperience: row.thermal_experience,
+    noiseExperience: row.noise_experience,
+    cableManagementExperience: row.cable_management_experience,
+    gpuClearanceIssue: row.gpu_clearance_issue,
+    coolerFitIssue: row.cooler_fit_issue,
+    biosUpdateNeeded: row.bios_update_needed,
+    driverIssue: row.driver_issue,
+    overallSatisfaction: row.overall_satisfaction,
+    wouldRecommend: row.would_recommend,
+    notes: row.notes ?? undefined,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
   };
 }
 
@@ -443,8 +476,18 @@ export class SupabasePersistenceStore implements PersistenceStore {
       throw new Error(error.message);
     }
 
+    const feedbackByBuildId = await this.getFeedbackByBuildId(
+      actor,
+      (data ?? []).map((row) => row.id),
+    );
+
     return {
-      builds: (data ?? []).map((row) => createSavedBuildSummary(toSavedBuild(row))),
+      builds: (data ?? []).map((row) => {
+        const savedBuild = toSavedBuild(row);
+        savedBuild.feedback = feedbackByBuildId.get(savedBuild.id) ?? [];
+        savedBuild.feedbackSummary = createPostBuildFeedbackSummary(savedBuild.feedback);
+        return createSavedBuildSummary(savedBuild);
+      }),
       limit: await this.getSavedBuildLimit(actor),
     };
   }
@@ -508,10 +551,26 @@ export class SupabasePersistenceStore implements PersistenceStore {
       throw new Error(error.message);
     }
 
-    return data ? toSavedBuild(data) : null;
+    if (!data) {
+      return null;
+    }
+
+    const savedBuild = toSavedBuild(data);
+    savedBuild.feedback = await this.getFeedbackForBuild(actor, id);
+    savedBuild.feedbackSummary = createPostBuildFeedbackSummary(savedBuild.feedback);
+    return savedBuild;
   }
 
   async deleteSavedBuild(actor: PersistenceActor, id: string) {
+    const feedbackDelete = await this.actorFilter(
+      this.service.from("post_build_feedback").delete().eq("build_id", id),
+      actor,
+    );
+
+    if (feedbackDelete.error) {
+      throw new Error(feedbackDelete.error.message);
+    }
+
     const { error } = await this.actorFilter(
       this.service.from("saved_builds").delete().eq("id", id),
       actor,
@@ -522,6 +581,67 @@ export class SupabasePersistenceStore implements PersistenceStore {
     }
 
     return this.listSavedBuilds(actor);
+  }
+
+  async savePostBuildFeedback(actor: PersistenceActor, input: PostBuildFeedbackInput) {
+    const savedBuild = await this.getSavedBuild(actor, input.buildId);
+
+    if (!savedBuild) {
+      throw new Error("Saved build not found.");
+    }
+
+    const now = nowIso();
+    const completedAt = input.completedAt ?? now;
+    const { data, error } = await this.service
+      .from("post_build_feedback")
+      .insert({
+        user_id: actor.userId ?? null,
+        session_id: actor.sessionId,
+        build_id: savedBuild.id,
+        completed_at: completedAt,
+        boot_success: input.bootSuccess,
+        installation_difficulty: input.installationDifficulty,
+        compatibility_issues: input.compatibilityIssues,
+        thermal_experience: input.thermalExperience,
+        noise_experience: input.noiseExperience,
+        cable_management_experience: input.cableManagementExperience,
+        gpu_clearance_issue: input.gpuClearanceIssue,
+        cooler_fit_issue: input.coolerFitIssue,
+        bios_update_needed: input.biosUpdateNeeded,
+        driver_issue: input.driverIssue,
+        overall_satisfaction: input.overallSatisfaction,
+        would_recommend: input.wouldRecommend,
+        notes: input.notes?.trim() || null,
+        created_at: now,
+        updated_at: now,
+      })
+      .select("*")
+      .single();
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    const updateResult = await this.actorFilter(
+      this.service.from("saved_builds").update({ updated_at: now }).eq("id", savedBuild.id),
+      actor,
+    );
+
+    if (updateResult.error) {
+      throw new Error(updateResult.error.message);
+    }
+
+    const feedback = toPostBuildFeedback(data);
+    const nextSavedBuild = await this.getSavedBuild(actor, savedBuild.id);
+    const nextList = await this.listSavedBuilds(actor);
+
+    return {
+      feedback,
+      savedBuild: nextSavedBuild ?? savedBuild,
+      summary: createSavedBuildSummary(nextSavedBuild ?? savedBuild),
+      builds: nextList.builds,
+      limit: nextList.limit,
+    };
   }
 
   async trackAffiliateClick(
@@ -562,6 +682,7 @@ export class SupabasePersistenceStore implements PersistenceStore {
       this.actorFilter(this.service.from("owned_parts").delete(), actor),
       this.actorFilter(this.service.from("affiliate_clicks").delete(), actor),
       this.actorFilter(this.service.from("checkout_sessions").delete(), actor),
+      this.actorFilter(this.service.from("post_build_feedback").delete(), actor),
     ]);
 
     return {
@@ -735,6 +856,51 @@ export class SupabasePersistenceStore implements PersistenceStore {
     if (error) {
       throw new Error(error.message);
     }
+  }
+
+  private async getFeedbackForBuild(
+    actor: PersistenceActor,
+    buildId: string,
+  ): Promise<PostBuildFeedback[]> {
+    const { data, error } = await this.actorFilter(
+      this.service.from("post_build_feedback").select("*").eq("build_id", buildId),
+      actor,
+    ).order("completed_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    return (data ?? []).map(toPostBuildFeedback);
+  }
+
+  private async getFeedbackByBuildId(
+    actor: PersistenceActor,
+    buildIds: string[],
+  ): Promise<Map<string, PostBuildFeedback[]>> {
+    const feedbackByBuildId = new Map<string, PostBuildFeedback[]>();
+
+    if (buildIds.length === 0) {
+      return feedbackByBuildId;
+    }
+
+    const { data, error } = await this.actorFilter(
+      this.service.from("post_build_feedback").select("*").in("build_id", buildIds),
+      actor,
+    ).order("completed_at", { ascending: false });
+
+    if (error) {
+      throw new Error(error.message);
+    }
+
+    for (const row of data ?? []) {
+      const feedback = toPostBuildFeedback(row);
+      const existing = feedbackByBuildId.get(feedback.buildId) ?? [];
+      existing.push(feedback);
+      feedbackByBuildId.set(feedback.buildId, existing);
+    }
+
+    return feedbackByBuildId;
   }
 
   private async upsertCheckoutSession(

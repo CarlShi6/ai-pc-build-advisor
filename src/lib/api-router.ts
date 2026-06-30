@@ -33,6 +33,8 @@ import type {
   EntitlementStatusResponse,
   OffersResponse,
   PartsResponse,
+  PostBuildFeedbackRequest,
+  PostBuildFeedbackResponse,
   ProductSearchRequest,
   ProductsSearchResponse,
   RecommendBuildResponse,
@@ -286,6 +288,43 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
           error instanceof Error ? error.message : "This saved build could not be stored.",
         );
       }
+      return jsonResponse(payload);
+    }
+
+    if (pathname === "/api/builds/feedback") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const { feedback } = await readJson<PostBuildFeedbackRequest>(request);
+
+      if (!feedback?.buildId) {
+        throw new ApiRouteError(400, "Post-build feedback requires a saved build id.");
+      }
+
+      if (
+        !Number.isFinite(feedback.overallSatisfaction) ||
+        feedback.overallSatisfaction < 1 ||
+        feedback.overallSatisfaction > 5
+      ) {
+        throw new ApiRouteError(400, "Overall satisfaction must be between 1 and 5.");
+      }
+
+      const actor = await store.getActor(request);
+      let result;
+      try {
+        result = await store.savePostBuildFeedback(actor, feedback);
+      } catch (error) {
+        throw new ApiRouteError(
+          404,
+          error instanceof Error ? error.message : "Feedback could not be attached to that saved build.",
+        );
+      }
+
+      const payload: PostBuildFeedbackResponse = {
+        success: true,
+        ...result,
+      };
       return jsonResponse(payload);
     }
 

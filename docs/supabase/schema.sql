@@ -76,6 +76,29 @@ create table if not exists public.owned_parts (
   updated_at timestamptz not null default now()
 );
 
+create table if not exists public.post_build_feedback (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.app_users(id) on delete cascade,
+  session_id text not null,
+  build_id uuid not null references public.saved_builds(id) on delete cascade,
+  completed_at timestamptz not null default now(),
+  boot_success text not null check (boot_success in ('yes', 'no', 'not_sure')),
+  installation_difficulty text not null check (installation_difficulty in ('easy', 'manageable', 'hard', 'not_sure')),
+  compatibility_issues text not null check (compatibility_issues in ('no_issue', 'minor_issue', 'major_issue', 'not_sure')),
+  thermal_experience text not null check (thermal_experience in ('no_issue', 'minor_issue', 'major_issue', 'not_sure')),
+  noise_experience text not null check (noise_experience in ('no_issue', 'minor_issue', 'major_issue', 'not_sure')),
+  cable_management_experience text not null check (cable_management_experience in ('no_issue', 'minor_issue', 'major_issue', 'not_sure')),
+  gpu_clearance_issue text not null check (gpu_clearance_issue in ('no_issue', 'minor_issue', 'major_issue', 'not_sure')),
+  cooler_fit_issue text not null check (cooler_fit_issue in ('no_issue', 'minor_issue', 'major_issue', 'not_sure')),
+  bios_update_needed text not null check (bios_update_needed in ('yes', 'no', 'not_sure')),
+  driver_issue text not null check (driver_issue in ('no_issue', 'minor_issue', 'major_issue', 'not_sure')),
+  overall_satisfaction integer not null check (overall_satisfaction between 1 and 5),
+  would_recommend text not null check (would_recommend in ('yes', 'no', 'not_sure')),
+  notes text,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
 create table if not exists public.affiliate_clicks (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references public.app_users(id) on delete set null,
@@ -118,6 +141,9 @@ create unique index if not exists replacement_counters_session_build_idx
   where user_id is null;
 create index if not exists owned_parts_user_build_idx on public.owned_parts (user_id, build_id);
 create index if not exists owned_parts_session_build_idx on public.owned_parts (session_id, build_id);
+create index if not exists post_build_feedback_user_completed_idx on public.post_build_feedback (user_id, completed_at desc);
+create index if not exists post_build_feedback_session_completed_idx on public.post_build_feedback (session_id, completed_at desc);
+create index if not exists post_build_feedback_build_completed_idx on public.post_build_feedback (build_id, completed_at desc);
 create index if not exists affiliate_clicks_user_clicked_idx on public.affiliate_clicks (user_id, clicked_at desc);
 create index if not exists affiliate_clicks_session_clicked_idx on public.affiliate_clicks (session_id, clicked_at desc);
 create index if not exists checkout_sessions_user_status_idx on public.checkout_sessions (user_id, status);
@@ -128,6 +154,7 @@ alter table public.entitlements enable row level security;
 alter table public.usage_counters enable row level security;
 alter table public.replacement_counters enable row level security;
 alter table public.owned_parts enable row level security;
+alter table public.post_build_feedback enable row level security;
 alter table public.affiliate_clicks enable row level security;
 alter table public.checkout_sessions enable row level security;
 
@@ -158,6 +185,11 @@ create policy "Users can read their replacement counters"
 
 create policy "Users can manage their owned parts"
   on public.owned_parts for all
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+create policy "Users can manage their post-build feedback"
+  on public.post_build_feedback for all
   using (auth.uid() = user_id)
   with check (auth.uid() = user_id);
 

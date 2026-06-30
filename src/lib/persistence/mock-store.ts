@@ -1,6 +1,7 @@
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import { recalculateBuild } from "@/lib/build-advisor";
-import type { SavedBuild, SavedBuildSummary } from "@/types/build";
+import { createPostBuildFeedbackSummary } from "@/lib/post-build-feedback";
+import type { PostBuildFeedback, PostBuildFeedbackInput, SavedBuild, SavedBuildSummary } from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
 import type {
   AuthSession,
@@ -26,6 +27,7 @@ type ActorState = {
   affiliateClicks: AffiliateClickEvent[];
   checkoutSessions: CheckoutSessionRecord[];
   savedBuilds: SavedBuild[];
+  postBuildFeedback: PostBuildFeedback[];
 };
 
 function nowIso() {
@@ -69,6 +71,9 @@ function toUserId(session: AuthSession) {
 }
 
 function createSavedBuildSummary(savedBuild: SavedBuild): SavedBuildSummary {
+  const feedbackSummary =
+    savedBuild.feedbackSummary ?? createPostBuildFeedbackSummary(savedBuild.feedback);
+
   return {
     id: savedBuild.id,
     name: savedBuild.name,
@@ -80,6 +85,7 @@ function createSavedBuildSummary(savedBuild: SavedBuild): SavedBuildSummary {
     targetUseCase: savedBuild.targetUseCase,
     cpuName: savedBuild.build.parts.find((part) => part.category === "cpu")?.displayName,
     gpuName: savedBuild.build.parts.find((part) => part.category === "gpu")?.displayName,
+    feedbackSummary,
   };
 }
 
@@ -345,14 +351,69 @@ export class MockPersistenceStore implements PersistenceStore {
   }
 
   async getSavedBuild(actor: PersistenceActor, id: string): Promise<SavedBuild | null> {
-    return this.getActorState(actor).savedBuilds.find((item) => item.id === id) ?? null;
+    const savedBuild = this.getActorState(actor).savedBuilds.find((item) => item.id === id);
+
+    if (!savedBuild) {
+      return null;
+    }
+
+    savedBuild.feedback = this.getFeedbackForBuild(actor, id);
+    savedBuild.feedbackSummary = createPostBuildFeedbackSummary(savedBuild.feedback);
+    return savedBuild;
   }
 
   async deleteSavedBuild(actor: PersistenceActor, id: string) {
     const state = this.getActorState(actor);
     state.savedBuilds = state.savedBuilds.filter((item) => item.id !== id);
+    state.postBuildFeedback = state.postBuildFeedback.filter((item) => item.buildId !== id);
 
     return {
+      builds: this.getSavedBuildSummaries(actor),
+      limit: this.getSavedBuildLimit(actor),
+    };
+  }
+
+  async savePostBuildFeedback(actor: PersistenceActor, input: PostBuildFeedbackInput) {
+    const state = this.getActorState(actor);
+    const savedBuild = state.savedBuilds.find((item) => item.id === input.buildId);
+
+    if (!savedBuild) {
+      throw new Error("Saved build not found.");
+    }
+
+    const now = nowIso();
+    const feedback: PostBuildFeedback = {
+      id: createId("feedback"),
+      buildId: input.buildId,
+      userId: actor.userId,
+      sessionId: actor.sessionId,
+      completedAt: input.completedAt ?? now,
+      bootSuccess: input.bootSuccess,
+      installationDifficulty: input.installationDifficulty,
+      compatibilityIssues: input.compatibilityIssues,
+      thermalExperience: input.thermalExperience,
+      noiseExperience: input.noiseExperience,
+      cableManagementExperience: input.cableManagementExperience,
+      gpuClearanceIssue: input.gpuClearanceIssue,
+      coolerFitIssue: input.coolerFitIssue,
+      biosUpdateNeeded: input.biosUpdateNeeded,
+      driverIssue: input.driverIssue,
+      overallSatisfaction: input.overallSatisfaction,
+      wouldRecommend: input.wouldRecommend,
+      notes: input.notes?.trim() || undefined,
+      createdAt: now,
+      updatedAt: now,
+    };
+
+    state.postBuildFeedback.unshift(feedback);
+    savedBuild.feedback = this.getFeedbackForBuild(actor, savedBuild.id);
+    savedBuild.feedbackSummary = createPostBuildFeedbackSummary(savedBuild.feedback);
+    savedBuild.updatedAt = now;
+
+    return {
+      feedback,
+      savedBuild,
+      summary: createSavedBuildSummary(savedBuild),
       builds: this.getSavedBuildSummaries(actor),
       limit: this.getSavedBuildLimit(actor),
     };
@@ -421,6 +482,7 @@ export class MockPersistenceStore implements PersistenceStore {
       affiliateClicks: [],
       checkoutSessions: [],
       savedBuilds: [],
+      postBuildFeedback: [],
     };
   }
 
@@ -463,6 +525,8 @@ export class MockPersistenceStore implements PersistenceStore {
       name: input.name.trim() || safeBuild.name,
       build: safeBuild,
       buildNeeds: input.buildNeeds,
+      feedback: existing?.feedback ?? [],
+      feedbackSummary: existing?.feedbackSummary,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
       totalPrice: safeBuild.totalPrice,
@@ -470,6 +534,10 @@ export class MockPersistenceStore implements PersistenceStore {
       ownedParts: safeBuild.parts.filter((part) => part.owned).length,
       targetUseCase: safeBuild.targetUseCase,
     };
+  }
+
+  private getFeedbackForBuild(actor: PersistenceActor, buildId: string) {
+    return this.getActorState(actor).postBuildFeedback.filter((item) => item.buildId === buildId);
   }
 }
 

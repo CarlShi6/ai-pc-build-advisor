@@ -6,6 +6,8 @@ import type {
   PartOffer,
   OffersResponse,
   PartsResponse,
+  PostBuildFeedbackRequest,
+  PostBuildFeedbackResponse,
   RecommendBuildResponse,
   RecommendedBuildInput,
   UsageStatusResponse,
@@ -33,7 +35,13 @@ import type {
   SignUpPayload,
   SignUpResponse,
 } from "@/types/api";
-import type { Build, SavedBuild, SavedBuildSummary, StoreEmployeeSummary } from "@/types/build";
+import type {
+  Build,
+  PostBuildFeedbackInput,
+  SavedBuild,
+  SavedBuildSummary,
+  StoreEmployeeSummary,
+} from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, UsageStatus } from "@/types/monetization";
 import type { AuthSession } from "@/lib/persistence/types";
 import type { Part } from "@/types/parts";
@@ -300,6 +308,17 @@ export async function deleteSavedBuild(
     builds: response.builds,
     limit: response.limit,
   };
+}
+
+export async function savePostBuildFeedback(
+  feedback: PostBuildFeedbackInput,
+): Promise<PostBuildFeedbackResponse> {
+  const payload: PostBuildFeedbackRequest = { feedback };
+
+  return requestJson<PostBuildFeedbackResponse>("/api/builds/feedback", {
+    method: "POST",
+    body: JSON.stringify(payload),
+  });
 }
 
 export async function replaceBuildPart(
