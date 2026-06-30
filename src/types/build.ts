@@ -4,10 +4,31 @@ import type { CustomerNeeds } from "@/types/api";
 
 export interface CompatibilityWarning {
   id: string;
-  severity: "info" | "warning" | "error";
+  severity: "warning" | "fail";
   message: string;
   affectedPartIds: string[];
   suggestedFix?: string;
+}
+
+export type CompatibilitySeverity = "pass" | "warning" | "fail";
+
+export interface CompatibilityRuleResult {
+  id: string;
+  label: string;
+  severity: CompatibilitySeverity;
+  message: string;
+  affectedPartIds: string[];
+  suggestedFix?: string;
+  checkedPartCategories: string[];
+}
+
+export interface BuildConfidenceScore {
+  score: number;
+  label: "High" | "Medium" | "Low";
+  summary: string;
+  passCount: number;
+  warningCount: number;
+  failCount: number;
 }
 
 export interface Build {
@@ -18,7 +39,9 @@ export interface Build {
   totalPrice: number;
   parts: Part[];
   compatibilityStatus: "pass" | "warning" | "fail";
+  compatibilityChecks: CompatibilityRuleResult[];
   compatibilityWarnings: CompatibilityWarning[];
+  confidenceScore: BuildConfidenceScore;
   recommendationSummary?: string;
 }
 
