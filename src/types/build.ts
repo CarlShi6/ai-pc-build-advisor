@@ -1,6 +1,7 @@
 import type { AffiliateLink } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 import type { CustomerNeeds } from "@/types/api";
+import type { PartCategory } from "@/types/parts";
 
 export interface CompatibilityWarning {
   id: string;
@@ -49,6 +50,52 @@ export interface PartDecisionMetadata {
   tradeOffSummary: string;
   valueScore: number;
   performanceScore: number | null;
+}
+
+export type SubstitutionType =
+  | "budgetAlternative"
+  | "performanceUpgrade"
+  | "sameTierSubstitute"
+  | "beginnerSafeSubstitute"
+  | "compatibilitySafeSubstitute";
+
+export interface SubstitutionSuggestion {
+  originalPartId: string;
+  substitutePartId: string;
+  category: PartCategory;
+  substitutionType: SubstitutionType;
+  priceDelta: number;
+  totalAfterSwap: number;
+  confidenceScoreAfterSwap: number;
+  compatibilityImpact: {
+    statusBefore: Build["compatibilityStatus"];
+    statusAfter: Build["compatibilityStatus"];
+    confidenceDelta: number;
+    warningDelta: number;
+    failDelta: number;
+    summary: string;
+  };
+  performanceImpact: {
+    scoreBefore: number | null;
+    scoreAfter: number | null;
+    scoreDelta: number | null;
+    summary: string;
+  };
+  budgetImpact: {
+    budget: number;
+    overBudgetBefore: number;
+    overBudgetAfter: number;
+    savings: number;
+    summary: string;
+  };
+  beginnerRiskImpact: {
+    riskBefore: number;
+    riskAfter: number;
+    riskDelta: number;
+    summary: string;
+  };
+  recommendationReason: string;
+  tradeOffSummary: string;
 }
 
 export interface Build {

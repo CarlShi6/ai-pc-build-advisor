@@ -1,4 +1,4 @@
-import { categoryLabels } from "@/data/seedParts";
+import { categoryLabels, seedParts } from "@/data/seedParts";
 import {
   getCategoryComparisonFields,
   getPartPowerRequirement,
@@ -16,7 +16,7 @@ import { canUseFeature } from "@/lib/monetization";
 import { searchProducts as searchProductsApi, trackAffiliateClick } from "@/lib/apiClient";
 import { productSearchResultToPart } from "@/lib/product-search/search-service";
 import { cn } from "@/lib/utils";
-import type { Build, PartDecisionMetadata } from "@/types/build";
+import type { Build, PartDecisionMetadata, SubstitutionSuggestion } from "@/types/build";
 import type { AffiliateLink, PlanType, UsageStatus } from "@/types/monetization";
 import type { Part, PartCategory } from "@/types/parts";
 import type { ProductSearchResult } from "@/lib/product-search/types";
@@ -72,6 +72,30 @@ const CATEGORY_VISUALS: Partial<Record<PartCategory, string>> = {
 
 function formatMoney(value: number) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatSignedMoney(value: number) {
+  if (value < 0) {
+    return `-${formatMoney(Math.abs(value))}`;
+  }
+
+  if (value > 0) {
+    return `+${formatMoney(value)}`;
+  }
+
+  return "$0.00";
+}
+
+function getSubstitutionLabel(type: SubstitutionSuggestion["substitutionType"]) {
+  const labels: Record<SubstitutionSuggestion["substitutionType"], string> = {
+    budgetAlternative: "Budget Alternative",
+    performanceUpgrade: "Performance Upgrade",
+    sameTierSubstitute: "Same-Tier Substitute",
+    beginnerSafeSubstitute: "Beginner-Safe Substitute",
+    compatibilitySafeSubstitute: "Compatibility-Safe Substitute",
+  };
+
+  return labels[type];
 }
 
 function formatRetailerName(value: string) {
@@ -331,6 +355,7 @@ export function CompareDrawer({
   isReplacing,
   errorMessage,
   recommendedReplacementId,
+  substitutionSuggestions = [],
   onOpenChange,
   onReplace,
   plan = "free",
@@ -347,6 +372,7 @@ export function CompareDrawer({
   isReplacing?: boolean;
   errorMessage?: string | null;
   recommendedReplacementId?: string | null;
+  substitutionSuggestions?: SubstitutionSuggestion[];
   onOpenChange: (open: boolean) => void;
   onReplace: (part: Part) => void;
   plan?: PlanType;
@@ -532,8 +558,31 @@ export function CompareDrawer({
   const selectedCompareParts = selectedIds
     .map((id) => sameCategoryParts.find((part) => part.id === id))
     .filter((part): part is Part => Boolean(part));
+  const recommendedSubstitution = useMemo(() => {
+    if (!selectedPart) {
+      return null;
+    }
+
+    return (
+      substitutionSuggestions.find(
+        (suggestion) =>
+          suggestion.category === selectedPart.category &&
+          suggestion.originalPartId === selectedPart.id,
+      ) ?? null
+    );
+  }, [selectedPart, substitutionSuggestions]);
+  const recommendedSubstitutePart = recommendedSubstitution
+    ? sameCategoryParts.find((part) => part.id === recommendedSubstitution.substitutePartId) ??
+      seedParts.find((part) => part.id === recommendedSubstitution.substitutePartId) ??
+      null
+    : null;
   const recommendedParts = baseCategoryParts
-    .filter((part, index) => index < 6 || part.id === recommendedReplacementId)
+    .filter(
+      (part, index) =>
+        index < 6 ||
+        part.id === recommendedReplacementId ||
+        part.id === recommendedSubstitution?.substitutePartId,
+    )
     .slice(0, 8);
   const searchedParts = baseCategoryParts.filter((part) => partMatchesSearch(part, searchQuery));
   const visibleTabs = [
@@ -652,6 +701,17 @@ export function CompareDrawer({
               A recommended review option is highlighted because it may address the selected
               compatibility warning.
             </div>
+          )}
+
+          {recommendedSubstitution && recommendedSubstitutePart && (
+            <RecommendedSwapPanel
+              suggestion={recommendedSubstitution}
+              substitute={recommendedSubstitutePart}
+              canReplacePart={canReplacePart}
+              isReplacing={isReplacing}
+              onPreview={() => previewSwap(recommendedSubstitutePart)}
+              onApply={() => onReplace(recommendedSubstitutePart)}
+            />
           )}
 
           <div className="mt-5">
@@ -819,6 +879,82 @@ export function CompareDrawer({
         />
       </DrawerContent>
     </Drawer>
+  );
+}
+
+function RecommendedSwapPanel({
+  suggestion,
+  substitute,
+  canReplacePart,
+  isReplacing,
+  onPreview,
+  onApply,
+}: {
+  suggestion: SubstitutionSuggestion;
+  substitute: Part;
+  canReplacePart: boolean;
+  isReplacing?: boolean;
+  onPreview: () => void;
+  onApply: () => void;
+}) {
+  return (
+    <section className="mt-4 rounded-xl border border-primary/25 bg-primary/5 p-4">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <Badge className="mb-3 rounded-md border border-primary/30 bg-primary/15 text-primary">
+            <Sparkles className="mr-1 size-3" /> Recommended Swap
+          </Badge>
+          <h3 className="text-lg font-bold">{substitute.displayName}</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {getSubstitutionLabel(suggestion.substitutionType)} based on the current build total,
+            compatibility checks, confidence score, power, and beginner risk.
+          </p>
+        </div>
+        <div className="grid min-w-64 grid-cols-3 gap-2 text-xs">
+          <div className="rounded-md border border-border bg-background/70 px-2 py-2">
+            <p className="text-muted-foreground">Price</p>
+            <p className={cn("font-mono font-semibold", suggestion.priceDelta <= 0 ? "text-success" : "text-warning")}>
+              {formatSignedMoney(suggestion.priceDelta)}
+            </p>
+          </div>
+          <div className="rounded-md border border-border bg-background/70 px-2 py-2">
+            <p className="text-muted-foreground">Total</p>
+            <p className="font-mono font-semibold">{formatMoney(suggestion.totalAfterSwap)}</p>
+          </div>
+          <div className="rounded-md border border-border bg-background/70 px-2 py-2">
+            <p className="text-muted-foreground">Confidence</p>
+            <p className="font-mono font-semibold">{suggestion.confidenceScoreAfterSwap}/100</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-2">
+        <div className="rounded-xl border border-border bg-background/60 p-3 text-sm">
+          <p className="font-medium">{suggestion.recommendationReason}</p>
+          <p className="mt-1 text-xs text-muted-foreground">{suggestion.tradeOffSummary}</p>
+        </div>
+        <div className="rounded-xl border border-border bg-background/60 p-3 text-xs text-muted-foreground">
+          <p>{suggestion.compatibilityImpact.summary}</p>
+          <p className="mt-1">{suggestion.budgetImpact.summary}</p>
+          <p className="mt-1">{suggestion.beginnerRiskImpact.summary}</p>
+        </div>
+      </div>
+
+      <div className="mt-4 flex flex-wrap justify-end gap-3">
+        <Button variant="secondary" className="rounded-xl" onClick={onPreview}>
+          Preview swap
+        </Button>
+        <Button className="rounded-xl shadow-glow" disabled={!canReplacePart || isReplacing} onClick={onApply}>
+          {isReplacing ? (
+            <>
+              <LoaderCircle className="mr-2 size-4 animate-spin" /> Replacing
+            </>
+          ) : (
+            "Apply recommended swap"
+          )}
+        </Button>
+      </div>
+    </section>
   );
 }
 

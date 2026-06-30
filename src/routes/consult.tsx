@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BuildCard } from "@/components/build-card";
 import { ChatPanel, type ChatMessage } from "@/components/chat-panel";
 import { CompareDrawer } from "@/components/compare-drawer";
@@ -33,6 +33,7 @@ import {
 } from "@/lib/apiClient";
 import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
 import { mergeCustomerNeeds } from "@/lib/needParser";
+import { getDynamicSubstitutionSuggestions } from "@/lib/substitution-engine";
 import type { AdvisorSuggestedAction } from "@/lib/ai/types";
 import type {
   CustomerNeeds,
@@ -385,6 +386,10 @@ function ConsultPage() {
   const plan = getPlanForEntitlement(entitlement);
   const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
   const hasFullExport = canUseFeature(plan, "build_export");
+  const substitutionSuggestions = useMemo(
+    () => (build ? getDynamicSubstitutionSuggestions(build) : []),
+    [build],
+  );
 
   useEffect(() => {
     let active = true;
@@ -1218,6 +1223,13 @@ function ConsultPage() {
                   focusedCategory={compareCategory ?? undefined}
                   onFocus={(category) => void openCompare(category)}
                   onCompare={(category) => void openCompare(category)}
+                  substitutions={substitutionSuggestions}
+                  onApplySubstitution={(part, suggestion) =>
+                    void handleReplacePart(
+                      part,
+                      `Applied ${categoryLabels[suggestion.category]} substitution: ${part.displayName}.`,
+                    )
+                  }
                 />
 
                 {detailsError && (
@@ -1586,6 +1598,7 @@ function ConsultPage() {
           isReplacing={isReplacingPart}
           errorMessage={compareError}
           recommendedReplacementId={recommendedReplacementId}
+          substitutionSuggestions={substitutionSuggestions}
           plan={plan}
           usageStatus={usageStatus}
           startWithOwnedPartForm={openOwnedPartForm}

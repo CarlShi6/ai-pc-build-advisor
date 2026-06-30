@@ -1,10 +1,11 @@
-import { categoryLabels } from "@/data/seedParts";
+import { categoryLabels, seedParts } from "@/data/seedParts";
 import { getPartSummarySpecs } from "@/lib/build-advisor";
 import { cn } from "@/lib/utils";
-import type { Build } from "@/types/build";
+import type { Build, SubstitutionSuggestion } from "@/types/build";
+import type { Part } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRightLeft, CheckCircle2, Eye, GitCompare, Layers, XCircle } from "lucide-react";
+import { AlertTriangle, ArrowRightLeft, CheckCircle2, Eye, GitCompare, Layers, Sparkles, XCircle } from "lucide-react";
 
 export type LegacyBuildPart = {
   category: string;
@@ -38,6 +39,8 @@ type BuildCardProps = {
   focusedCategory?: string;
   onFocus?: (category: string) => void;
   onCompare?: (category: string) => void;
+  substitutions?: SubstitutionSuggestion[];
+  onApplySubstitution?: (part: Part, suggestion: SubstitutionSuggestion) => void;
   compact?: boolean;
 };
 
@@ -98,6 +101,8 @@ export function BuildCard({
   focusedCategory,
   onFocus,
   onCompare,
+  substitutions,
+  onApplySubstitution,
   compact = false,
 }: BuildCardProps) {
   return (
@@ -107,6 +112,8 @@ export function BuildCard({
       focusedCategory={focusedCategory}
       onFocus={onFocus}
       onCompare={onCompare}
+      substitutions={substitutions}
+      onApplySubstitution={onApplySubstitution}
       compact={compact}
     />
   );
@@ -118,6 +125,8 @@ export function BuildCardInner({
   focusedCategory,
   onFocus,
   onCompare,
+  substitutions = [],
+  onApplySubstitution,
   compact = false,
 }: BuildCardProps) {
   const rows = normalizeRows(build, parts);
@@ -184,6 +193,14 @@ export function BuildCardInner({
           <PerfStat label="Confidence" value={`${confidenceScore}/100`} pct={confidenceScore} tone={status === "fail" ? "primary" : "success"} />
           <PerfStat label="Parts Selected" value={`${rows.length}`} pct={Math.min(rows.length * 12, 100)} />
         </div>
+      )}
+
+      {!compact && build && substitutions.length > 0 && (
+        <SmartSubstitutions
+          suggestions={substitutions}
+          onFocus={onFocus}
+          onApplySubstitution={onApplySubstitution}
+        />
       )}
 
       <div className="overflow-hidden rounded-2xl border border-border bg-card">
@@ -357,6 +374,125 @@ export function BuildCardInner({
         </div>
       )}
     </div>
+  );
+}
+
+function getSubstitutionLabel(type: SubstitutionSuggestion["substitutionType"]) {
+  const labels: Record<SubstitutionSuggestion["substitutionType"], string> = {
+    budgetAlternative: "Budget Alternative",
+    performanceUpgrade: "Performance Upgrade",
+    sameTierSubstitute: "Same-Tier Substitute",
+    beginnerSafeSubstitute: "Beginner-Safe Substitute",
+    compatibilitySafeSubstitute: "Compatibility-Safe Substitute",
+  };
+
+  return labels[type];
+}
+
+function formatSignedMoney(value: number) {
+  if (value < 0) {
+    return `-${formatMoney(Math.abs(value))}`;
+  }
+
+  if (value > 0) {
+    return `+${formatMoney(value)}`;
+  }
+
+  return "$0.00";
+}
+
+function SmartSubstitutions({
+  suggestions,
+  onFocus,
+  onApplySubstitution,
+}: {
+  suggestions: SubstitutionSuggestion[];
+  onFocus?: (category: string) => void;
+  onApplySubstitution?: (part: Part, suggestion: SubstitutionSuggestion) => void;
+}) {
+  const visibleSuggestions = suggestions.slice(0, 3);
+
+  return (
+    <section className="rounded-2xl border border-primary/20 bg-card p-5">
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="size-4 text-primary" />
+            <h3 className="text-base font-bold">Smart Substitutions</h3>
+          </div>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Deterministic swap ideas based on budget, compatibility, confidence, power, and beginner risk.
+          </p>
+        </div>
+        <Badge className="rounded-md border border-primary/20 bg-primary/10 text-primary">
+          {suggestions.length} found
+        </Badge>
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-3">
+        {visibleSuggestions.map((suggestion) => {
+          const substitute = seedParts.find((part) => part.id === suggestion.substitutePartId);
+          const original = seedParts.find((part) => part.id === suggestion.originalPartId);
+
+          if (!substitute) {
+            return null;
+          }
+
+          return (
+            <article key={`${suggestion.originalPartId}-${suggestion.substitutePartId}`} className="flex min-h-56 flex-col rounded-xl border border-border bg-background/60 p-4">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Badge className="rounded-md bg-primary/15 text-primary">
+                  {getSubstitutionLabel(suggestion.substitutionType)}
+                </Badge>
+                <Badge variant="secondary" className="rounded-md">
+                  {categoryLabels[suggestion.category]}
+                </Badge>
+              </div>
+              <h4 className="text-sm font-semibold leading-snug">{substitute.displayName}</h4>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Replaces {original?.displayName ?? categoryLabels[suggestion.category]}
+              </p>
+              <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <div className="rounded-md border border-border bg-card px-2 py-2">
+                  <p className="text-muted-foreground">Price</p>
+                  <p className={cn("font-mono font-semibold", suggestion.priceDelta <= 0 ? "text-success" : "text-warning")}>
+                    {formatSignedMoney(suggestion.priceDelta)}
+                  </p>
+                </div>
+                <div className="rounded-md border border-border bg-card px-2 py-2">
+                  <p className="text-muted-foreground">Total</p>
+                  <p className="font-mono font-semibold">{formatMoney(suggestion.totalAfterSwap)}</p>
+                </div>
+                <div className="rounded-md border border-border bg-card px-2 py-2">
+                  <p className="text-muted-foreground">Confidence</p>
+                  <p className="font-mono font-semibold">{suggestion.confidenceScoreAfterSwap}/100</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs font-medium">{suggestion.recommendationReason}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{suggestion.tradeOffSummary}</p>
+              <div className="mt-auto flex flex-wrap gap-2 pt-4">
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="rounded-md"
+                  onClick={() => onFocus?.(suggestion.category)}
+                >
+                  Review
+                </Button>
+                <Button
+                  size="sm"
+                  className="rounded-md"
+                  disabled={!onApplySubstitution}
+                  onClick={() => onApplySubstitution?.(substitute, suggestion)}
+                >
+                  Apply Swap
+                </Button>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
