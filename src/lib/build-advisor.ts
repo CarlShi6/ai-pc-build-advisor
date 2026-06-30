@@ -1,5 +1,11 @@
 import { categoryLabels, recommendedBuildPartIds, seedParts } from "@/data/seedParts";
-import { calculateBuildTotal, deriveCompatibilityStatus, evaluateCompatibility } from "@/lib/compatibility";
+import {
+  calculateBuildConfidenceScore,
+  calculateBuildTotal,
+  deriveCompatibilityStatus,
+  evaluateCompatibilityRules,
+  getCompatibilityWarnings,
+} from "@/lib/compatibility";
 import type { RecommendedBuildInput, PartOffer } from "@/types/api";
 import type {
   Build,
@@ -59,17 +65,30 @@ function buildFromParts(parts: Part[], input?: RecommendedBuildInput): Build {
     totalPrice: calculateBuildTotal(parts),
     parts,
     compatibilityStatus: "pass",
+    compatibilityChecks: [],
     compatibilityWarnings: [],
+    confidenceScore: {
+      score: 0,
+      label: "Low",
+      summary: "Compatibility rules have not run yet.",
+      passCount: 0,
+      warningCount: 0,
+      failCount: 0,
+    },
     recommendationSummary:
       "Balanced mock recommendation based on budget, use case, compatibility, and upgrade flexibility.",
   };
 
-  const compatibilityWarnings = evaluateCompatibility(buildDraft);
+  const compatibilityChecks = evaluateCompatibilityRules(buildDraft);
+  const compatibilityWarnings = getCompatibilityWarnings(compatibilityChecks);
+  const confidenceScore = calculateBuildConfidenceScore(compatibilityChecks);
 
   return {
     ...buildDraft,
+    compatibilityChecks,
     compatibilityWarnings,
-    compatibilityStatus: deriveCompatibilityStatus(compatibilityWarnings),
+    compatibilityStatus: deriveCompatibilityStatus(compatibilityChecks),
+    confidenceScore,
     totalPrice: calculateBuildTotal(parts),
   };
 }
@@ -481,8 +500,8 @@ export function getStoreEmployeeSummary(
       : "No higher-tier upgrade is configured in the current demo catalog.",
     compatibilityStatus:
       build.compatibilityStatus === "pass"
-        ? "All checks passed."
-        : `${build.compatibilityWarnings.length} compatibility item(s) need attention.`,
+        ? `All checks passed with ${build.confidenceScore.score}/100 confidence.`
+        : `${build.compatibilityWarnings.length} compatibility item(s) need attention. Confidence: ${build.confidenceScore.score}/100.`,
     preCartStatus: `${preCartReadyCount}/${cartItems.length} items have usable purchase references.`,
   };
 }

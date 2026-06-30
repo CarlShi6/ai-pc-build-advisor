@@ -150,7 +150,12 @@ function getWarningTargetCategory(warning: CompatibilityWarningModel) {
     return "case";
   }
 
-  if (warning.id === "air-cooler-height" || warning.id === "aio-radiator-fit") {
+  if (
+    warning.id === "air-cooler-height" ||
+    warning.id === "aio-radiator-fit" ||
+    warning.id === "cooler-case-fit" ||
+    warning.id === "cooler-socket-support"
+  ) {
     return "cooler";
   }
 
@@ -303,6 +308,7 @@ function createBuildExportText({
     "",
     `Estimated total: ${formatMoney(build.totalPrice)}`,
     `Compatibility: ${formatCompatibilityStatus(build.compatibilityStatus)}`,
+    `Build confidence: ${build.confidenceScore.score}/100 (${build.confidenceScore.label})`,
     `Target use case: ${build.targetUseCase.join(" + ") || "Not specified"}`,
     `Budget: ${buildNeeds.budget ? formatMoney(buildNeeds.budget) : "Still collecting"}`,
     `Appearance: ${formatAppearancePreference(buildNeeds.appearancePreference)}`,
@@ -314,6 +320,9 @@ function createBuildExportText({
       const price = part.owned ? "$0 - Already owned" : formatMoney(part.price);
       return `- ${part.category.toUpperCase()}: ${part.displayName} (${price})`;
     }),
+    "",
+    "## Compatibility Checks",
+    ...build.compatibilityChecks.map((check) => `- ${check.severity.toUpperCase()}: ${check.label} - ${check.message}`),
     "",
     "## Purchase References",
     ...cartPreview.map((item) => {
@@ -1224,7 +1233,9 @@ function ConsultPage() {
                         <ShieldCheck className="size-5" />
                         <div>
                           <h2 className="text-base font-bold">Compatibility checks passed</h2>
-                          <p className="text-sm">No rule-based issues found in the current build.</p>
+                          <p className="text-sm">
+                            {build.compatibilityChecks.length} deterministic checks passed with {build.confidenceScore.score}/100 confidence.
+                          </p>
                         </div>
                       </div>
                     </section>
@@ -1254,12 +1265,12 @@ function ConsultPage() {
                                   <div className="flex flex-wrap items-center gap-2">
                                     <Badge
                                       className={
-                                        warning.severity === "error"
+                                        warning.severity === "fail"
                                           ? "bg-destructive/15 text-destructive"
                                           : "bg-warning/15 text-warning"
                                       }
                                     >
-                                      {warning.severity === "error" ? "Needs review" : "Warning"}
+                                      {warning.severity === "fail" ? "Needs review" : "Warning"}
                                     </Badge>
                                     {affectedNames && (
                                       <span className="truncate text-sm text-muted-foreground">

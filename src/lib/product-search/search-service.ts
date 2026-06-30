@@ -1,7 +1,13 @@
 import { localProductSearchProvider } from "@/lib/product-search/local-provider";
 import { mockRetailerProductSearchProvider } from "@/lib/product-search/mock-retailer-provider";
 import type { ProductSearchQuery, ProductSearchResponse, ProductSearchResult } from "@/lib/product-search/types";
-import { calculateBuildTotal, deriveCompatibilityStatus, evaluateCompatibility } from "@/lib/compatibility";
+import {
+  calculateBuildConfidenceScore,
+  calculateBuildTotal,
+  deriveCompatibilityStatus,
+  evaluateCompatibilityRules,
+  getCompatibilityWarnings,
+} from "@/lib/compatibility";
 import type { Build } from "@/types/build";
 import type { AffiliateMerchant } from "@/types/monetization";
 import type { Part, PartAvailability } from "@/types/parts";
@@ -67,14 +73,26 @@ function createCandidateBuild(build: Build, replacement: Part): Build {
     parts,
     totalPrice: calculateBuildTotal(parts),
     compatibilityStatus: "pass",
+    compatibilityChecks: [],
     compatibilityWarnings: [],
+    confidenceScore: {
+      score: 0,
+      label: "Low",
+      summary: "Compatibility rules have not run yet.",
+      passCount: 0,
+      warningCount: 0,
+      failCount: 0,
+    },
   };
-  const warnings = evaluateCompatibility(candidate);
+  const compatibilityChecks = evaluateCompatibilityRules(candidate);
+  const compatibilityWarnings = getCompatibilityWarnings(compatibilityChecks);
 
   return {
     ...candidate,
-    compatibilityWarnings: warnings,
-    compatibilityStatus: deriveCompatibilityStatus(warnings),
+    compatibilityChecks,
+    compatibilityWarnings,
+    compatibilityStatus: deriveCompatibilityStatus(compatibilityChecks),
+    confidenceScore: calculateBuildConfidenceScore(compatibilityChecks),
   };
 }
 

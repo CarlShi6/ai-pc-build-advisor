@@ -5,9 +5,11 @@ import {
   getPartSummarySpecs,
 } from "@/lib/build-advisor";
 import {
+  calculateBuildConfidenceScore,
   calculateBuildTotal,
   deriveCompatibilityStatus,
-  evaluateCompatibility,
+  evaluateCompatibilityRules,
+  getCompatibilityWarnings,
 } from "@/lib/compatibility";
 import { canUseFeature } from "@/lib/monetization";
 import { searchProducts as searchProductsApi, trackAffiliateClick } from "@/lib/apiClient";
@@ -110,14 +112,26 @@ function buildCandidate(build: Build, replacement: Part) {
     parts,
     totalPrice: calculateBuildTotal(parts),
     compatibilityWarnings: [],
+    compatibilityChecks: [],
     compatibilityStatus: "pass",
+    confidenceScore: {
+      score: 0,
+      label: "Low",
+      summary: "Compatibility rules have not run yet.",
+      passCount: 0,
+      warningCount: 0,
+      failCount: 0,
+    },
   };
-  const warnings = evaluateCompatibility(candidate);
+  const compatibilityChecks = evaluateCompatibilityRules(candidate);
+  const compatibilityWarnings = getCompatibilityWarnings(compatibilityChecks);
 
   return {
     ...candidate,
-    compatibilityWarnings: warnings,
-    compatibilityStatus: deriveCompatibilityStatus(warnings),
+    compatibilityChecks,
+    compatibilityWarnings,
+    compatibilityStatus: deriveCompatibilityStatus(compatibilityChecks),
+    confidenceScore: calculateBuildConfidenceScore(compatibilityChecks),
   };
 }
 
@@ -1899,18 +1913,22 @@ function CompatibilityBadge({ build }: { build: Build }) {
   if (build.compatibilityStatus === "pass") {
     return (
       <Badge className="rounded-md bg-success/15 text-success">
-        <CheckCircle2 className="mr-1 size-3" /> Pass
+        <CheckCircle2 className="mr-1 size-3" /> {build.confidenceScore.score}/100
       </Badge>
     );
   }
 
   if (build.compatibilityStatus === "warning") {
-    return <Badge className="rounded-md bg-warning/15 text-warning">Warning</Badge>;
+    return (
+      <Badge className="rounded-md bg-warning/15 text-warning">
+        {build.confidenceScore.score}/100 warning
+      </Badge>
+    );
   }
 
   return (
     <Badge className="rounded-md bg-destructive/15 text-destructive">
-      <AlertTriangle className="mr-1 size-3" /> Needs review
+      <AlertTriangle className="mr-1 size-3" /> {build.confidenceScore.score}/100 review
     </Badge>
   );
 }

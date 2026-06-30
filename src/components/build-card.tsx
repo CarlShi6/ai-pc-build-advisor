@@ -124,6 +124,14 @@ export function BuildCardInner({
   const total = build?.totalPrice ?? rows.reduce((sum, part) => sum + part.price, 0);
   const status = build?.compatibilityStatus ?? "pass";
   const warningCount = build?.compatibilityWarnings.length ?? 0;
+  const confidenceScore = build?.confidenceScore.score ?? 100;
+  const confidenceLabel = build?.confidenceScore.label ?? "High";
+  const keyFindings = build
+    ? [
+        ...build.compatibilityChecks.filter((check) => check.severity !== "pass"),
+        ...build.compatibilityChecks.filter((check) => check.severity === "pass"),
+      ].slice(0, 4)
+    : [];
   const statusMeta =
     status === "pass"
       ? {
@@ -170,9 +178,10 @@ export function BuildCardInner({
       </div>
 
       {!compact && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid gap-4 md:grid-cols-4">
           <PerfStat label="Budget Use" value={`${Math.round((total / (build?.budget ?? 2800)) * 100)}%`} pct={Math.min(Math.round((total / (build?.budget ?? 2800)) * 100), 100)} />
           <PerfStat label="Compatibility" value={status === "pass" ? "Ready" : status === "warning" ? "Review" : "Needs review"} pct={status === "pass" ? 100 : status === "warning" ? 72 : 38} tone={status === "fail" ? "primary" : "success"} />
+          <PerfStat label="Confidence" value={`${confidenceScore}/100`} pct={confidenceScore} tone={status === "fail" ? "primary" : "success"} />
           <PerfStat label="Parts Selected" value={`${rows.length}`} pct={Math.min(rows.length * 12, 100)} />
         </div>
       )}
@@ -287,7 +296,7 @@ export function BuildCardInner({
               <h4 className="text-lg font-bold text-primary">Build Insight</h4>
               <p className="mt-1 text-sm text-muted-foreground">
                 {build
-                  ? "This build updates from demo data, so replacements flow through pricing, warnings, and purchase references."
+                  ? build.confidenceScore.summary
                   : "Compare a lower-cost GPU or a stronger PSU before finalizing the parts list."}
               </p>
             </div>
@@ -299,6 +308,10 @@ export function BuildCardInner({
                 </p>
               </div>
               <div>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confidence</p>
+                <p className="font-mono text-lg font-bold">{confidenceLabel}</p>
+              </div>
+              <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Status</p>
                 <p className={cn("text-lg font-bold", status === "pass" ? "text-success" : status === "warning" ? "text-warning" : "text-destructive")}>
                   {status === "pass" ? "READY" : status === "warning" ? "REVIEW" : "FIX"}
@@ -306,6 +319,33 @@ export function BuildCardInner({
               </div>
             </div>
           </div>
+          {keyFindings.length > 0 && (
+            <div className="mt-5 grid gap-2 md:grid-cols-2">
+              {keyFindings.map((finding) => (
+                <div
+                  key={finding.id}
+                  className={cn(
+                    "rounded-xl border bg-background/70 px-3 py-2 text-sm",
+                    finding.severity === "pass" && "border-success/20 text-success",
+                    finding.severity === "warning" && "border-warning/30 bg-warning/10 text-warning",
+                    finding.severity === "fail" && "border-destructive/30 bg-destructive/10 text-destructive",
+                  )}
+                >
+                  <div className="flex items-center gap-2 font-semibold">
+                    {finding.severity === "pass" ? (
+                      <CheckCircle2 className="size-4" />
+                    ) : finding.severity === "warning" ? (
+                      <AlertTriangle className="size-4" />
+                    ) : (
+                      <XCircle className="size-4" />
+                    )}
+                    <span>{finding.label}</span>
+                  </div>
+                  <p className="mt-1 text-xs opacity-85">{finding.message}</p>
+                </div>
+              ))}
+            </div>
+          )}
           <div className="mt-6 flex gap-4">
             <Button variant="secondary" className="flex-1 rounded-xl py-6 font-semibold">
               Save Draft

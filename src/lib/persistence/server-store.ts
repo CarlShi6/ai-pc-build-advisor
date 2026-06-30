@@ -93,17 +93,19 @@ function toUser(row: { id: string; email?: string; display_name?: string | null;
 }
 
 function toSavedBuild(row: SavedBuildRow): SavedBuild {
+  const safeBuild = recalculateBuild(row.build);
+
   return {
     id: row.id,
     name: row.name,
-    build: row.build,
+    build: safeBuild,
     buildNeeds: row.build_needs,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
-    totalPrice: row.total_price,
-    compatibilityStatus: row.compatibility_status,
-    ownedParts: row.owned_parts,
-    targetUseCase: row.target_use_case,
+    totalPrice: safeBuild.totalPrice,
+    compatibilityStatus: safeBuild.compatibilityStatus,
+    ownedParts: safeBuild.parts.filter((part) => part.owned).length,
+    targetUseCase: safeBuild.targetUseCase.length > 0 ? safeBuild.targetUseCase : row.target_use_case,
   };
 }
 
