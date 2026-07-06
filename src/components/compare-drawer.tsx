@@ -21,13 +21,6 @@ import type { AffiliateLink, PlanType, UsageStatus } from "@/types/monetization"
 import type { Part, PartCategory } from "@/types/parts";
 import type { ProductSearchResult } from "@/lib/product-search/types";
 import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from "react";
-import {
-  Drawer,
-  DrawerContent,
-  DrawerDescription,
-  DrawerHeader,
-  DrawerTitle,
-} from "@/components/ui/drawer";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -346,7 +339,7 @@ function partMatchesSearch(part: Part, query: string) {
   return tokens.some((token) => haystack.includes(token));
 }
 
-export function CompareDrawer({
+export function ComparePanel({
   build,
   category,
   parts,
@@ -550,7 +543,7 @@ export function CompareDrawer({
     };
   }, [previewPart]);
 
-  if (!build || !category || !selectedPart) {
+  if (!open || !build || !category || !selectedPart) {
     return null;
   }
 
@@ -572,9 +565,9 @@ export function CompareDrawer({
     );
   }, [selectedPart, substitutionSuggestions]);
   const recommendedSubstitutePart = recommendedSubstitution
-    ? sameCategoryParts.find((part) => part.id === recommendedSubstitution.substitutePartId) ??
+    ? (sameCategoryParts.find((part) => part.id === recommendedSubstitution.substitutePartId) ??
       seedParts.find((part) => part.id === recommendedSubstitution.substitutePartId) ??
-      null
+      null)
     : null;
   const recommendedParts = baseCategoryParts
     .filter(
@@ -628,22 +621,24 @@ export function CompareDrawer({
   }
 
   return (
-    <Drawer open={open} onOpenChange={onOpenChange}>
-      <DrawerContent className="mx-auto flex max-h-[86vh] w-full max-w-7xl flex-col overflow-hidden rounded-t-[24px] border-primary/20 bg-background">
-        <DrawerHeader className="sticky top-0 z-20 border-b border-border bg-background/95 px-6 pb-4 pt-5 backdrop-blur">
-          <div className="flex flex-wrap items-start justify-between gap-3">
-            <div className="space-y-3">
-              <Badge className="w-fit rounded-md border border-primary/30 bg-primary/10 text-primary">
-                <GitCompare className="mr-1 size-3" /> Decision Drawer
-              </Badge>
-              <div>
-                <DrawerTitle className="text-xl">Compare {sectionTitle} decisions</DrawerTitle>
-                <DrawerDescription className="mt-1 max-w-2xl">
-                  See which option best fits your budget, performance needs, compatibility, and
-                  beginner risk before replacing anything.
-                </DrawerDescription>
-              </div>
+    <aside className="order-2 flex min-h-[70vh] min-w-0 flex-col overflow-hidden border-y border-primary/20 bg-background lg:h-full lg:min-h-0 lg:border-x lg:border-y-0">
+      <div className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 pb-4 pt-5 backdrop-blur xl:px-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="space-y-3">
+            <Badge className="w-fit rounded-md border border-primary/30 bg-primary/10 text-primary">
+              <Sparkles className="mr-1 size-3" /> AI-assisted Compare
+            </Badge>
+            <div>
+              <h2 className="text-xl font-semibold leading-tight">
+                Compare {sectionTitle} decisions
+              </h2>
+              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                See which option best fits your budget, performance needs, compatibility, and
+                beginner risk while the advisor chat stays open.
+              </p>
             </div>
+          </div>
+          <div className="flex items-start gap-2">
             <div className="rounded-xl border border-border bg-card px-4 py-3 text-right">
               <p className="text-xs uppercase tracking-widest text-muted-foreground">
                 Current total
@@ -652,235 +647,246 @@ export function CompareDrawer({
                 {formatMoney(build.totalPrice)}
               </p>
             </div>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="rounded-md"
+              aria-label="Close compare panel"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="size-4" />
+            </Button>
           </div>
+        </div>
 
-          <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-            <div className="flex rounded-full border border-border bg-card p-1">
-              {visibleTabs.map(({ key, label, icon: Icon }) => (
-                <button
-                  key={key}
-                  type="button"
-                  className={cn(
-                    "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
-                    displayedTab === key
-                      ? "bg-primary text-primary-foreground shadow-glow"
-                      : "text-muted-foreground hover:text-foreground",
-                  )}
-                  onClick={() => setActiveTab(key as ExplorerTab)}
-                >
-                  <Icon className="size-4" />
-                  {label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-2">
-              {["price", "value", "performance"].map((mode) => (
-                <Button
-                  key={mode}
-                  size="sm"
-                  variant={sortMode === mode ? "default" : "secondary"}
-                  className="rounded-md capitalize"
-                  onClick={() => setSortMode(mode)}
-                >
-                  {mode}
-                </Button>
-              ))}
-              <Badge variant="secondary" className="rounded-md">
-                {Math.max(0, sameCategoryParts.length - 1)} alternatives
-              </Badge>
-            </div>
-          </div>
-        </DrawerHeader>
-
-        <div ref={drawerBodyRef} className="min-h-0 flex-1 overflow-y-auto px-6 pb-20 pt-4">
-          <CurrentSelection build={build} part={selectedPart} plan={plan} onUpgraded={onUpgraded} />
-
-          {recommendedReplacementId && (
-            <div className="mt-4 rounded-xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
-              A recommended review option is highlighted because it may address the selected
-              compatibility warning.
-            </div>
-          )}
-
-          {recommendedSubstitution && recommendedSubstitutePart && (
-            <RecommendedSwapPanel
-              suggestion={recommendedSubstitution}
-              substitute={recommendedSubstitutePart}
-              canReplacePart={canReplacePart}
-              isReplacing={isReplacing}
-              onPreview={() => previewSwap(recommendedSubstitutePart)}
-              onApply={() => onReplace(recommendedSubstitutePart)}
-            />
-          )}
-
-          <div className="mt-5">
-            {isLoading ? (
-              <LoadingState title={`Loading ${sectionTitle.toLowerCase()} options`} />
-            ) : errorMessage ? (
-              <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
-                {errorMessage}
-              </div>
-            ) : sameCategoryParts.length < 2 ? (
-              <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-                This category needs at least two demo parts before exploration is useful.
-              </div>
-            ) : displayedTab === "recommended" ? (
-              <PartCardGrid
-                build={build}
-                parts={recommendedParts}
-                selectedPart={selectedPart}
-                selectedIds={selectedIds}
-                recommendedReplacementId={recommendedReplacementId}
-                onToggleCompare={toggleComparePart}
-                onPreviewSwap={previewSwap}
-              />
-            ) : displayedTab === "search" ? (
-              <section className="space-y-4">
-                <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
-                  <div className="relative">
-                    <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-                    <input
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      className="w-full rounded-2xl border border-border bg-card py-4 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/25"
-                      placeholder="Search brand, model, name, socket, wattage, VRAM, RAM type..."
-                    />
-                  </div>
-                  <div className="flex flex-wrap items-center justify-end gap-3">
-                    <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm">
-                      <Switch
-                        checked={includeRetailerResults}
-                        onCheckedChange={setIncludeRetailerResults}
-                        aria-label="Include retailer results"
-                      />
-                      <span>Include retailer results</span>
-                    </label>
-                    <Button
-                      variant="secondary"
-                      className="rounded-xl"
-                      onClick={() => setShowCustomPartForm((current) => !current)}
-                    >
-                      Add part I already own
-                    </Button>
-                  </div>
-                </div>
-
-                {showCustomPartForm && (
-                  <CustomPartForm
-                    category={selectedPart.category}
-                    selectedPart={selectedPart}
-                    initialName={searchQuery}
-                    onAdd={(part) => {
-                      setCustomParts((current) => [part, ...current]);
-                      setSearchQuery(part.displayName);
-                      setShowCustomPartForm(false);
-                    }}
-                  />
+        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex rounded-full border border-border bg-card p-1">
+            {visibleTabs.map(({ key, label, icon: Icon }) => (
+              <button
+                key={key}
+                type="button"
+                className={cn(
+                  "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
+                  displayedTab === key
+                    ? "bg-primary text-primary-foreground shadow-glow"
+                    : "text-muted-foreground hover:text-foreground",
                 )}
+                onClick={() => setActiveTab(key as ExplorerTab)}
+              >
+                <Icon className="size-4" />
+                {label}
+              </button>
+            ))}
+          </div>
 
-                <SearchSection
-                  title="In your catalog"
-                  description="Local seed parts remain available without live retailer calls."
-                >
-                  <PartCardGrid
+          <div className="flex flex-wrap items-center gap-2">
+            {["price", "value", "performance"].map((mode) => (
+              <Button
+                key={mode}
+                size="sm"
+                variant={sortMode === mode ? "default" : "secondary"}
+                className="rounded-md capitalize"
+                onClick={() => setSortMode(mode)}
+              >
+                {mode}
+              </Button>
+            ))}
+            <Badge variant="secondary" className="rounded-md">
+              {Math.max(0, sameCategoryParts.length - 1)} alternatives
+            </Badge>
+          </div>
+        </div>
+      </div>
+
+      <div ref={drawerBodyRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-20 pt-4 xl:px-6">
+        <CurrentSelection build={build} part={selectedPart} plan={plan} onUpgraded={onUpgraded} />
+
+        {recommendedReplacementId && (
+          <div className="mt-4 rounded-xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
+            A recommended review option is highlighted because it may address the selected
+            compatibility warning.
+          </div>
+        )}
+
+        {recommendedSubstitution && recommendedSubstitutePart && (
+          <RecommendedSwapPanel
+            suggestion={recommendedSubstitution}
+            substitute={recommendedSubstitutePart}
+            canReplacePart={canReplacePart}
+            isReplacing={isReplacing}
+            onPreview={() => previewSwap(recommendedSubstitutePart)}
+            onApply={() => onReplace(recommendedSubstitutePart)}
+          />
+        )}
+
+        <div className="mt-5">
+          {isLoading ? (
+            <LoadingState title={`Loading ${sectionTitle.toLowerCase()} options`} />
+          ) : errorMessage ? (
+            <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
+              {errorMessage}
+            </div>
+          ) : sameCategoryParts.length < 2 ? (
+            <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+              This category needs at least two demo parts before exploration is useful.
+            </div>
+          ) : displayedTab === "recommended" ? (
+            <PartCardGrid
+              build={build}
+              parts={recommendedParts}
+              selectedPart={selectedPart}
+              selectedIds={selectedIds}
+              recommendedReplacementId={recommendedReplacementId}
+              onToggleCompare={toggleComparePart}
+              onPreviewSwap={previewSwap}
+            />
+          ) : displayedTab === "search" ? (
+            <section className="space-y-4">
+              <div className="grid gap-3 lg:grid-cols-[1fr_auto]">
+                <div className="relative">
+                  <Search className="pointer-events-none absolute left-4 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+                  <input
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    className="w-full rounded-2xl border border-border bg-card py-4 pl-11 pr-4 text-sm outline-none transition-all focus:ring-2 focus:ring-primary/25"
+                    placeholder="Search brand, model, name, socket, wattage, VRAM, RAM type..."
+                  />
+                </div>
+                <div className="flex flex-wrap items-center justify-end gap-3">
+                  <label className="inline-flex items-center gap-2 rounded-xl border border-border bg-card px-3 py-2 text-sm">
+                    <Switch
+                      checked={includeRetailerResults}
+                      onCheckedChange={setIncludeRetailerResults}
+                      aria-label="Include retailer results"
+                    />
+                    <span>Include retailer results</span>
+                  </label>
+                  <Button
+                    variant="secondary"
+                    className="rounded-xl"
+                    onClick={() => setShowCustomPartForm((current) => !current)}
+                  >
+                    Add part I already own
+                  </Button>
+                </div>
+              </div>
+
+              {showCustomPartForm && (
+                <CustomPartForm
+                  category={selectedPart.category}
+                  selectedPart={selectedPart}
+                  initialName={searchQuery}
+                  onAdd={(part) => {
+                    setCustomParts((current) => [part, ...current]);
+                    setSearchQuery(part.displayName);
+                    setShowCustomPartForm(false);
+                  }}
+                />
+              )}
+
+              <SearchSection
+                title="In your catalog"
+                description="Local seed parts remain available without live retailer calls."
+              >
+                <PartCardGrid
+                  build={build}
+                  parts={searchedParts}
+                  selectedPart={selectedPart}
+                  selectedIds={selectedIds}
+                  recommendedReplacementId={recommendedReplacementId}
+                  onToggleCompare={toggleComparePart}
+                  onPreviewSwap={previewSwap}
+                  emptyMessage="No local demo parts match that search."
+                  isSearchEmpty={searchQuery.trim().length > 0}
+                  onAddCustom={() => setShowCustomPartForm(true)}
+                />
+              </SearchSection>
+
+              <SearchSection
+                title="Retailer results preview"
+                description="Retailer results are mock data in this preview. Prices and stock may change."
+                action={<AffiliateDisclosure />}
+              >
+                {!includeRetailerResults ? (
+                  <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+                    Turn on retailer results to preview demo retailer matches.
+                  </div>
+                ) : productSearchError ? (
+                  <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
+                    {productSearchError}
+                  </div>
+                ) : isProductSearching ? (
+                  <LoadingState title="Loading retailer preview results" />
+                ) : retailerResults.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+                    No demo retailer results match that search yet.
+                  </div>
+                ) : (
+                  <RetailerResultGrid
                     build={build}
-                    parts={searchedParts}
+                    results={retailerResults}
                     selectedPart={selectedPart}
                     selectedIds={selectedIds}
-                    recommendedReplacementId={recommendedReplacementId}
+                    compareDisabled={selectedIds.length >= 4}
                     onToggleCompare={toggleComparePart}
                     onPreviewSwap={previewSwap}
-                    emptyMessage="No local demo parts match that search."
-                    isSearchEmpty={searchQuery.trim().length > 0}
-                    onAddCustom={() => setShowCustomPartForm(true)}
                   />
-                </SearchSection>
+                )}
+              </SearchSection>
 
-                <SearchSection
-                  title="Retailer results preview"
-                  description="Retailer results are mock data in this preview. Prices and stock may change."
-                  action={<AffiliateDisclosure />}
-                >
-                  {!includeRetailerResults ? (
-                    <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-                      Turn on retailer results to preview demo retailer matches.
-                    </div>
-                  ) : productSearchError ? (
-                    <div className="rounded-xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
-                      {productSearchError}
-                    </div>
-                  ) : isProductSearching ? (
-                    <LoadingState title="Loading retailer preview results" />
-                  ) : retailerResults.length === 0 ? (
-                    <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-                      No demo retailer results match that search yet.
-                    </div>
-                  ) : (
-                    <RetailerResultGrid
-                      build={build}
-                      results={retailerResults}
-                      selectedPart={selectedPart}
-                      selectedIds={selectedIds}
-                      compareDisabled={selectedIds.length >= 4}
-                      onToggleCompare={toggleComparePart}
-                      onPreviewSwap={previewSwap}
-                    />
-                  )}
-                </SearchSection>
-
-                <SearchSection
-                  title="External search coming later"
-                  description={productSearchDisclaimer}
-                >
-                  <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-sm text-muted-foreground">
-                    External live search coming later. No retailer websites are scraped in this
-                    preview.
-                  </div>
-                </SearchSection>
-              </section>
-            ) : (
-              <CompareTab
-                build={build}
-                parts={selectedCompareParts}
-                selectedPart={selectedPart}
-                plan={plan}
-                isReplacing={isReplacing}
-                onPreviewSwap={previewSwap}
-                onUpgraded={onUpgraded}
-              />
-            )}
-          </div>
-
-          {previewPart && (
-            <PreviewSwapPanel
+              <SearchSection
+                title="External search coming later"
+                description={productSearchDisclaimer}
+              >
+                <div className="rounded-xl border border-dashed border-border bg-card/50 p-5 text-sm text-muted-foreground">
+                  External live search coming later. No retailer websites are scraped in this
+                  preview.
+                </div>
+              </SearchSection>
+            </section>
+          ) : (
+            <CompareTab
               build={build}
-              currentPart={selectedPart}
-              previewPart={previewPart}
+              parts={selectedCompareParts}
+              selectedPart={selectedPart}
               plan={plan}
               isReplacing={isReplacing}
-              isHighlighted={isPreviewPanelHighlighted}
-              panelRef={previewPanelRef}
-              onCancel={() => setPreviewPart(null)}
-              onConfirm={confirmPreviewSwap}
-              canReplacePart={canReplacePart}
+              onPreviewSwap={previewSwap}
               onUpgraded={onUpgraded}
             />
           )}
         </div>
 
-        <CompareTray
-          trayRef={compareTrayRef}
-          parts={selectedCompareParts}
-          selectedPart={selectedPart}
-          onRemove={(part) => setSelectedIds((current) => current.filter((id) => id !== part.id))}
-          onClear={clearSelection}
-          onCompare={() => setActiveTab("compare")}
-        />
-      </DrawerContent>
-    </Drawer>
+        {previewPart && (
+          <PreviewSwapPanel
+            build={build}
+            currentPart={selectedPart}
+            previewPart={previewPart}
+            plan={plan}
+            isReplacing={isReplacing}
+            isHighlighted={isPreviewPanelHighlighted}
+            panelRef={previewPanelRef}
+            onCancel={() => setPreviewPart(null)}
+            onConfirm={confirmPreviewSwap}
+            canReplacePart={canReplacePart}
+            onUpgraded={onUpgraded}
+          />
+        )}
+      </div>
+
+      <CompareTray
+        trayRef={compareTrayRef}
+        parts={selectedCompareParts}
+        selectedPart={selectedPart}
+        onRemove={(part) => setSelectedIds((current) => current.filter((id) => id !== part.id))}
+        onClear={clearSelection}
+        onCompare={() => setActiveTab("compare")}
+      />
+    </aside>
   );
 }
+
+export const CompareDrawer = ComparePanel;
 
 function RecommendedSwapPanel({
   suggestion,
@@ -913,7 +919,12 @@ function RecommendedSwapPanel({
         <div className="grid min-w-64 grid-cols-3 gap-2 text-xs">
           <div className="rounded-md border border-border bg-background/70 px-2 py-2">
             <p className="text-muted-foreground">Price</p>
-            <p className={cn("font-mono font-semibold", suggestion.priceDelta <= 0 ? "text-success" : "text-warning")}>
+            <p
+              className={cn(
+                "font-mono font-semibold",
+                suggestion.priceDelta <= 0 ? "text-success" : "text-warning",
+              )}
+            >
               {formatSignedMoney(suggestion.priceDelta)}
             </p>
           </div>
@@ -944,7 +955,11 @@ function RecommendedSwapPanel({
         <Button variant="secondary" className="rounded-xl" onClick={onPreview}>
           Preview swap
         </Button>
-        <Button className="rounded-xl shadow-glow" disabled={!canReplacePart || isReplacing} onClick={onApply}>
+        <Button
+          className="rounded-xl shadow-glow"
+          disabled={!canReplacePart || isReplacing}
+          onClick={onApply}
+        >
           {isReplacing ? (
             <>
               <LoaderCircle className="mr-2 size-4 animate-spin" /> Replacing
@@ -1565,9 +1580,7 @@ function DecisionSummary({
                 <DecisionBadges decision={decision} />
               </div>
               <h4 className="text-sm font-semibold leading-snug">{part.displayName}</h4>
-              <p className="mt-2 text-xs text-muted-foreground">
-                {decision.recommendationReason}
-              </p>
+              <p className="mt-2 text-xs text-muted-foreground">{decision.recommendationReason}</p>
             </article>
           );
         })}
@@ -1864,9 +1877,7 @@ function CompatibilityImpactBadge({
 
   if (impact.status === "warning") {
     return (
-      <Badge className="rounded-md bg-warning/15 text-warning">
-        Compatibility Impact: Review
-      </Badge>
+      <Badge className="rounded-md bg-warning/15 text-warning">Compatibility Impact: Review</Badge>
     );
   }
 

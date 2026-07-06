@@ -105,7 +105,10 @@ function requireSearchParam(url: URL, key: string) {
 
 function getIdsFromSearchParams(url: URL) {
   const rawIds = url.searchParams.getAll("ids").flatMap((value) =>
-    value.split(",").map((id) => id.trim()).filter(Boolean),
+    value
+      .split(",")
+      .map((id) => id.trim())
+      .filter(Boolean),
   );
 
   if (rawIds.length === 0) {
@@ -317,7 +320,9 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       } catch (error) {
         throw new ApiRouteError(
           404,
-          error instanceof Error ? error.message : "Feedback could not be attached to that saved build.",
+          error instanceof Error
+            ? error.message
+            : "Feedback could not be attached to that saved build.",
         );
       }
 
@@ -376,7 +381,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         const responsePayload: AdvisorResponsePayload = {
           assistantMessage:
             "You have used the Free advisor questions for today. Your current build, compatibility checks, and part comparisons are still available. Build Pro unlocks 50 AI questions per build.",
-          explanation: "Usage was not consumed because the current plan has no remaining advisor questions.",
+          explanation:
+            "Usage was not consumed because the current plan has no remaining advisor questions.",
           provider: "mock",
           usage: usageBefore,
           usageConsumed: false,
@@ -395,6 +401,7 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         message,
         currentBuild: payload.currentBuild ?? null,
         collectedNeeds: payload.collectedNeeds ?? {},
+        activeCompare: payload.activeCompare ?? null,
         plan: entitlement.active ? entitlement.plan : "free",
         usageStatus: usageResult.usage,
       });
@@ -612,7 +619,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         success: true,
         entitlement: result.entitlement,
         usage: result.usage,
-        message: "Demo state reset. Free limits, usage, Pro access, and saved builds are back to the starting point.",
+        message:
+          "Demo state reset. Free limits, usage, Pro access, and saved builds are back to the starting point.",
       };
       return jsonResponse(payload);
     }

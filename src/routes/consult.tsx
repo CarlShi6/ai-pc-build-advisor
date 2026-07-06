@@ -2,7 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useMemo, useState } from "react";
 import { BuildCard } from "@/components/build-card";
 import { ChatPanel, type ChatMessage } from "@/components/chat-panel";
-import { CompareDrawer } from "@/components/compare-drawer";
+import { ComparePanel } from "@/components/compare-drawer";
 import { TopBar } from "@/components/top-bar";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { ProFeatureLock } from "@/components/ProFeatureLock";
@@ -36,11 +36,8 @@ import {
 import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
 import { mergeCustomerNeeds } from "@/lib/needParser";
 import { getDynamicSubstitutionSuggestions } from "@/lib/substitution-engine";
-import type { AdvisorSuggestedAction } from "@/lib/ai/types";
-import type {
-  CustomerNeeds,
-  RecommendedBuildInput,
-} from "@/types/api";
+import type { ActiveCompareContext, AdvisorSuggestedAction } from "@/lib/ai/types";
+import type { CustomerNeeds, RecommendedBuildInput } from "@/types/api";
 import type {
   Build as BuildModel,
   CartPreviewItem as CartPreviewItemModel,
@@ -51,7 +48,7 @@ import type {
 } from "@/types/build";
 import type { Entitlement, UsageStatus } from "@/types/monetization";
 import type { AuthSession } from "@/lib/persistence/types";
-import type { Part } from "@/types/parts";
+import type { Part, PartCategory } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -78,13 +75,7 @@ const DEFAULT_RECOMMENDATION_INPUT: RecommendedBuildInput = {
   targetUseCase: ["4K video editing", "casual gaming"],
 };
 
-const QUICK_REPLIES = [
-  "2K gaming",
-  "Video editing",
-  "Budget $2500",
-  "Black case",
-  "Beginner",
-];
+const QUICK_REPLIES = ["2K gaming", "Video editing", "Budget $2500", "Black case", "Beginner"];
 
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   {
@@ -125,8 +116,8 @@ export const Route = createFileRoute("/consult")({
   component: ConsultPage,
 });
 
-function normalizeCategory(category: string) {
-  return category.toLowerCase();
+function normalizeCategory(category: string): PartCategory {
+  return category.toLowerCase() as PartCategory;
 }
 
 function getWarningTargetCategory(warning: CompatibilityWarningModel) {
@@ -268,14 +259,13 @@ function buildAssistantReply({
 
   const cpu = build?.parts.find((part) => part.category === "cpu");
   const gpu = build?.parts.find((part) => part.category === "gpu");
-  const followUp =
-    !needs.budget
-      ? "A budget range would help tighten the rest of the parts."
-      : !needs.targetUseCase || needs.targetUseCase.length === 0
-          ? "Tell me the main workload next so I can tune the GPU and CPU balance."
-        : !needs.experienceLevel
-          ? "If you want, tell me whether you're a beginner or more advanced and I'll tune how aggressive the recommendation should be."
-          : "You can still open the Part Compare Drawer on any part to review alternatives.";
+  const followUp = !needs.budget
+    ? "A budget range would help tighten the rest of the parts."
+    : !needs.targetUseCase || needs.targetUseCase.length === 0
+      ? "Tell me the main workload next so I can tune the GPU and CPU balance."
+      : !needs.experienceLevel
+        ? "If you want, tell me whether you're a beginner or more advanced and I'll tune how aggressive the recommendation should be."
+        : "You can still open the AI-assisted compare panel on any part to review alternatives.";
 
   return `Noted ${responseBits.join(", ")}. I refreshed the recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. ${followUp}`;
 }
@@ -285,9 +275,11 @@ function formatMoney(value: number) {
 }
 
 function formatDate(value: string) {
-  return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric" }).format(
-    new Date(value),
-  );
+  return new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(value));
 }
 
 function formatCompatibilityStatus(status: BuildModel["compatibilityStatus"]) {
@@ -298,7 +290,9 @@ function formatCompatibilityStatus(status: BuildModel["compatibilityStatus"]) {
   return "Needs review";
 }
 
-function formatFeedbackDifficulty(value: NonNullable<SavedBuildSummary["feedbackSummary"]>["beginnerDifficulty"]) {
+function formatFeedbackDifficulty(
+  value: NonNullable<SavedBuildSummary["feedbackSummary"]>["beginnerDifficulty"],
+) {
   const labels: Record<typeof value, string> = {
     easy: "Easy",
     manageable: "Manageable",
@@ -337,7 +331,9 @@ function createBuildExportText({
     }),
     "",
     "## Compatibility Checks",
-    ...build.compatibilityChecks.map((check) => `- ${check.severity.toUpperCase()}: ${check.label} - ${check.message}`),
+    ...build.compatibilityChecks.map(
+      (check) => `- ${check.severity.toUpperCase()}: ${check.label} - ${check.message}`,
+    ),
     "",
     "## Purchase References",
     ...cartPreview.map((item) => {
@@ -373,7 +369,7 @@ function ConsultPage() {
   const [compareParts, setCompareParts] = useState<Part[]>([]);
   const [compareError, setCompareError] = useState<string | null>(null);
   const [recommendedReplacementId, setRecommendedReplacementId] = useState<string | null>(null);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isCompareOpen, setIsCompareOpen] = useState(false);
   const [isLoadingBuild, setIsLoadingBuild] = useState(true);
   const [isLoadingDetails, setIsLoadingDetails] = useState(false);
   const [isLoadingCompare, setIsLoadingCompare] = useState(false);
@@ -382,13 +378,18 @@ function ConsultPage() {
   const [customerNeeds, setCustomerNeeds] = useState<CustomerNeeds>({});
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
   const [chatInput, setChatInput] = useState("");
-  const [toast, setToast] = useState<{ message: string; tone: "success" | "error" | "notice" } | null>(null);
+  const [toast, setToast] = useState<{
+    message: string;
+    tone: "success" | "error" | "notice";
+  } | null>(null);
   const [usageStatus, setUsageStatus] = useState<UsageStatus | null>(null);
   const [entitlement, setEntitlement] = useState<Entitlement | null>(null);
   const [authSession, setAuthSession] = useState<AuthSession | null>(null);
   const [showUsageUpgrade, setShowUsageUpgrade] = useState(false);
   const [expandedWarningIds, setExpandedWarningIds] = useState<Set<string>>(new Set());
-  const [advisorUpdatedFields, setAdvisorUpdatedFields] = useState<Set<keyof CustomerNeeds>>(new Set());
+  const [advisorUpdatedFields, setAdvisorUpdatedFields] = useState<Set<keyof CustomerNeeds>>(
+    new Set(),
+  );
   const [openOwnedPartForm, setOpenOwnedPartForm] = useState(false);
   const [ownedPartHint, setOwnedPartHint] = useState<string | null>(null);
   const [savedBuilds, setSavedBuilds] = useState<SavedBuildSummary[]>([]);
@@ -398,7 +399,8 @@ function ConsultPage() {
   const [isSavingBuild, setIsSavingBuild] = useState(false);
   const [saveBuildName, setSaveBuildName] = useState("");
   const [currentSavedBuildId, setCurrentSavedBuildId] = useState<string | null>(null);
-  const [currentFeedbackSummary, setCurrentFeedbackSummary] = useState<SavedBuildSummary["feedbackSummary"]>();
+  const [currentFeedbackSummary, setCurrentFeedbackSummary] =
+    useState<SavedBuildSummary["feedbackSummary"]>();
   const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; name: string } | null>(null);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
   const plan = getPlanForEntitlement(entitlement);
@@ -408,6 +410,25 @@ function ConsultPage() {
     () => (build ? getDynamicSubstitutionSuggestions(build) : []),
     [build],
   );
+  const activeCompareContext = useMemo<ActiveCompareContext | null>(() => {
+    if (!isCompareOpen || !build || !compareCategory) {
+      return null;
+    }
+
+    const currentPart = build.parts.find((part) => part.category === compareCategory);
+
+    if (!currentPart) {
+      return null;
+    }
+
+    return {
+      category: currentPart.category,
+      currentPart,
+      candidateParts: compareParts.filter((part) => part.category === currentPart.category),
+      budget: customerNeeds.budget ?? build.budget,
+      buildTotal: build.totalPrice,
+    };
+  }, [build, compareCategory, compareParts, customerNeeds.budget, isCompareOpen]);
 
   useEffect(() => {
     let active = true;
@@ -445,7 +466,9 @@ function ConsultPage() {
             return;
           }
 
-          setDetailsError("The purchase references and recommendation summary could not be loaded from the mock API.");
+          setDetailsError(
+            "The purchase references and recommendation summary could not be loaded from the mock API.",
+          );
         } finally {
           if (active) {
             setIsLoadingDetails(false);
@@ -456,7 +479,9 @@ function ConsultPage() {
           return;
         }
 
-        setBuildError("The internal recommendation API could not be loaded. Please refresh and try again.");
+        setBuildError(
+          "The internal recommendation API could not be loaded. Please refresh and try again.",
+        );
       } finally {
         if (active) {
           setIsLoadingBuild(false);
@@ -491,8 +516,8 @@ function ConsultPage() {
     return () => window.clearTimeout(timer);
   }, [toast]);
 
-  function handleDrawerOpenChange(open: boolean) {
-    setIsDrawerOpen(open);
+  function handleCompareOpenChange(open: boolean) {
+    setIsCompareOpen(open);
 
     if (!open) {
       setCompareCategory(null);
@@ -658,7 +683,7 @@ function ConsultPage() {
       setCurrentSavedBuildId(savedBuild.id);
       setCurrentFeedbackSummary(savedBuild.feedbackSummary);
       setIsSavedBuildsOpen(false);
-      handleDrawerOpenChange(false);
+      handleCompareOpenChange(false);
       setToast({ message: `"${savedBuild.name}" loaded.`, tone: "success" });
     } catch {
       setToast({ message: "Could not load that saved build.", tone: "error" });
@@ -791,7 +816,11 @@ function ConsultPage() {
 
     downloadTextFile(
       `${build.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "pc-build"}.json`,
-      JSON.stringify({ build, buildNeeds: customerNeeds, purchaseReferences: cartPreview }, null, 2),
+      JSON.stringify(
+        { build, buildNeeds: customerNeeds, purchaseReferences: cartPreview },
+        null,
+        2,
+      ),
       "application/json",
     );
   }
@@ -815,7 +844,7 @@ function ConsultPage() {
     setCompareError(null);
     setCompareParts([]);
     setRecommendedReplacementId(nextRecommendedReplacementId ?? null);
-    setIsDrawerOpen(true);
+    setIsCompareOpen(true);
     setIsLoadingCompare(true);
 
     try {
@@ -879,7 +908,7 @@ function ConsultPage() {
       setEmployeeSummary(nextState.employeeSummary);
       setCurrentSavedBuildId(null);
       setCurrentFeedbackSummary(undefined);
-      handleDrawerOpenChange(false);
+      handleCompareOpenChange(false);
       setToast({
         message:
           successMessage ?? `Replaced ${categoryLabels[part.category]} with ${part.displayName}.`,
@@ -941,6 +970,7 @@ function ConsultPage() {
         message,
         currentBuild: build,
         collectedNeeds: customerNeeds,
+        activeCompare: activeCompareContext,
         plan,
         usageStatus,
       });
@@ -990,7 +1020,10 @@ function ConsultPage() {
     }
   }
 
-  async function applyAdvisorNeedsUpdate(nextNeeds: CustomerNeeds, updatedFields: Array<keyof CustomerNeeds>) {
+  async function applyAdvisorNeedsUpdate(
+    nextNeeds: CustomerNeeds,
+    updatedFields: Array<keyof CustomerNeeds>,
+  ) {
     const mergedNeeds = mergeCustomerNeeds(customerNeeds, nextNeeds);
     setCustomerNeeds(mergedNeeds);
     setAdvisorUpdatedFields((current) => {
@@ -1007,10 +1040,12 @@ function ConsultPage() {
       setEmployeeSummary(nextState.employeeSummary);
       setCurrentSavedBuildId(null);
       setCurrentFeedbackSummary(undefined);
-      handleDrawerOpenChange(false);
+      handleCompareOpenChange(false);
       setToast({ message: "Build needs updated from advisor action.", tone: "success" });
     } catch {
-      setDetailsError("The build needs were updated, but the recommendation could not refresh right now.");
+      setDetailsError(
+        "The build needs were updated, but the recommendation could not refresh right now.",
+      );
       setToast({ message: "Could not refresh the build after updating needs.", tone: "error" });
     } finally {
       setIsLoadingDetails(false);
@@ -1026,10 +1061,9 @@ function ConsultPage() {
         await applyAdvisorNeedsUpdate({ targetUseCase: action.targetUseCase }, ["targetUseCase"]);
         return;
       case "update_appearance":
-        await applyAdvisorNeedsUpdate(
-          { appearancePreference: action.appearancePreference },
-          ["appearancePreference"],
-        );
+        await applyAdvisorNeedsUpdate({ appearancePreference: action.appearancePreference }, [
+          "appearancePreference",
+        ]);
         return;
       case "update_brand_preference":
         await applyAdvisorNeedsUpdate(
@@ -1044,10 +1078,9 @@ function ConsultPage() {
         );
         return;
       case "update_experience_level":
-        await applyAdvisorNeedsUpdate(
-          { experienceLevel: action.experienceLevel },
-          ["experienceLevel"],
-        );
+        await applyAdvisorNeedsUpdate({ experienceLevel: action.experienceLevel }, [
+          "experienceLevel",
+        ]);
         return;
       case "add_owned_part": {
         const category = action.category ?? "gpu";
@@ -1099,7 +1132,8 @@ function ConsultPage() {
 
     if (!openedWindow) {
       setToast({
-        message: "Your browser blocked the new tab. Please allow popups for this site and try again.",
+        message:
+          "Your browser blocked the new tab. Please allow popups for this site and try again.",
         tone: "notice",
       });
       return;
@@ -1190,8 +1224,14 @@ function ConsultPage() {
         onSignOutClick={() => void handleSignOut()}
       />
 
-      <main className="grid h-[calc(100vh-4rem)] min-h-0 grid-cols-1 overflow-hidden lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_410px]">
-        <section className="min-h-0 min-w-0 overflow-y-auto bg-card/30">
+      <main
+        className={`grid h-[calc(100vh-4rem)] min-h-0 grid-cols-1 overflow-y-auto lg:overflow-hidden ${
+          isCompareOpen
+            ? "lg:grid-cols-[minmax(320px,0.85fr)_minmax(420px,1.15fr)_390px] xl:grid-cols-[minmax(360px,0.9fr)_minmax(520px,1.1fr)_410px]"
+            : "lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_410px]"
+        }`}
+      >
+        <section className="order-3 min-h-0 min-w-0 bg-card/30 lg:order-1 lg:overflow-y-auto">
           <div className="mx-auto max-w-6xl space-y-6 px-6 py-6 md:px-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
@@ -1237,7 +1277,7 @@ function ConsultPage() {
               </div>
             ) : build ? (
               <>
-                  <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -1301,8 +1341,9 @@ function ConsultPage() {
                       <div>
                         <h2 className="text-base font-bold">Keep building with Build Pro</h2>
                         <p className="mt-1 text-sm text-muted-foreground">
-                          Free planning limits are designed for a first pass. Build Pro unlocks more advisor questions,
-                          more hardware replacements, saved builds, and full export.
+                          Free planning limits are designed for a first pass. Build Pro unlocks more
+                          advisor questions, more hardware replacements, saved builds, and full
+                          export.
                         </p>
                       </div>
                     </div>
@@ -1344,7 +1385,8 @@ function ConsultPage() {
                         <div>
                           <h2 className="text-base font-bold">Compatibility checks passed</h2>
                           <p className="text-sm">
-                            {build.compatibilityChecks.length} deterministic checks passed with {build.confidenceScore.score}/100 confidence.
+                            {build.compatibilityChecks.length} deterministic checks passed with{" "}
+                            {build.confidenceScore.score}/100 confidence.
                           </p>
                         </div>
                       </div>
@@ -1357,19 +1399,26 @@ function ConsultPage() {
                           <h2 className="text-lg font-bold">Compatibility needs review</h2>
                         </div>
                         <Badge className="bg-warning/15 text-warning">
-                          {build.compatibilityWarnings.length} item{build.compatibilityWarnings.length === 1 ? "" : "s"}
+                          {build.compatibilityWarnings.length} item
+                          {build.compatibilityWarnings.length === 1 ? "" : "s"}
                         </Badge>
                       </div>
                       <div className="space-y-2">
                         {build.compatibilityWarnings.map((warning) => {
                           const expanded = expandedWarningIds.has(warning.id);
                           const affectedNames = warning.affectedPartIds
-                            .map((partId) => build.parts.find((part) => part.id === partId)?.displayName)
+                            .map(
+                              (partId) =>
+                                build.parts.find((part) => part.id === partId)?.displayName,
+                            )
                             .filter(Boolean)
                             .join(" + ");
 
                           return (
-                            <div key={warning.id} className="rounded-xl border border-border bg-background/60 p-3">
+                            <div
+                              key={warning.id}
+                              className="rounded-xl border border-border bg-background/60 p-3"
+                            >
                               <div className="flex flex-wrap items-center justify-between gap-3">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-2">
@@ -1396,7 +1445,10 @@ function ConsultPage() {
                                   className="rounded-md"
                                   onClick={() => toggleWarningDetails(warning.id)}
                                 >
-                                  View details <ChevronDown className={`ml-1 size-3 transition-transform ${expanded ? "rotate-180" : ""}`} />
+                                  View details{" "}
+                                  <ChevronDown
+                                    className={`ml-1 size-3 transition-transform ${expanded ? "rotate-180" : ""}`}
+                                  />
                                 </Button>
                               </div>
                               {expanded && (
@@ -1473,7 +1525,8 @@ function ConsultPage() {
                         <h2 className="text-xl font-bold">Purchase Reference List</h2>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        Demo retailer references only. No checkout, payment, or live stock integration yet.
+                        Demo retailer references only. No checkout, payment, or live stock
+                        integration yet.
                       </p>
                     </div>
                     <div className="flex flex-wrap items-center gap-2">
@@ -1537,7 +1590,9 @@ function ConsultPage() {
                               <td className="px-4 py-3 text-muted-foreground">{item.retailer}</td>
                               <td className="px-4 py-3 text-muted-foreground">{item.note}</td>
                               <td className="px-4 py-3 text-right font-mono">
-                                {item.estimatedPrice === 0 ? "Already owned" : `$${item.estimatedPrice.toFixed(2)}`}
+                                {item.estimatedPrice === 0
+                                  ? "Already owned"
+                                  : `$${item.estimatedPrice.toFixed(2)}`}
                               </td>
                               <td className="px-4 py-3 text-right">
                                 {(item.affiliateLinks ?? []).slice(0, 1).map((link) => (
@@ -1581,11 +1636,21 @@ function ConsultPage() {
                     </div>
                     {hasFullExport && (
                       <div className="flex flex-wrap gap-2">
-                        <Button size="sm" variant="secondary" className="rounded-md" onClick={() => void handleCopyExport()}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="rounded-md"
+                          onClick={() => void handleCopyExport()}
+                        >
                           <Copy className="mr-2 size-4" />
                           Copy
                         </Button>
-                        <Button size="sm" variant="secondary" className="rounded-md" onClick={handleDownloadJson}>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          className="rounded-md"
+                          onClick={handleDownloadJson}
+                        >
                           <FileJson className="mr-2 size-4" />
                           JSON
                         </Button>
@@ -1604,7 +1669,8 @@ function ConsultPage() {
                     {hasFullExport ? (
                       <div className="rounded-xl border border-success/20 bg-success/10 p-4 text-sm text-success">
                         <CheckCircle2 className="mb-3 size-5" />
-                        Build Pro export is active. Copy the summary or download JSON/Markdown for your purchase planning.
+                        Build Pro export is active. Copy the summary or download JSON/Markdown for
+                        your purchase planning.
                       </div>
                     ) : (
                       <ProFeatureLock
@@ -1668,8 +1734,29 @@ function ConsultPage() {
           </div>
         </section>
 
+        {build && (
+          <ComparePanel
+            build={build}
+            category={compareCategory}
+            parts={compareParts}
+            open={isCompareOpen}
+            isLoading={isLoadingCompare}
+            isReplacing={isReplacingPart}
+            errorMessage={compareError}
+            recommendedReplacementId={recommendedReplacementId}
+            substitutionSuggestions={substitutionSuggestions}
+            plan={plan}
+            usageStatus={usageStatus}
+            startWithOwnedPartForm={openOwnedPartForm}
+            ownedPartHint={ownedPartHint}
+            onUpgraded={() => void refreshMonetizationState()}
+            onOpenChange={handleCompareOpenChange}
+            onReplace={(part) => void handleReplacePart(part)}
+          />
+        )}
+
         <ChatPanel
-          className="shrink-0"
+          className="order-1 h-[min(82vh,720px)] shrink-0 lg:order-3 lg:h-full"
           input={chatInput}
           isGenerating={isGeneratingRecommendation}
           messages={chatMessages}
@@ -1685,27 +1772,6 @@ function ConsultPage() {
           onActionClick={(action) => void handleAdvisorAction(action)}
         />
       </main>
-
-      {build && (
-        <CompareDrawer
-          build={build}
-          category={compareCategory}
-          parts={compareParts}
-          open={isDrawerOpen}
-          isLoading={isLoadingCompare}
-          isReplacing={isReplacingPart}
-          errorMessage={compareError}
-          recommendedReplacementId={recommendedReplacementId}
-          substitutionSuggestions={substitutionSuggestions}
-          plan={plan}
-          usageStatus={usageStatus}
-          startWithOwnedPartForm={openOwnedPartForm}
-          ownedPartHint={ownedPartHint}
-          onUpgraded={() => void refreshMonetizationState()}
-          onOpenChange={handleDrawerOpenChange}
-          onReplace={(part) => void handleReplacePart(part)}
-        />
-      )}
 
       {isSavedBuildsOpen && (
         <SavedBuildsPanel
@@ -1744,7 +1810,7 @@ function ConsultPage() {
                 ? "border border-destructive/30 bg-destructive/10 text-destructive"
                 : toast.tone === "notice"
                   ? "border border-warning/30 bg-warning/10 text-warning"
-                : "border border-primary/30 bg-card/95"
+                  : "border border-primary/30 bg-card/95"
             }`}
           >
             {toast.tone === "error" ? (
@@ -1851,7 +1917,8 @@ function SavedBuildsPanel({
                   <div className="min-w-0">
                     <h3 className="truncate font-semibold">{savedBuild.name}</h3>
                     <p className="mt-1 text-xs text-muted-foreground">
-                      Saved {formatDate(savedBuild.createdAt)} · Updated {formatDate(savedBuild.updatedAt)}
+                      Saved {formatDate(savedBuild.createdAt)} · Updated{" "}
+                      {formatDate(savedBuild.updatedAt)}
                     </p>
                   </div>
                   <Badge
@@ -1868,7 +1935,9 @@ function SavedBuildsPanel({
                 <div className="mt-4 grid gap-2 text-sm">
                   <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">Total</span>
-                    <span className="font-mono font-semibold">{formatMoney(savedBuild.totalPrice)}</span>
+                    <span className="font-mono font-semibold">
+                      {formatMoney(savedBuild.totalPrice)}
+                    </span>
                   </div>
                   <div className="flex justify-between gap-4">
                     <span className="text-muted-foreground">CPU</span>
@@ -1919,16 +1988,35 @@ function SavedBuildsPanel({
                 </div>
 
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
-                  <Button size="sm" className="rounded-md" onClick={() => onReportFeedback(savedBuild)}>
+                  <Button
+                    size="sm"
+                    className="rounded-md"
+                    onClick={() => onReportFeedback(savedBuild)}
+                  >
                     Report Build Result
                   </Button>
-                  <Button size="sm" variant="secondary" className="rounded-md" onClick={() => onRename(savedBuild)}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="rounded-md"
+                    onClick={() => onRename(savedBuild)}
+                  >
                     Rename
                   </Button>
-                  <Button size="sm" variant="secondary" className="rounded-md" onClick={() => onLoad(savedBuild.id)}>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="rounded-md"
+                    onClick={() => onLoad(savedBuild.id)}
+                  >
                     Load build
                   </Button>
-                  <Button size="sm" variant="ghost" className="rounded-md text-destructive" onClick={() => onDelete(savedBuild.id)}>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="rounded-md text-destructive"
+                    onClick={() => onDelete(savedBuild.id)}
+                  >
                     <Trash2 className="mr-2 size-4" />
                     Delete
                   </Button>

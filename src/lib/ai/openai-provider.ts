@@ -28,6 +28,24 @@ function buildPrompt(request: AdvisorRequest) {
     price: part.price,
     specs: part.specs,
   }));
+  const activeCompare = request.activeCompare
+    ? {
+        category: request.activeCompare.category,
+        budget: request.activeCompare.budget,
+        buildTotal: request.activeCompare.buildTotal,
+        currentPart: {
+          displayName: request.activeCompare.currentPart.displayName,
+          price: request.activeCompare.currentPart.price,
+          specs: request.activeCompare.currentPart.specs,
+        },
+        candidateParts: request.activeCompare.candidateParts.slice(0, 6).map((part) => ({
+          displayName: part.displayName,
+          price: part.price,
+          specs: part.specs,
+          recommendationReason: part.recommendationReason,
+        })),
+      }
+    : null;
 
   return [
     "You are a PC build advisor for individual consumers.",
@@ -36,6 +54,7 @@ function buildPrompt(request: AdvisorRequest) {
     "Suggested actions must use only these types: update_budget, update_use_case, update_appearance, update_brand_preference, update_experience_level, add_owned_part, open_part_explorer, explain_current_build, ask_clarifying_question.",
     "Use add_owned_part when the user says they already own or want to reuse hardware.",
     "Use open_part_explorer when the user asks whether to upgrade CPU, GPU, or another category.",
+    "When activeCompareContext is present, answer as if the user is looking at that inline compare panel. Reference the current part and candidates by name, and explain tradeoffs conversationally.",
     "Compatibility, pricing, replacement, and purchase references are handled by rule-based app code.",
     `Plan: ${request.plan}`,
     `User message: ${request.message}`,
@@ -46,6 +65,7 @@ function buildPrompt(request: AdvisorRequest) {
       compatibilityStatus: request.currentBuild?.compatibilityStatus,
       parts: buildParts,
     })}`,
+    `Active compare context: ${JSON.stringify(activeCompare)}`,
   ].join("\n");
 }
 
@@ -88,7 +108,11 @@ export const openAiProvider: AiProvider = {
     };
     const text =
       payload.output_text ??
-      payload.output?.flatMap((item) => item.content ?? []).map((content) => content.text).filter(Boolean).join("\n") ??
+      payload.output
+        ?.flatMap((item) => item.content ?? [])
+        .map((content) => content.text)
+        .filter(Boolean)
+        .join("\n") ??
       "";
     const parsed = extractJsonObject(text);
 
