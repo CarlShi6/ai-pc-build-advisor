@@ -2,25 +2,16 @@ import OpenAI from "openai";
 import { createCandidateBuild } from "@/lib/build-advisor";
 import { getServerConfig } from "@/lib/config.server";
 import {
+  buildAdvisorSystemPrompt,
+  buildResponseQualityContext,
+} from "@/lib/ai/response-quality";
+import {
   normalizeAdvisorActions,
   type AdvisorProviderResponse,
   type AdvisorRequest,
   type AiProvider,
 } from "@/lib/ai/types";
 import type { Part } from "@/types/parts";
-
-const SYSTEM_INSTRUCTION =
-  "You are an AI PC build advisor. Your job is to help beginner users choose compatible PC parts based on budget, use case, performance target, aesthetics, and availability. Explain tradeoffs clearly. Do not invent exact live inventory or prices unless provided by the app context. If comparing parts, reference the active compare context.";
-
-const RESPONSE_JSON_INSTRUCTION = [
-  "Return only JSON with assistantMessage, extractedNeeds, suggestedActions, warnings, and explanation.",
-  "assistantMessage must be beginner-friendly and specific to the PC build context.",
-  "Never directly replace parts. Only suggest safe actions.",
-  "Suggested actions must use only these types: update_budget, update_use_case, update_appearance, update_brand_preference, update_experience_level, add_owned_part, open_part_explorer, explain_current_build, ask_clarifying_question.",
-  "Use add_owned_part when the user says they already own or want to reuse hardware.",
-  "Use open_part_explorer when the user asks whether to upgrade CPU, GPU, or another category.",
-  "Compatibility, pricing, replacement, and purchase references are handled by rule-based app code.",
-].join("\n");
 
 function extractJsonObject(text: string) {
   const start = text.indexOf("{");
@@ -86,6 +77,7 @@ function buildAdvisorContext(request: AdvisorRequest) {
     : null;
 
   return {
+    responseQuality: buildResponseQualityContext(request),
     userMessage: request.message,
     conversationHistory: request.conversationHistory ?? [],
     collectedNeeds: request.collectedNeeds ?? {},
@@ -145,7 +137,7 @@ export const openAiAdvisorProvider: AiProvider = {
       input: [
         {
           role: "system",
-          content: `${SYSTEM_INSTRUCTION}\n\n${RESPONSE_JSON_INSTRUCTION}`,
+          content: buildAdvisorSystemPrompt(),
         },
         {
           role: "user",

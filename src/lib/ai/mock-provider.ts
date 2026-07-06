@@ -63,6 +63,10 @@ function isUpgradeQuestion(message: string) {
   );
 }
 
+function formatBudget(value: number | undefined) {
+  return typeof value === "number" ? `$${value.toLocaleString()}` : "your current budget";
+}
+
 export function createMockAdvisorResponse(request: AdvisorRequest): AdvisorProviderResponse {
   const parsed = parseCustomerNeeds(request.message);
   const build = request.currentBuild;
@@ -189,19 +193,38 @@ export function createMockAdvisorResponse(request: AdvisorRequest): AdvisorProvi
       : null,
   ].filter(Boolean);
 
-  const assistantMessage =
-    extractedBits.length > 0
-      ? `Got it: ${extractedBits.join(", ")}. I can refresh the rule-based build recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. Compatibility stays checked by deterministic rules.`
-      : activeCompare
-        ? `You're comparing ${activeCompare.currentPart.displayName} against ${activeCompare.candidateParts
-            .slice(0, 3)
-            .map((part) => part.displayName)
-            .join(
-              ", ",
-            )}. I can talk through the tradeoffs while the inline compare panel stays open, using your ${activeCompare.budget ? `$${activeCompare.budget.toLocaleString()} budget` : "current budget"} and ${activeCompare.buildTotal ? `$${activeCompare.buildTotal.toLocaleString()} build total` : "current build total"} as context.`
-        : categoryFocus
-          ? `Let's focus on the ${categoryFocus.toUpperCase()}. Open the Part Explorer to compare options before swapping anything.`
-          : "I can help with budget, games, creator apps, style, or brand preferences. The current build stays safe because compatibility and pricing are still handled by local rules.";
+  const assistantMessage = activeCompare
+    ? [
+        "Recommendation: Compare the top alternatives before replacing the current part.",
+        `Fit: You're reviewing ${activeCompare.currentPart.displayName} against ${activeCompare.candidateParts
+          .slice(0, 3)
+          .map((part) => part.displayName)
+          .join(", ") || "same-category options"}.`,
+        `Budget impact: Use ${formatBudget(activeCompare.budget)} and the app-estimated ${formatBudget(activeCompare.buildTotal)} build total as the guardrails.`,
+        "Compatibility impact: Let the local compatibility checks confirm fit before you swap anything.",
+        "Performance tradeoff: Favor the part that improves your main workload without forcing PSU, case, or cooling compromises.",
+        "Next action: Open the Part Explorer action or pick a compare row after checking warnings.",
+      ].join("\n")
+    : extractedBits.length > 0
+      ? [
+          `Direct answer: Got it: ${extractedBits.join(", ")}.`,
+          `Reasoning: That helps tune the CPU, GPU, style, and budget balance around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}.`,
+          "Practical recommendation: Refresh the rule-based recommendation so compatibility stays checked by local rules.",
+          "Next step: Apply the suggested update below, then compare any part that still feels uncertain.",
+        ].join("\n")
+      : categoryFocus
+        ? [
+            `Direct answer: Let's focus on the ${categoryFocus.toUpperCase()}.`,
+            "Reasoning: Same-category comparisons are safer than swapping parts blindly.",
+            "Practical recommendation: Review alternatives in Part Explorer before changing the build.",
+            "Next step: Open the suggested explorer action and check compatibility warnings.",
+          ].join("\n")
+        : [
+            "Direct answer: I can help tune budget, games, creator apps, style, or brand preferences.",
+            "Reasoning: Those inputs decide the CPU/GPU balance and how much room to leave for compatibility-safe supporting parts.",
+            "Practical recommendation: Start with budget plus the main apps or games you care about.",
+            "Next step: Answer the clarifying question or ask me to explain the current build.",
+          ].join("\n");
 
   return {
     assistantMessage,
