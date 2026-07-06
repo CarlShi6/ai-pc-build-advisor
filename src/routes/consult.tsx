@@ -968,6 +968,16 @@ function ConsultPage() {
     try {
       const advisorResponse = await askAdvisor({
         message,
+        conversationHistory: chatMessages
+          .filter(
+            (chatMessage) =>
+              chatMessage.role === "user" || chatMessage.id !== "assistant-welcome",
+          )
+          .slice(-8)
+          .map((chatMessage) => ({
+            role: chatMessage.role,
+            text: chatMessage.text,
+          })),
         currentBuild: build,
         collectedNeeds: customerNeeds,
         activeCompare: activeCompareContext,

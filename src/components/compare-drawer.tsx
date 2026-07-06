@@ -393,7 +393,7 @@ export function ComparePanel({
   const compareTrayRef = useRef<HTMLDivElement | null>(null);
   const previewPanelRef = useRef<HTMLElement | null>(null);
 
-  const selectedPart = build?.parts.find((part) => part.category === category);
+  const selectedPart = build?.parts.find((part) => part.category === category) ?? null;
   const sectionTitle = selectedPart ? categoryLabels[selectedPart.category] : "Part";
 
   const baseCategoryParts = useMemo(() => {
@@ -432,6 +432,20 @@ export function ComparePanel({
 
     return sortParts(Array.from(byId.values()), selectedPart, sortMode);
   }, [baseCategoryParts, retailerPreviewParts, selectedPart, sortMode]);
+
+  const recommendedSubstitution = useMemo(() => {
+    if (!selectedPart) {
+      return null;
+    }
+
+    return (
+      substitutionSuggestions.find(
+        (suggestion) =>
+          suggestion.category === selectedPart.category &&
+          suggestion.originalPartId === selectedPart.id,
+      ) ?? null
+    );
+  }, [selectedPart, substitutionSuggestions]);
 
   useEffect(() => {
     if (!open || !selectedPart) {
@@ -544,26 +558,47 @@ export function ComparePanel({
   }, [previewPart]);
 
   if (!open || !build || !category || !selectedPart) {
-    return null;
+    if (!open) {
+      return null;
+    }
+
+    return (
+      <aside className="order-2 flex min-h-[70vh] min-w-0 flex-col overflow-hidden border-y border-primary/20 bg-background lg:h-full lg:min-h-0 lg:border-x lg:border-y-0">
+        <div className="flex items-start justify-between gap-4 border-b border-border bg-background/95 px-4 py-5 xl:px-6">
+          <div>
+            <Badge className="mb-3 w-fit rounded-md border border-primary/30 bg-primary/10 text-primary">
+              <Sparkles className="mr-1 size-3" /> AI-assisted Compare
+            </Badge>
+            <h2 className="text-xl font-semibold leading-tight">No part selected</h2>
+            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+              Choose a part from the build to compare compatible alternatives. The advisor chat
+              remains available while you browse.
+            </p>
+          </div>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="rounded-md"
+            aria-label="Close compare panel"
+            onClick={() => onOpenChange(false)}
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+        <div className="flex min-h-0 flex-1 items-center justify-center p-6">
+          <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+            Compare will show candidate parts, price changes, compatibility impact, and swap
+            previews once a current build part is selected.
+          </div>
+        </div>
+      </aside>
+    );
   }
 
   const currentSelectedPart = selectedPart;
   const selectedCompareParts = selectedIds
     .map((id) => sameCategoryParts.find((part) => part.id === id))
     .filter((part): part is Part => Boolean(part));
-  const recommendedSubstitution = useMemo(() => {
-    if (!selectedPart) {
-      return null;
-    }
-
-    return (
-      substitutionSuggestions.find(
-        (suggestion) =>
-          suggestion.category === selectedPart.category &&
-          suggestion.originalPartId === selectedPart.id,
-      ) ?? null
-    );
-  }, [selectedPart, substitutionSuggestions]);
   const recommendedSubstitutePart = recommendedSubstitution
     ? (sameCategoryParts.find((part) => part.id === recommendedSubstitution.substitutePartId) ??
       seedParts.find((part) => part.id === recommendedSubstitution.substitutePartId) ??
