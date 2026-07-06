@@ -1,7 +1,7 @@
 import type { CustomerNeeds } from "@/types/api";
 import type { Build } from "@/types/build";
 import type { PlanType, UsageStatus } from "@/types/monetization";
-import type { PartCategory } from "@/types/parts";
+import type { Part, PartCategory } from "@/types/parts";
 
 export type AdvisorSuggestedAction =
   | {
@@ -64,8 +64,17 @@ export interface AdvisorRequest {
   message: string;
   currentBuild?: Build | null;
   collectedNeeds?: CustomerNeeds;
+  activeCompare?: ActiveCompareContext | null;
   plan: PlanType;
   usageStatus: UsageStatus;
+}
+
+export interface ActiveCompareContext {
+  category: PartCategory;
+  currentPart: Part;
+  candidateParts: Part[];
+  budget?: number;
+  buildTotal?: number;
 }
 
 export interface AdvisorProviderResponse {
@@ -82,6 +91,7 @@ export interface AdvisorApiRequest {
   message: string;
   currentBuild?: Build | null;
   collectedNeeds?: CustomerNeeds;
+  activeCompare?: ActiveCompareContext | null;
   plan?: PlanType;
   usageStatus?: UsageStatus | null;
 }
@@ -121,7 +131,9 @@ function asString(value: unknown) {
 }
 
 function asStringArray(value: unknown) {
-  return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === "string")
+    : [];
 }
 
 function asCategory(value: unknown) {

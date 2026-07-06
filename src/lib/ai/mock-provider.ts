@@ -58,7 +58,9 @@ function getOwnedPartHint(message: string) {
 }
 
 function isUpgradeQuestion(message: string) {
-  return /\bupgrade\b|\bupgrade\b.*\b(cpu|gpu)\b|\b(cpu|gpu)\b.*\bupgrade\b|\bwhich.*\b(cpu|gpu)\b/i.test(message);
+  return /\bupgrade\b|\bupgrade\b.*\b(cpu|gpu)\b|\b(cpu|gpu)\b.*\bupgrade\b|\bwhich.*\b(cpu|gpu)\b/i.test(
+    message,
+  );
 }
 
 export function createMockAdvisorResponse(request: AdvisorRequest): AdvisorProviderResponse {
@@ -66,6 +68,7 @@ export function createMockAdvisorResponse(request: AdvisorRequest): AdvisorProvi
   const build = request.currentBuild;
   const cpu = build?.parts.find((part) => part.category === "cpu");
   const gpu = build?.parts.find((part) => part.category === "gpu");
+  const activeCompare = request.activeCompare;
   const categoryFocus = getCategoryFocus(request.message);
   const ownedPartHint = getOwnedPartHint(request.message);
   const suggestedActions: AdvisorSuggestedAction[] = [];
@@ -138,7 +141,9 @@ export function createMockAdvisorResponse(request: AdvisorRequest): AdvisorProvi
 
   if (categoryFocus || isUpgradeQuestion(request.message)) {
     const categories: PartCategory[] =
-      isUpgradeQuestion(request.message) && /\bcpu\b/i.test(request.message) && /\bgpu\b/i.test(request.message)
+      isUpgradeQuestion(request.message) &&
+      /\bcpu\b/i.test(request.message) &&
+      /\bgpu\b/i.test(request.message)
         ? ["gpu", "cpu"]
         : [categoryFocus ?? "gpu"];
 
@@ -167,7 +172,9 @@ export function createMockAdvisorResponse(request: AdvisorRequest): AdvisorProvi
   }
 
   const extractedBits = [
-    parsed.parsedNeeds.budget ? `a budget around $${parsed.parsedNeeds.budget.toLocaleString()}` : null,
+    parsed.parsedNeeds.budget
+      ? `a budget around $${parsed.parsedNeeds.budget.toLocaleString()}`
+      : null,
     parsed.parsedNeeds.targetUseCase?.length
       ? parsed.parsedNeeds.targetUseCase.join(" + ").toLowerCase()
       : null,
@@ -185,9 +192,16 @@ export function createMockAdvisorResponse(request: AdvisorRequest): AdvisorProvi
   const assistantMessage =
     extractedBits.length > 0
       ? `Got it: ${extractedBits.join(", ")}. I can refresh the rule-based build recommendation around ${cpu?.displayName ?? "the selected CPU"} and ${gpu?.displayName ?? "the selected GPU"}. Compatibility stays checked by deterministic rules.`
-      : categoryFocus
-        ? `Let's focus on the ${categoryFocus.toUpperCase()}. Open the Part Explorer to compare options before swapping anything.`
-        : "I can help with budget, games, creator apps, style, or brand preferences. The current build stays safe because compatibility and pricing are still handled by local rules.";
+      : activeCompare
+        ? `You're comparing ${activeCompare.currentPart.displayName} against ${activeCompare.candidateParts
+            .slice(0, 3)
+            .map((part) => part.displayName)
+            .join(
+              ", ",
+            )}. I can talk through the tradeoffs while the inline compare panel stays open, using your ${activeCompare.budget ? `$${activeCompare.budget.toLocaleString()} budget` : "current budget"} and ${activeCompare.buildTotal ? `$${activeCompare.buildTotal.toLocaleString()} build total` : "current build total"} as context.`
+        : categoryFocus
+          ? `Let's focus on the ${categoryFocus.toUpperCase()}. Open the Part Explorer to compare options before swapping anything.`
+          : "I can help with budget, games, creator apps, style, or brand preferences. The current build stays safe because compatibility and pricing are still handled by local rules.";
 
   return {
     assistantMessage,

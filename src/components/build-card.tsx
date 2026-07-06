@@ -1,11 +1,25 @@
 import { categoryLabels, seedParts } from "@/data/seedParts";
 import { getPartSummarySpecs } from "@/lib/build-advisor";
 import { cn } from "@/lib/utils";
-import type { Build, BuildFeedbackDifficulty, PostBuildFeedbackSummary, SubstitutionSuggestion } from "@/types/build";
+import type {
+  Build,
+  BuildFeedbackDifficulty,
+  PostBuildFeedbackSummary,
+  SubstitutionSuggestion,
+} from "@/types/build";
 import type { Part } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { AlertTriangle, ArrowRightLeft, CheckCircle2, Eye, GitCompare, Layers, Sparkles, XCircle } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRightLeft,
+  CheckCircle2,
+  Eye,
+  GitCompare,
+  Layers,
+  Sparkles,
+  XCircle,
+} from "lucide-react";
 
 export type LegacyBuildPart = {
   category: string;
@@ -196,9 +210,23 @@ export function BuildCardInner({
 
       {!compact && (
         <div className="grid gap-4 md:grid-cols-4">
-          <PerfStat label="Budget Use" value={`${Math.round((total / (build?.budget ?? 2800)) * 100)}%`} pct={Math.min(Math.round((total / (build?.budget ?? 2800)) * 100), 100)} />
-          <PerfStat label="Compatibility" value={status === "pass" ? "Ready" : status === "warning" ? "Review" : "Needs review"} pct={status === "pass" ? 100 : status === "warning" ? 72 : 38} tone={status === "fail" ? "primary" : "success"} />
-          <PerfStat label="Confidence" value={`${confidenceScore}/100`} pct={confidenceScore} tone={status === "fail" ? "primary" : "success"} />
+          <PerfStat
+            label="Budget Use"
+            value={`${Math.round((total / (build?.budget ?? 2800)) * 100)}%`}
+            pct={Math.min(Math.round((total / (build?.budget ?? 2800)) * 100), 100)}
+          />
+          <PerfStat
+            label="Compatibility"
+            value={status === "pass" ? "Ready" : status === "warning" ? "Review" : "Needs review"}
+            pct={status === "pass" ? 100 : status === "warning" ? 72 : 38}
+            tone={status === "fail" ? "primary" : "success"}
+          />
+          <PerfStat
+            label="Confidence"
+            value={`${confidenceScore}/100`}
+            pct={confidenceScore}
+            tone={status === "fail" ? "primary" : "success"}
+          />
           <PerfStat
             label={feedbackSummary ? "Build Completed" : "Parts Selected"}
             value={feedbackSummary ? "Reported" : `${rows.length}`}
@@ -231,7 +259,12 @@ export function BuildCardInner({
               Click any row to view alternatives, or use the action buttons.
             </p>
           </div>
-          <div className={cn("flex items-center gap-2 rounded-full px-3 py-1 text-xs", statusMeta.pillClass)}>
+          <div
+            className={cn(
+              "flex items-center gap-2 rounded-full px-3 py-1 text-xs",
+              statusMeta.pillClass,
+            )}
+          >
             <span className={cn("size-2 rounded-full", statusMeta.dotClass)} />
             <StatusIcon className="size-3.5" />
             <span>{statusMeta.label}</span>
@@ -244,7 +277,9 @@ export function BuildCardInner({
                 <th className="px-6 py-4 font-medium">Category</th>
                 <th className="px-6 py-4 font-medium">Part Name</th>
                 <th className="px-6 py-4 text-right font-medium">Price</th>
-                {(onFocus || onCompare) && <th className="px-6 py-4 text-right font-medium">Actions</th>}
+                {(onFocus || onCompare) && (
+                  <th className="px-6 py-4 text-right font-medium">Actions</th>
+                )}
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-sm">
@@ -273,7 +308,9 @@ export function BuildCardInner({
                     <span
                       className={cn(
                         "rounded-md px-2 py-0.5",
-                        focusedCategory === part.category ? "bg-primary/20 text-primary" : "text-muted-foreground",
+                        focusedCategory === part.category
+                          ? "bg-primary/20 text-primary"
+                          : "text-muted-foreground",
                       )}
                     >
                       {part.categoryLabel}
@@ -303,7 +340,10 @@ export function BuildCardInner({
                       {part.specs.length > 0 && (
                         <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
                           {part.specs.map((spec) => (
-                            <span key={spec} className="rounded-md border border-border bg-background/60 px-2 py-1">
+                            <span
+                              key={spec}
+                              className="rounded-md border border-border bg-background/60 px-2 py-1"
+                            >
                               {spec}
                             </span>
                           ))}
@@ -316,7 +356,12 @@ export function BuildCardInner({
                   </td>
                   {(onFocus || onCompare) && (
                     <td className="px-6 py-4 text-right">
-                      <RowActions category={part.category} categoryLabel={part.categoryLabel} onCompare={onCompare} onFocus={onFocus} />
+                      <RowActions
+                        category={part.category}
+                        categoryLabel={part.categoryLabel}
+                        onCompare={onCompare}
+                        onFocus={onFocus}
+                      />
                     </td>
                   )}
                 </tr>
@@ -345,12 +390,23 @@ export function BuildCardInner({
                 </p>
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Confidence</p>
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                  Confidence
+                </p>
                 <p className="font-mono text-lg font-bold">{confidenceLabel}</p>
               </div>
               <div>
                 <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Status</p>
-                <p className={cn("text-lg font-bold", status === "pass" ? "text-success" : status === "warning" ? "text-warning" : "text-destructive")}>
+                <p
+                  className={cn(
+                    "text-lg font-bold",
+                    status === "pass"
+                      ? "text-success"
+                      : status === "warning"
+                        ? "text-warning"
+                        : "text-destructive",
+                  )}
+                >
                   {status === "pass" ? "READY" : status === "warning" ? "REVIEW" : "FIX"}
                 </p>
               </div>
@@ -364,8 +420,10 @@ export function BuildCardInner({
                   className={cn(
                     "rounded-xl border bg-background/70 px-3 py-2 text-sm",
                     finding.severity === "pass" && "border-success/20 text-success",
-                    finding.severity === "warning" && "border-warning/30 bg-warning/10 text-warning",
-                    finding.severity === "fail" && "border-destructive/30 bg-destructive/10 text-destructive",
+                    finding.severity === "warning" &&
+                      "border-warning/30 bg-warning/10 text-warning",
+                    finding.severity === "fail" &&
+                      "border-destructive/30 bg-destructive/10 text-destructive",
                   )}
                 >
                   <div className="flex items-center gap-2 font-semibold">
@@ -441,8 +499,14 @@ function PostBuildFeedbackSummaryCard({
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-4">
         <FeedbackMetric label="Build completed" value={summary ? "Yes" : "Not reported"} />
-        <FeedbackMetric label="Issues reported" value={summary ? String(summary.issuesReported) : "None yet"} />
-        <FeedbackMetric label="Satisfaction score" value={summary ? `${summary.satisfactionScore}/5` : "Not rated"} />
+        <FeedbackMetric
+          label="Issues reported"
+          value={summary ? String(summary.issuesReported) : "None yet"}
+        />
+        <FeedbackMetric
+          label="Satisfaction score"
+          value={summary ? `${summary.satisfactionScore}/5` : "Not rated"}
+        />
         <FeedbackMetric
           label="Beginner difficulty"
           value={summary ? formatFeedbackDifficulty(summary.beginnerDifficulty) : "Not reported"}
@@ -505,7 +569,8 @@ function SmartSubstitutions({
             <h3 className="text-base font-bold">Smart Substitutions</h3>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">
-            Deterministic swap ideas based on budget, compatibility, confidence, power, and beginner risk.
+            Deterministic swap ideas based on budget, compatibility, confidence, power, and beginner
+            risk.
           </p>
         </div>
         <Badge className="rounded-md border border-primary/20 bg-primary/10 text-primary">
@@ -523,7 +588,10 @@ function SmartSubstitutions({
           }
 
           return (
-            <article key={`${suggestion.originalPartId}-${suggestion.substitutePartId}`} className="flex min-h-56 flex-col rounded-xl border border-border bg-background/60 p-4">
+            <article
+              key={`${suggestion.originalPartId}-${suggestion.substitutePartId}`}
+              className="flex min-h-56 flex-col rounded-xl border border-border bg-background/60 p-4"
+            >
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge className="rounded-md bg-primary/15 text-primary">
                   {getSubstitutionLabel(suggestion.substitutionType)}
@@ -539,17 +607,26 @@ function SmartSubstitutions({
               <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
                 <div className="rounded-md border border-border bg-card px-2 py-2">
                   <p className="text-muted-foreground">Price</p>
-                  <p className={cn("font-mono font-semibold", suggestion.priceDelta <= 0 ? "text-success" : "text-warning")}>
+                  <p
+                    className={cn(
+                      "font-mono font-semibold",
+                      suggestion.priceDelta <= 0 ? "text-success" : "text-warning",
+                    )}
+                  >
                     {formatSignedMoney(suggestion.priceDelta)}
                   </p>
                 </div>
                 <div className="rounded-md border border-border bg-card px-2 py-2">
                   <p className="text-muted-foreground">Total</p>
-                  <p className="font-mono font-semibold">{formatMoney(suggestion.totalAfterSwap)}</p>
+                  <p className="font-mono font-semibold">
+                    {formatMoney(suggestion.totalAfterSwap)}
+                  </p>
                 </div>
                 <div className="rounded-md border border-border bg-card px-2 py-2">
                   <p className="text-muted-foreground">Confidence</p>
-                  <p className="font-mono font-semibold">{suggestion.confidenceScoreAfterSwap}/100</p>
+                  <p className="font-mono font-semibold">
+                    {suggestion.confidenceScoreAfterSwap}/100
+                  </p>
                 </div>
               </div>
               <p className="mt-3 text-xs font-medium">{suggestion.recommendationReason}</p>
@@ -606,15 +683,11 @@ function RowActions({
           (onCompare ?? onFocus)?.(category);
         }}
       >
-        {isPrimary ? (
-          <GitCompare className="mr-1 size-3" />
-        ) : (
-          <Layers className="mr-1 size-3" />
-        )}
+        {isPrimary ? <GitCompare className="mr-1 size-3" /> : <Layers className="mr-1 size-3" />}
         {compareLabel}
       </Button>
       <span className="hidden items-center gap-1 text-xs text-muted-foreground xl:inline-flex">
-        <ArrowRightLeft className="size-3" /> Open {categoryLabel.toLowerCase()} drawer
+        <ArrowRightLeft className="size-3" /> Open {categoryLabel.toLowerCase()} compare
       </span>
     </div>
   );
