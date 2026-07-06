@@ -19,6 +19,7 @@ import process from "node:process";
 export function getServerConfig() {
   return {
     nodeEnv: process.env.NODE_ENV,
+    aiProvider: process.env.AI_PROVIDER,
     openAiApiKey: process.env.OPENAI_API_KEY,
     aiProviderApiKey: process.env.AI_PROVIDER_API_KEY,
     aiProviderModel: process.env.AI_PROVIDER_MODEL ?? "gpt-4.1-mini",

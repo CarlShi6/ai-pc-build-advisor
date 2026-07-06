@@ -62,11 +62,17 @@ export type AdvisorSuggestedAction =
 
 export interface AdvisorRequest {
   message: string;
+  conversationHistory?: AdvisorConversationMessage[];
   currentBuild?: Build | null;
   collectedNeeds?: CustomerNeeds;
   activeCompare?: ActiveCompareContext | null;
   plan: PlanType;
   usageStatus: UsageStatus;
+}
+
+export interface AdvisorConversationMessage {
+  role: "user" | "assistant";
+  text: string;
 }
 
 export interface ActiveCompareContext {
@@ -89,6 +95,7 @@ export interface AdvisorProviderResponse {
 
 export interface AdvisorApiRequest {
   message: string;
+  conversationHistory?: AdvisorConversationMessage[];
   currentBuild?: Build | null;
   collectedNeeds?: CustomerNeeds;
   activeCompare?: ActiveCompareContext | null;

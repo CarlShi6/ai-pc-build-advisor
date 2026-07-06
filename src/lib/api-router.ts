@@ -399,6 +399,7 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       const entitlement = await store.getEntitlement(actor);
       const advisorResponse = await getAdvisorResponse({
         message,
+        conversationHistory: payload.conversationHistory ?? [],
         currentBuild: payload.currentBuild ?? null,
         collectedNeeds: payload.collectedNeeds ?? {},
         activeCompare: payload.activeCompare ?? null,
