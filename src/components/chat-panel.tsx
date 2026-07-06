@@ -4,6 +4,21 @@ import type { ReactNode } from "react";
 import type { AdvisorSuggestedAction } from "@/lib/ai/types";
 import { ArrowRight, LoaderCircle, MessageSquareText, Sparkles } from "lucide-react";
 
+const STRUCTURED_LABELS = [
+  "Direct answer",
+  "Recommendation",
+  "Reasoning",
+  "Budget impact",
+  "Compatibility impact",
+  "Performance tradeoff",
+  "Practical recommendation",
+  "Next step",
+  "Fit",
+  "Next action",
+];
+
+const STRUCTURED_LABEL_PATTERN = new RegExp(`^(${STRUCTURED_LABELS.join("|")}):\\s*(.*)$`, "i");
+
 export type ChatMessage = {
   id: string;
   role: "user" | "assistant";
@@ -94,8 +109,8 @@ export function ChatPanel({
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/15">
                 <span className="text-xs font-bold uppercase text-primary">AI</span>
               </div>
-              <div className="rounded-2xl rounded-tl-none border border-border bg-card p-4">
-                <p className="text-sm leading-relaxed">{m.text}</p>
+              <div className="min-w-0 rounded-2xl rounded-tl-none border border-border bg-card p-4">
+                <StructuredAssistantMessage text={m.text} />
                 {m.fallbackUsed && (
                   <p className="mt-2 text-xs text-muted-foreground">
                     Mock advisor used. Build checks remain rule-based.
@@ -180,6 +195,64 @@ export function ChatPanel({
       </form>
     </aside>
   );
+}
+
+function StructuredAssistantMessage({ text }: { text: string }) {
+  const sections = parseStructuredMessage(text);
+
+  if (!sections) {
+    return <p className="whitespace-pre-line text-sm leading-relaxed">{text}</p>;
+  }
+
+  return (
+    <div className="space-y-3 text-sm leading-relaxed">
+      {sections.map((section, index) => (
+        <section key={`${section.label}-${index}`} className="min-w-0">
+          <h3 className="mb-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-primary">
+            {section.label}
+          </h3>
+          <p className="whitespace-pre-line break-words text-muted-foreground">{section.body}</p>
+        </section>
+      ))}
+    </div>
+  );
+}
+
+function parseStructuredMessage(text: string) {
+  const lines = text
+    .split(/\r?\n/)
+    .map((line) => line.trim())
+    .filter(Boolean);
+  const sections: Array<{ label: string; body: string }> = [];
+
+  lines.forEach((line) => {
+    const match = line.match(STRUCTURED_LABEL_PATTERN);
+
+    if (!match) {
+      const previousSection = sections.at(-1);
+
+      if (previousSection) {
+        previousSection.body = `${previousSection.body}\n${line}`;
+      }
+
+      return;
+    }
+
+    sections.push({
+      label: normalizeStructuredLabel(match[1]),
+      body: match[2],
+    });
+  });
+
+  return sections.length > 0 ? sections : null;
+}
+
+function normalizeStructuredLabel(label: string) {
+  const normalized = STRUCTURED_LABELS.find(
+    (structuredLabel) => structuredLabel.toLowerCase() === label.toLowerCase(),
+  );
+
+  return normalized ?? label;
 }
 
 function getActionLabel(action: AdvisorSuggestedAction) {
