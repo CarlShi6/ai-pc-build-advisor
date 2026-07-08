@@ -1,5 +1,5 @@
 import { categoryLabels, seedParts } from "@/data/seedParts";
-import { getPartSummarySpecs } from "@/lib/build-advisor";
+import { getCompatibilityNotesForPart, getPartSummarySpecs } from "@/lib/build-advisor";
 import { cn } from "@/lib/utils";
 import type {
   Build,
@@ -7,19 +7,24 @@ import type {
   PostBuildFeedbackSummary,
   SubstitutionSuggestion,
 } from "@/types/build";
-import type { Part } from "@/types/parts";
+import type { Part, PartCategory } from "@/types/parts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import {
   AlertTriangle,
   ArrowRightLeft,
   CheckCircle2,
+  Check,
+  Clipboard,
   Eye,
   GitCompare,
   Layers,
+  ListChecks,
   Sparkles,
   XCircle,
 } from "lucide-react";
+import { useMemo, useState } from "react";
 
 export type LegacyBuildPart = {
   category: string;
@@ -47,6 +52,17 @@ type BuildCardRow = {
   specs: string[];
 };
 
+const SHOPPING_LIST_CATEGORIES: PartCategory[] = [
+  "cpu",
+  "gpu",
+  "motherboard",
+  "ram",
+  "ssd",
+  "psu",
+  "case",
+  "cooler",
+];
+
 type BuildCardProps = {
   build?: Build;
   parts?: LegacyBuildPart[];
@@ -62,6 +78,74 @@ type BuildCardProps = {
 
 function formatMoney(value: number) {
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function formatBudgetImpact(total: number, budget?: number) {
+  if (!budget) {
+    return "Budget target not provided";
+  }
+
+  const delta = budget - total;
+
+  if (delta >= 0) {
+    return `${formatMoney(delta)} under budget`;
+  }
+
+  return `${formatMoney(Math.abs(delta))} over budget`;
+}
+
+function getEstimatedSystemWattage(parts: Part[]) {
+  const estimatedDraw = parts.reduce((sum, part) => {
+    if (typeof part.specs.powerDrawW === "number") {
+      return sum + part.specs.powerDrawW;
+    }
+
+    if (typeof part.specs.tdpW === "number") {
+      return sum + part.specs.tdpW;
+    }
+
+    return sum;
+  }, 0);
+
+  return estimatedDraw > 0 ? estimatedDraw : null;
+}
+
+function getSuggestedNextAction(build: Build, total: number) {
+  if (build.compatibilityStatus === "fail") {
+    return "Resolve the compatibility issue before buying parts.";
+  }
+
+  if (build.compatibilityStatus === "warning") {
+    return "Review the compatibility warnings, then compare replacements for affected parts.";
+  }
+
+  if (total > build.budget) {
+    return "Compare lower-cost substitutions to bring the list back under budget.";
+  }
+
+  return "Review prices with a retailer and save this list before purchasing.";
+}
+
+function getReplacementNote(part: Part, substitutions: SubstitutionSuggestion[]) {
+  const suggestion = substitutions.find((item) => item.originalPartId === part.id);
+
+  if (!suggestion) {
+    return null;
+  }
+
+  const substitute = seedParts.find((item) => item.id === suggestion.substitutePartId);
+
+  if (!substitute) {
+    return suggestion.tradeOffSummary;
+  }
+
+  return `Optional replacement: ${substitute.displayName} (${formatSignedMoney(suggestion.priceDelta)}). ${suggestion.tradeOffSummary}`;
+}
+
+function getShoppingListParts(build: Build) {
+  return SHOPPING_LIST_CATEGORIES.map((category) =>
+    build.parts.find((part) => part.category === category),
+  ).filter((part): part is Part => Boolean(part));
 }
 
 function normalizeRows(build?: Build, parts?: LegacyBuildPart[]) {
@@ -151,6 +235,8 @@ export function BuildCardInner({
   onReportBuildResult,
   compact = false,
 }: BuildCardProps) {
+  const [shoppingListOpen, setShoppingListOpen] = useState(false);
+  const [copyStatus, setCopyStatus] = useState<"idle" | "copied" | "failed">("idle");
   const rows = normalizeRows(build, parts);
   const total = build?.totalPrice ?? rows.reduce((sum, part) => sum + part.price, 0);
   const status = build?.compatibilityStatus ?? "pass";
@@ -163,6 +249,17 @@ export function BuildCardInner({
         ...build.compatibilityChecks.filter((check) => check.severity === "pass"),
       ].slice(0, 4)
     : [];
+  const shoppingListText = useMemo(
+    () =>
+      build
+        ? createShoppingListText({
+            build,
+            parts: getShoppingListParts(build),
+            substitutions,
+          })
+        : createLegacyShoppingListText(rows, total),
+    [build, rows, substitutions, total],
+  );
   const statusMeta =
     status === "pass"
       ? {
@@ -448,6 +545,18 @@ export function BuildCardInner({
             <Button className="flex-1 rounded-xl py-6 font-semibold shadow-glow">
               View Purchase References
             </Button>
+            <Collapsible
+              open={shoppingListOpen}
+              onOpenChange={setShoppingListOpen}
+              className="flex-1"
+            >
+              <CollapsibleTrigger asChild>
+                <Button variant="secondary" className="flex-1 rounded-xl py-6 font-semibold">
+                  <ListChecks className="mr-2 size-4" />
+                  Review Parts List
+                </Button>
+              </CollapsibleTrigger>
+            </Collapsible>
             {onReportBuildResult && (
               <Button
                 variant="secondary"
@@ -460,6 +569,284 @@ export function BuildCardInner({
           </div>
         </div>
       )}
+
+      {!compact && (
+        <Collapsible open={shoppingListOpen} onOpenChange={setShoppingListOpen}>
+          <CollapsibleContent>
+            <ShoppingListPanel
+              build={build}
+              rows={rows}
+              total={total}
+              substitutions={substitutions}
+              textOutput={shoppingListText}
+              copyStatus={copyStatus}
+              onCopy={() => {
+                if (!navigator.clipboard) {
+                  setCopyStatus("failed");
+                  return;
+                }
+
+                void navigator.clipboard
+                  .writeText(shoppingListText)
+                  .then(() => {
+                    setCopyStatus("copied");
+                    window.setTimeout(() => setCopyStatus("idle"), 1600);
+                  })
+                  .catch(() => setCopyStatus("failed"));
+              }}
+            />
+          </CollapsibleContent>
+        </Collapsible>
+      )}
+    </div>
+  );
+}
+
+function createShoppingListText({
+  build,
+  parts,
+  substitutions,
+}: {
+  build: Build;
+  parts: Part[];
+  substitutions: SubstitutionSuggestion[];
+}) {
+  const estimatedWattage = getEstimatedSystemWattage(parts);
+  const lines = [
+    `${build.name} Shopping List`,
+    `Use case: ${build.targetUseCase.join(" + ")}`,
+    `Estimated subtotal: ${formatMoney(build.totalPrice)}`,
+    `Budget target: ${formatMoney(build.budget)}`,
+    `Budget impact: ${formatBudgetImpact(build.totalPrice, build.budget)}`,
+    `Estimated wattage: ${estimatedWattage ? `${estimatedWattage}W` : "Not available"}`,
+    `Compatibility: ${build.confidenceScore.summary}`,
+    `Suggested next action: ${getSuggestedNextAction(build, build.totalPrice)}`,
+    "",
+    "Parts:",
+  ];
+
+  parts.forEach((part) => {
+    const specs = getPartSummarySpecs(part);
+    const notes = [
+      ...getCompatibilityNotesForPart(build, part),
+      getReplacementNote(part, substitutions),
+    ].filter(Boolean);
+
+    lines.push(
+      `- ${categoryLabels[part.category]}: ${part.displayName} - ${
+        part.owned ? "$0.00 (already owned)" : formatMoney(part.price)
+      }`,
+    );
+
+    if (specs.length > 0) {
+      lines.push(`  Specs: ${specs.join(", ")}`);
+    }
+
+    if (notes.length > 0) {
+      lines.push(`  Notes: ${notes.join(" ")}`);
+    }
+  });
+
+  return lines.join("\n");
+}
+
+function createLegacyShoppingListText(rows: BuildCardRow[], total: number) {
+  return [
+    "Shopping List",
+    `Estimated subtotal: ${formatMoney(total)}`,
+    "Compatibility: Review parts against the final recommended build before buying.",
+    "Suggested next action: Generate a current recommendation, then review retailer prices.",
+    "",
+    "Parts:",
+    ...rows.map(
+      (part) =>
+        `- ${part.categoryLabel}: ${part.name} - ${
+          part.owned ? "$0.00 (already owned)" : formatMoney(part.price)
+        }`,
+    ),
+  ].join("\n");
+}
+
+function ShoppingListPanel({
+  build,
+  rows,
+  total,
+  substitutions,
+  textOutput,
+  copyStatus,
+  onCopy,
+}: {
+  build?: Build;
+  rows: BuildCardRow[];
+  total: number;
+  substitutions: SubstitutionSuggestion[];
+  textOutput: string;
+  copyStatus: "idle" | "copied" | "failed";
+  onCopy: () => void;
+}) {
+  const shoppingParts = build ? getShoppingListParts(build) : [];
+  const estimatedWattage = build ? getEstimatedSystemWattage(shoppingParts) : null;
+  const budgetImpact = build ? formatBudgetImpact(total, build.budget) : "Budget target not provided";
+  const suggestedNextAction = build
+    ? getSuggestedNextAction(build, total)
+    : "Generate a current recommendation, then review retailer prices.";
+  const compatibilityNotes = build
+    ? build.compatibilityChecks
+        .filter((check) => check.severity !== "pass")
+        .map((check) => check.message)
+    : [];
+
+  return (
+    <section className="rounded-2xl border border-border bg-card p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <Badge className="mb-3 rounded-md border border-primary/30 bg-primary/10 text-primary">
+            <ListChecks className="mr-1 size-3" /> Pre-cart
+          </Badge>
+          <h3 className="text-xl font-bold">Shopping List</h3>
+          <p className="mt-1 text-sm text-muted-foreground">
+            A copy-friendly review of the selected build before any retailer checkout exists.
+          </p>
+        </div>
+        <Button variant="secondary" className="rounded-md" onClick={onCopy}>
+          {copyStatus === "copied" ? (
+            <>
+              <Check className="mr-2 size-4" /> Copied
+            </>
+          ) : (
+            <>
+              <Clipboard className="mr-2 size-4" /> Copy
+            </>
+          )}
+        </Button>
+      </div>
+
+      <div className="mt-5 grid gap-3 md:grid-cols-4">
+        <SummaryTile label="Estimated subtotal" value={formatMoney(total)} />
+        <SummaryTile label="Budget target" value={build ? formatMoney(build.budget) : "N/A"} />
+        <SummaryTile
+          label="Budget impact"
+          value={budgetImpact}
+          valueClass={build && total <= build.budget ? "text-success" : "text-warning"}
+        />
+        <SummaryTile
+          label="Estimated wattage"
+          value={estimatedWattage ? `${estimatedWattage}W` : "N/A"}
+        />
+      </div>
+
+      <div className="mt-5 overflow-x-auto rounded-xl border border-border">
+        <table className="w-full min-w-[900px] text-left text-sm">
+          <thead>
+            <tr className="border-b border-border bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
+              <th className="px-4 py-3 font-medium">Category</th>
+              <th className="px-4 py-3 font-medium">Part</th>
+              <th className="px-4 py-3 font-medium">Key specs</th>
+              <th className="px-4 py-3 font-medium">Compatibility / replacement note</th>
+              <th className="px-4 py-3 text-right font-medium">Price</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {build
+              ? shoppingParts.map((part) => {
+                  const notes = [
+                    ...getCompatibilityNotesForPart(build, part),
+                    getReplacementNote(part, substitutions),
+                  ].filter(Boolean);
+
+                  return (
+                    <tr key={part.id}>
+                      <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                        {categoryLabels[part.category]}
+                      </td>
+                      <td className="px-4 py-3 font-medium">{part.displayName}</td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {getPartSummarySpecs(part).join(" | ") || "N/A"}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">{notes.join(" ")}</td>
+                      <td className="px-4 py-3 text-right font-mono">
+                        {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
+                      </td>
+                    </tr>
+                  );
+                })
+              : rows.map((part) => (
+                  <tr key={part.id}>
+                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                      {part.categoryLabel}
+                    </td>
+                    <td className="px-4 py-3 font-medium">{part.name}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {part.specs.join(" | ") || "N/A"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      Review against the final selected build before purchasing.
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
+                    </td>
+                  </tr>
+                ))}
+          </tbody>
+        </table>
+      </div>
+
+      <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
+        <div className="rounded-xl border border-border bg-background/60 p-4">
+          <h4 className="text-sm font-semibold">Compatibility Notes</h4>
+          <div className="mt-3 space-y-2 text-sm text-muted-foreground">
+            {compatibilityNotes.length > 0 ? (
+              compatibilityNotes.map((note) => (
+                <p key={note} className="rounded-md border border-warning/25 bg-warning/10 p-2">
+                  {note}
+                </p>
+              ))
+            ) : (
+              <p>
+                {build
+                  ? build.confidenceScore.summary
+                  : "Compatibility notes become more precise after a live recommendation is selected."}
+              </p>
+            )}
+          </div>
+          <div className="mt-4 rounded-md border border-primary/20 bg-primary/10 p-3 text-sm">
+            <p className="font-semibold text-primary">Suggested next action</p>
+            <p className="mt-1 text-muted-foreground">{suggestedNextAction}</p>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-border bg-background/60 p-4">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="text-sm font-semibold">Copy-friendly Text</h4>
+            {copyStatus === "failed" && (
+              <span className="text-xs text-warning">Select the text below to copy manually.</span>
+            )}
+          </div>
+          <textarea
+            readOnly
+            value={textOutput}
+            className="mt-3 h-72 w-full resize-none rounded-md border border-border bg-card p-3 font-mono text-xs leading-relaxed text-foreground outline-none focus-visible:ring-2 focus-visible:ring-primary/40"
+            aria-label="Copy-friendly shopping list text"
+          />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SummaryTile({
+  label,
+  value,
+  valueClass,
+}: {
+  label: string;
+  value: string;
+  valueClass?: string;
+}) {
+  return (
+    <div className="rounded-xl border border-border bg-background/60 p-3">
+      <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={cn("mt-1 text-sm font-semibold", valueClass)}>{value}</p>
     </div>
   );
 }
