@@ -244,13 +244,17 @@ export function getCartPreviewItems(build: Build): CartPreviewItem[] {
     retailer: part.owned ? "Already owned" : part.retailer ?? "Partner retailer",
     estimatedPrice: part.owned ? 0 : part.price,
     quantity: 1,
-    productUrl: part.owned ? undefined : part.productUrl,
+    purchaseUrl: part.owned ? undefined : part.purchaseUrl,
+    productUrl: part.owned ? undefined : part.purchaseUrl ?? part.productUrl,
     searchUrl: part.owned ? undefined : part.searchUrl,
+    stockStatus: part.owned ? "unknown" : part.stockStatus ?? part.availability,
+    lastUpdated: part.owned ? undefined : part.lastUpdated,
+    specSummary: part.specSummary,
     affiliateLinks: part.owned ? [] : part.affiliateLinks,
-    availability: part.owned ? "unknown" : part.availability,
+    availability: part.owned ? "unknown" : part.stockStatus ?? part.availability,
     note: part.owned
       ? "Already owned - no purchase needed."
-      : getAvailabilityNote(part.availability),
+      : getAvailabilityNote(part.stockStatus ?? part.availability),
   }));
 }
 
@@ -266,11 +270,15 @@ export function getOffersForPart(partId: string): PartOffer[] {
       partId: part.id,
       retailer: part.retailer ?? "Partner retailer",
       estimatedPrice: part.price,
-      availability: part.availability ?? "unknown",
-      productUrl: part.productUrl,
+      availability: part.stockStatus ?? part.availability ?? "unknown",
+      purchaseUrl: part.purchaseUrl,
+      productUrl: part.purchaseUrl ?? part.productUrl,
       searchUrl: part.searchUrl,
+      stockStatus: part.stockStatus ?? part.availability ?? "unknown",
+      lastUpdated: part.lastUpdated,
+      specSummary: part.specSummary,
       affiliateLinks: part.affiliateLinks,
-      note: getAvailabilityNote(part.availability),
+      note: getAvailabilityNote(part.stockStatus ?? part.availability),
     },
   ];
 }

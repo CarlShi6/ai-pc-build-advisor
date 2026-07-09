@@ -17,6 +17,7 @@ import {
   CheckCircle2,
   Check,
   Clipboard,
+  ExternalLink,
   Eye,
   GitCompare,
   Layers,
@@ -50,6 +51,11 @@ type BuildCardRow = {
   price: number;
   owned?: boolean;
   specs: string[];
+  brandModel?: string;
+  retailer?: string;
+  stockStatus?: string;
+  purchaseUrl?: string;
+  specSummary?: string;
 };
 
 const SHOPPING_LIST_CATEGORIES: PartCategory[] = [
@@ -92,6 +98,34 @@ function formatBudgetImpact(total: number, budget?: number) {
   }
 
   return `${formatMoney(Math.abs(delta))} over budget`;
+}
+
+function formatStockStatus(value?: Part["stockStatus"] | Part["availability"]) {
+  if (value === "in_stock") {
+    return "In stock";
+  }
+
+  if (value === "low_stock") {
+    return "Low stock";
+  }
+
+  if (value === "out_of_stock") {
+    return "Out of stock";
+  }
+
+  return undefined;
+}
+
+function getBrandModel(part: Part) {
+  return [part.brand, part.model].filter(Boolean).join(" ");
+}
+
+function getPurchaseUrl(part: Part) {
+  return part.purchaseUrl ?? part.productUrl ?? part.searchUrl ?? part.affiliateLinks?.[0]?.url;
+}
+
+function getSpecSummary(part: Part) {
+  return part.specSummary ?? getPartSummarySpecs(part).join(", ");
 }
 
 function getEstimatedSystemWattage(parts: Part[]) {
@@ -158,6 +192,11 @@ function normalizeRows(build?: Build, parts?: LegacyBuildPart[]) {
       price: part.owned ? 0 : part.price,
       owned: part.owned,
       specs: getPartSummarySpecs(part),
+      brandModel: getBrandModel(part),
+      retailer: part.owned ? undefined : part.retailer,
+      stockStatus: part.owned ? undefined : formatStockStatus(part.stockStatus ?? part.availability),
+      purchaseUrl: part.owned ? undefined : getPurchaseUrl(part),
+      specSummary: getSpecSummary(part),
     }));
   }
 
@@ -428,6 +467,41 @@ export function BuildCardInner({
                           </Badge>
                         )}
                       </div>
+                      {(part.brandModel || part.retailer || part.stockStatus || part.purchaseUrl) && (
+                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                          {part.brandModel && part.brandModel !== part.name && (
+                            <span>{part.brandModel}</span>
+                          )}
+                          {part.retailer && <span>{part.retailer}</span>}
+                          {part.stockStatus && (
+                            <span
+                              className={cn(
+                                "rounded-md border px-2 py-0.5",
+                                part.stockStatus === "In stock" &&
+                                  "border-success/25 bg-success/10 text-success",
+                                part.stockStatus === "Low stock" &&
+                                  "border-warning/25 bg-warning/10 text-warning",
+                                part.stockStatus === "Out of stock" &&
+                                  "border-destructive/25 bg-destructive/10 text-destructive",
+                              )}
+                            >
+                              {part.stockStatus}
+                            </span>
+                          )}
+                          {part.purchaseUrl && (
+                            <a
+                              href={part.purchaseUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-primary hover:underline"
+                              onClick={(event) => event.stopPropagation()}
+                            >
+                              <ExternalLink className="size-3" />
+                              View product
+                            </a>
+                          )}
+                        </div>
+                      )}
                       {(onFocus || onCompare) && (
                         <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
                           <ArrowRightLeft className="size-3" />
@@ -627,6 +701,9 @@ function createShoppingListText({
 
   parts.forEach((part) => {
     const specs = getPartSummarySpecs(part);
+    const retailer = part.owned ? undefined : part.retailer;
+    const stockStatus = part.owned ? undefined : formatStockStatus(part.stockStatus ?? part.availability);
+    const purchaseUrl = part.owned ? undefined : getPurchaseUrl(part);
     const notes = [
       ...getCompatibilityNotesForPart(build, part),
       getReplacementNote(part, substitutions),
@@ -640,6 +717,18 @@ function createShoppingListText({
 
     if (specs.length > 0) {
       lines.push(`  Specs: ${specs.join(", ")}`);
+    }
+
+    if (retailer || stockStatus || purchaseUrl) {
+      lines.push(
+        `  Product: ${[
+          retailer ? `Retailer: ${retailer}` : null,
+          stockStatus ? `Stock: ${stockStatus}` : null,
+          purchaseUrl ? `Link: ${purchaseUrl}` : null,
+        ]
+          .filter(Boolean)
+          .join(" | ")}`,
+      );
     }
 
     if (notes.length > 0) {
@@ -736,12 +825,14 @@ function ShoppingListPanel({
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-xl border border-border">
-        <table className="w-full min-w-[900px] text-left text-sm">
+        <table className="w-full min-w-[1080px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
               <th className="px-4 py-3 font-medium">Category</th>
               <th className="px-4 py-3 font-medium">Part</th>
               <th className="px-4 py-3 font-medium">Key specs</th>
+              <th className="px-4 py-3 font-medium">Retailer</th>
+              <th className="px-4 py-3 font-medium">Stock</th>
               <th className="px-4 py-3 font-medium">Compatibility / replacement note</th>
               <th className="px-4 py-3 text-right font-medium">Price</th>
             </tr>
@@ -749,6 +840,8 @@ function ShoppingListPanel({
           <tbody className="divide-y divide-border">
             {build
               ? shoppingParts.map((part) => {
+                  const purchaseUrl = getPurchaseUrl(part);
+                  const stockStatus = formatStockStatus(part.stockStatus ?? part.availability);
                   const notes = [
                     ...getCompatibilityNotesForPart(build, part),
                     getReplacementNote(part, substitutions),
@@ -761,7 +854,30 @@ function ShoppingListPanel({
                       </td>
                       <td className="px-4 py-3 font-medium">{part.displayName}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {getPartSummarySpecs(part).join(" | ") || "N/A"}
+                        {getSpecSummary(part) || getPartSummarySpecs(part).join(" | ") || "N/A"}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {part.owned ? (
+                          "Already owned"
+                        ) : (
+                          <div className="space-y-1">
+                            <p>{part.retailer ?? "N/A"}</p>
+                            {purchaseUrl && (
+                              <a
+                                href={purchaseUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                              >
+                                <ExternalLink className="size-3" />
+                                View product
+                              </a>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 text-muted-foreground">
+                        {part.owned ? "N/A" : stockStatus ?? "N/A"}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">{notes.join(" ")}</td>
                       <td className="px-4 py-3 text-right font-mono">
@@ -778,6 +894,10 @@ function ShoppingListPanel({
                     <td className="px-4 py-3 font-medium">{part.name}</td>
                     <td className="px-4 py-3 text-muted-foreground">
                       {part.specs.join(" | ") || "N/A"}
+                    </td>
+                    <td className="px-4 py-3 text-muted-foreground">{part.retailer ?? "N/A"}</td>
+                    <td className="px-4 py-3 text-muted-foreground">
+                      {part.stockStatus ?? "N/A"}
                     </td>
                     <td className="px-4 py-3 text-muted-foreground">
                       Review against the final selected build before purchasing.

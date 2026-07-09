@@ -26,9 +26,15 @@ export interface Part {
   owned?: boolean;
   userProvided?: boolean;
   retailer?: string;
+  purchaseUrl?: string;
   productUrl?: string;
   searchUrl?: string;
   imageUrl?: string;
+  stockStatus?: PartAvailability;
+  lastUpdated?: string;
+  partNumber?: string;
+  sku?: string;
+  specSummary?: string;
   color?: string;
   affiliateLinks?: AffiliateLink[];
   availability?: PartAvailability;
@@ -38,5 +44,6 @@ export interface Part {
   pros?: string[];
   cons?: string[];
   valueScore?: number;
+  valueRating?: number;
   performanceScore?: number;
 }
