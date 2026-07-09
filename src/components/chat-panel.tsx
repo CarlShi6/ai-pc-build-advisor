@@ -52,6 +52,9 @@ export function ChatPanel({
   onActionClick?: (action: AdvisorSuggestedAction) => void;
 }) {
   const messagesRef = useRef<HTMLDivElement | null>(null);
+  const showStarterPrompts =
+    messages.length === 0 ||
+    (messages.length === 1 && messages[0]?.role === "assistant");
 
   useEffect(() => {
     const container = messagesRef.current;
@@ -83,24 +86,29 @@ export function ChatPanel({
         {usageSlot && <div className="mt-3">{usageSlot}</div>}
       </div>
 
-      <div className="shrink-0 border-b border-border/80 px-5 py-4">
-        <p className="mb-3 text-xs uppercase tracking-[0.2em] text-muted-foreground">
-          Quick Prompts
-        </p>
-        <div className="flex flex-wrap gap-2">
-          {quickReplies.map((reply) => (
-            <button
-              key={reply}
-              type="button"
-              onClick={() => onSend(reply)}
-              disabled={isGenerating}
-              className="rounded-md border border-border bg-card px-3 py-1.5 text-xs transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
-            >
-              {reply}
-            </button>
-          ))}
+      {showStarterPrompts && (
+        <div className="shrink-0 border-b border-border/80 px-5 py-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
+              Demo Starters
+            </p>
+            <span className="text-[11px] text-muted-foreground">Click one to run the flow</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {quickReplies.map((reply) => (
+              <button
+                key={reply}
+                type="button"
+                onClick={() => onSend(reply)}
+                disabled={isGenerating}
+                className="max-w-full rounded-md border border-border bg-card px-3 py-1.5 text-left text-xs leading-snug transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {reply}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
+      )}
 
       <div ref={messagesRef} className="min-h-0 flex-1 space-y-6 overflow-y-auto p-5">
         {messages.map((m) =>
@@ -154,9 +162,14 @@ export function ChatPanel({
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/15">
               <span className="text-xs font-bold uppercase text-primary">AI</span>
             </div>
-            <div className="flex items-center gap-2 rounded-2xl rounded-tl-none border border-border bg-card p-4 text-sm text-muted-foreground">
-              <LoaderCircle className="size-4 animate-spin text-primary" />
-              Updating the recommendation...
+            <div className="rounded-2xl rounded-tl-none border border-border bg-card p-4 text-sm text-muted-foreground">
+              <div className="flex items-center gap-2 font-medium text-foreground">
+                <LoaderCircle className="size-4 animate-spin text-primary" />
+                Updating recommendation
+              </div>
+              <p className="mt-1 text-xs">
+                Checking budget, fit, compatibility, and replacement options.
+              </p>
             </div>
           </div>
         )}
@@ -170,10 +183,13 @@ export function ChatPanel({
         className="shrink-0 border-t border-border bg-card/85 p-5 backdrop-blur-sm"
       >
         {limitSlot && <div className="mb-4">{limitSlot}</div>}
-        <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
+        {showStarterPrompts && (
+          <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
           <Sparkles className="size-3.5 text-primary" />
-          The input stays fixed while messages scroll above.
-        </div>
+            Try a starter above or type your own budget, target resolution, look, or upgrade
+            question.
+          </div>
+        )}
         <div className="relative">
           <input
             value={input}

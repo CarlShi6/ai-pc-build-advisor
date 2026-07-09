@@ -75,7 +75,13 @@ const DEFAULT_RECOMMENDATION_INPUT: RecommendedBuildInput = {
   targetUseCase: ["4K video editing", "casual gaming"],
 };
 
-const QUICK_REPLIES = ["2K gaming", "Video editing", "Budget $2500", "Black case", "Beginner"];
+const QUICK_REPLIES = [
+  "Build me a $1500 gaming PC for 1080p/1440p.",
+  "I want a $2000 1440p high refresh gaming PC.",
+  "I want a white aesthetic PC build.",
+  "Should I upgrade from a 5070 Ti to a 5080?",
+  "Give me a cheaper alternative without losing too much performance.",
+];
 
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   {
@@ -1010,7 +1016,7 @@ function ConsultPage() {
       }
     } catch {
       setDetailsError(
-        "The advisor could not complete the request. The previous build is still shown.",
+        "Advisor request failed. The current build is still available, and compare, replacement, and shopping-list tools remain usable.",
       );
       setToast({
         message: "Could not reach the advisor right now. Please try again.",
@@ -1021,7 +1027,7 @@ function ConsultPage() {
         {
           id: createMessageId(),
           role: "assistant",
-          text: "I could not reach the advisor service this time. Your current build is unchanged, and compatibility checks remain available.",
+          text: "I could not reach the advisor service this time. Your current build is unchanged, and compatibility checks remain available. Try one of the demo prompts again in a moment.",
         },
       ]);
     } finally {
@@ -1282,8 +1288,21 @@ function ConsultPage() {
 
             {buildError ? (
               <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-6">
-                <h2 className="text-lg font-bold text-destructive">Build could not be loaded</h2>
-                <p className="mt-2 text-sm text-destructive/90">{buildError}</p>
+                <div className="flex items-start gap-3">
+                  <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-destructive/30 bg-background">
+                    <AlertTriangle className="size-4 text-destructive" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-destructive">
+                      Build recommendation unavailable
+                    </h2>
+                    <p className="mt-2 text-sm text-destructive/90">{buildError}</p>
+                    <p className="mt-2 text-sm text-muted-foreground">
+                      Refresh the page, then run a starter prompt from the chat to verify the demo
+                      flow.
+                    </p>
+                  </div>
+                </div>
               </div>
             ) : build ? (
               <>
@@ -1382,8 +1401,12 @@ function ConsultPage() {
                 />
 
                 {detailsError && (
-                  <div className="rounded-2xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
-                    {detailsError}
+                  <div className="flex items-start gap-3 rounded-2xl border border-warning/30 bg-warning/10 p-4 text-sm text-warning">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                    <div>
+                      <p className="font-semibold">Advisor detail refresh needs another try</p>
+                      <p className="mt-1 text-warning/90">{detailsError}</p>
+                    </div>
                   </div>
                 )}
 
@@ -1527,7 +1550,7 @@ function ConsultPage() {
                   </section>
                 </div>
 
-                <section className="rounded-2xl border border-border bg-card p-6">
+                <section id="purchase-reference-list" className="rounded-2xl border border-border bg-card p-6">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -1574,13 +1597,25 @@ function ConsultPage() {
 
                   <div className="overflow-hidden rounded-2xl border border-border">
                     {isLoadingDetails && cartPreview.length === 0 ? (
-                      <div className="flex items-center gap-2 p-5 text-sm text-muted-foreground">
-                        <LoaderCircle className="size-4 animate-spin" />
-                        Loading purchase references
+                      <div className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
+                        <LoaderCircle className="size-4 animate-spin text-primary" />
+                        <div>
+                          <p className="font-medium text-foreground">Preparing purchase references</p>
+                          <p className="mt-1">
+                            Matching selected parts to demo retailer metadata and price notes.
+                          </p>
+                        </div>
                       </div>
                     ) : cartPreview.length === 0 ? (
-                      <div className="p-5 text-sm text-muted-foreground">
-                        Purchase references will populate as soon as the build is ready.
+                      <div className="flex items-start gap-3 p-5 text-sm text-muted-foreground">
+                        <ShoppingBag className="mt-0.5 size-4 shrink-0 text-primary" />
+                        <div>
+                          <p className="font-medium text-foreground">No purchase references yet</p>
+                          <p className="mt-1">
+                            Ask for a recommendation or refresh the build. This MVP shows demo
+                            retailer metadata only, with no checkout or live inventory.
+                          </p>
+                        </div>
                       </div>
                     ) : (
                       <table className="w-full text-left text-sm">

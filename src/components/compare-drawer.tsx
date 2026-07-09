@@ -598,9 +598,13 @@ export function ComparePanel({
           </Button>
         </div>
         <div className="flex min-h-0 flex-1 items-center justify-center p-6">
-          <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-            Compare will show candidate parts, price changes, compatibility impact, and swap
-            previews once a current build part is selected.
+          <div className="max-w-md rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
+            <GitCompare className="mb-3 size-5 text-primary" />
+            <p className="font-medium text-foreground">Pick a part from the build card</p>
+            <p className="mt-1">
+              Compare will show candidate parts, price changes, compatibility impact, and swap
+              previews once a current build part is selected.
+            </p>
           </div>
         </div>
       </aside>
@@ -771,11 +775,25 @@ export function ComparePanel({
             <LoadingState title={`Loading ${sectionTitle.toLowerCase()} options`} />
           ) : errorMessage ? (
             <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
-              {errorMessage}
+              <div className="flex items-start gap-3">
+                <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                <div>
+                  <p className="font-semibold">Compare options unavailable</p>
+                  <p className="mt-1">{errorMessage}</p>
+                  <p className="mt-2 text-destructive/80">
+                    Close the drawer and open Compare / Replace from the part row again.
+                  </p>
+                </div>
+              </div>
             </div>
           ) : sameCategoryParts.length < 2 ? (
             <div className="rounded-2xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-              This category needs at least two demo parts before exploration is useful.
+              <GitCompare className="mb-3 size-5 text-primary" />
+              <p className="font-medium text-foreground">No alternatives ready for this category</p>
+              <p className="mt-1">
+                This category needs at least two demo parts before exploration is useful. Try a CPU
+                or GPU row for the clearest demo.
+              </p>
             </div>
           ) : displayedTab === "recommended" ? (
             <PartCardGrid
@@ -866,7 +884,8 @@ export function ComparePanel({
                   <LoadingState title="Loading retailer preview results" />
                 ) : retailerResults.length === 0 ? (
                   <div className="rounded-xl border border-dashed border-border bg-card/50 p-6 text-sm text-muted-foreground">
-                    No demo retailer results match that search yet.
+                    No demo retailer results match that search yet. Try a broader brand, model, or
+                    category term.
                   </div>
                 ) : (
                   <RetailerResultGrid
@@ -2309,8 +2328,11 @@ function CompatibilityBadge({ build }: { build: Build }) {
 function LoadingState({ title }: { title: string }) {
   return (
     <div className="flex min-h-48 items-center justify-center rounded-2xl border border-dashed border-border bg-card/50 p-8 text-sm text-muted-foreground">
-      <LoaderCircle className="mr-2 size-4 animate-spin" />
-      {title}
+      <div className="text-center">
+        <LoaderCircle className="mx-auto mb-3 size-5 animate-spin text-primary" />
+        <p className="font-medium text-foreground">{title}</p>
+        <p className="mt-1 text-xs">Checking price, fit, and compatibility impact.</p>
+      </div>
     </div>
   );
 }
