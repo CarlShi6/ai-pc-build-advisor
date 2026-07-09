@@ -41,16 +41,25 @@ export function productSearchResultToPart(result: ProductSearchResult): Part {
     price,
     source: result.source === "local" ? "catalog" : result.source,
     retailer: result.retailer,
+    purchaseUrl: productUrl,
     productUrl,
     searchUrl: productUrl,
     imageUrl: result.imageUrl,
+    stockStatus: toAvailability(result.stockStatus),
+    lastUpdated: result.lastUpdated,
+    specSummary: result.specs
+      ? Object.entries(result.specs)
+          .slice(0, 3)
+          .map(([, value]) => String(value))
+          .join(", ")
+      : undefined,
     affiliateLinks: [
       {
         merchant: toMerchant(result.retailer),
         url: affiliateUrl,
         price,
         inStock: result.stockStatus === "in_stock" || result.stockStatus === "low_stock",
-        label: "Check price",
+        label: "View product",
       },
     ],
     availability: toAvailability(result.stockStatus),

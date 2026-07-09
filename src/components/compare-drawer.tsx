@@ -102,23 +102,35 @@ function formatRetailerName(value: string) {
     other: "Retailer",
   };
 
-  return labels[value] ?? value;
+  return labels[value.toLowerCase()] ?? value;
 }
 
-function formatStockStatus(value: ProductSearchResult["stockStatus"]) {
+function formatStockStatus(value?: ProductSearchResult["stockStatus"] | Part["stockStatus"]) {
   if (value === "in_stock") {
-    return "Demo in stock";
+    return "In stock";
   }
 
   if (value === "low_stock") {
-    return "Demo low stock";
+    return "Low stock";
   }
 
   if (value === "out_of_stock") {
-    return "Demo out of stock";
+    return "Out of stock";
   }
 
   return "Stock unknown";
+}
+
+function getPartPurchaseUrl(part: Part) {
+  return part.purchaseUrl ?? part.productUrl ?? part.searchUrl ?? part.affiliateLinks?.[0]?.url;
+}
+
+function getPartSpecSummary(part: Part) {
+  return part.specSummary ?? getPartSummarySpecs(part).join(" | ");
+}
+
+function getPartRetailerLabel(part: Part) {
+  return part.owned ? "Already owned" : part.retailer ? formatRetailerName(part.retailer) : null;
 }
 
 function buildCandidate(build: Build, replacement: Part) {
@@ -1257,7 +1269,7 @@ function RetailerResultCard({
           </Button>
           <Button variant="ghost" className="rounded-xl" onClick={() => void handleCheckPrice()}>
             <ShoppingBag className="mr-2 size-4" />
-            Check price
+            View product
           </Button>
           {dealMessage && (
             <p className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2 text-xs text-warning">
@@ -1358,6 +1370,10 @@ function PartCard({
   const delta = getDisplayPrice(part) - getDisplayPrice(selectedPart);
   const candidateBuild = buildCandidate(build, part);
   const deltaBadges = getComparisonDeltaBadges(build, part, selectedPart).slice(0, 3);
+  const retailerLabel = getPartRetailerLabel(part);
+  const stockStatus = part.owned ? null : formatStockStatus(part.stockStatus ?? part.availability);
+  const purchaseUrl = part.owned ? null : getPartPurchaseUrl(part);
+  const specSummary = getPartSpecSummary(part);
 
   return (
     <article
@@ -1383,6 +1399,12 @@ function PartCard({
             <CompatibilityBadge build={candidateBuild} />
           </div>
           <h4 className="font-bold leading-snug">{part.displayName}</h4>
+          {(retailerLabel || stockStatus) && (
+            <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              {retailerLabel && <span>{retailerLabel}</span>}
+              {stockStatus && <span>{stockStatus}</span>}
+            </div>
+          )}
           <p className="mt-2 font-mono text-xl font-bold">
             {part.owned ? "$0" : formatMoney(part.price)}
           </p>
@@ -1397,6 +1419,8 @@ function PartCard({
           </p>
         </div>
       </div>
+
+      {specSummary && <p className="mt-3 text-xs text-muted-foreground">{specSummary}</p>}
 
       <div className="mt-3 flex flex-wrap gap-1.5">
         {getPartSummarySpecs(part)
@@ -1439,6 +1463,14 @@ function PartCard({
             <ArrowRightLeft className="mr-2 size-4" />
             Preview swap
           </Button>
+          {purchaseUrl && (
+            <Button variant="ghost" className="rounded-xl sm:col-span-2" asChild>
+              <a href={purchaseUrl} target="_blank" rel="noreferrer">
+                <ShoppingBag className="mr-2 size-4" />
+                View product
+              </a>
+            </Button>
+          )}
         </div>
       </div>
     </article>
@@ -1715,6 +1747,46 @@ function ComparisonTable({
               {parts.map((part) => (
                 <td key={part.id} className="px-4 py-3 text-muted-foreground">
                   {getDecision(part).tradeOffSummary}
+                </td>
+              ))}
+            </tr>
+            <tr>
+              <td className="px-4 py-3 text-muted-foreground">Product metadata</td>
+              {parts.map((part) => {
+                const retailerLabel = getPartRetailerLabel(part);
+                const stockStatus = part.owned
+                  ? null
+                  : formatStockStatus(part.stockStatus ?? part.availability);
+                const purchaseUrl = part.owned ? null : getPartPurchaseUrl(part);
+
+                return (
+                  <td key={part.id} className="px-4 py-3 text-muted-foreground">
+                    <div className="space-y-1">
+                      <p>{[part.brand, part.model].filter(Boolean).join(" ")}</p>
+                      {(retailerLabel || stockStatus) && (
+                        <p>{[retailerLabel, stockStatus].filter(Boolean).join(" | ")}</p>
+                      )}
+                      {purchaseUrl && (
+                        <a
+                          href={purchaseUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1 text-primary hover:underline"
+                        >
+                          <ShoppingBag className="size-3" />
+                          View product
+                        </a>
+                      )}
+                    </div>
+                  </td>
+                );
+              })}
+            </tr>
+            <tr>
+              <td className="px-4 py-3 text-muted-foreground">Spec summary</td>
+              {parts.map((part) => (
+                <td key={part.id} className="px-4 py-3 text-muted-foreground">
+                  {getPartSpecSummary(part) || "N/A"}
                 </td>
               ))}
             </tr>
@@ -2093,7 +2165,7 @@ function PreviewSwapPanel({
               onClick={() => void handlePreviewAffiliateClick(affiliateLink)}
             >
               <ShoppingBag className="mr-2 size-4" />
-              {affiliateLink.label ?? "Check price"}
+              {affiliateLink.label ?? "View product"}
             </Button>
           )}
           {dealMessage && (

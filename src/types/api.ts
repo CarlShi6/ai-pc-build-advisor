@@ -57,8 +57,12 @@ export interface PartOffer {
   retailer: string;
   estimatedPrice: number;
   availability: PartAvailability;
+  purchaseUrl?: string;
   productUrl?: string;
   searchUrl?: string;
+  stockStatus?: PartAvailability;
+  lastUpdated?: string;
+  specSummary?: string;
   affiliateLinks?: Part["affiliateLinks"];
   note: string;
 }

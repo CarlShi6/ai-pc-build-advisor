@@ -118,8 +118,12 @@ export interface CartPreviewItem {
   retailer: string;
   estimatedPrice: number;
   quantity: number;
+  purchaseUrl?: string;
   productUrl?: string;
   searchUrl?: string;
+  stockStatus?: "in_stock" | "low_stock" | "out_of_stock" | "unknown";
+  lastUpdated?: string;
+  specSummary?: string;
   affiliateLinks?: AffiliateLink[];
   availability?: "in_stock" | "low_stock" | "out_of_stock" | "unknown";
   note?: string;
