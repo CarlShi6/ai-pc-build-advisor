@@ -299,6 +299,12 @@ export function BuildCardInner({
         : createLegacyShoppingListText(rows, total),
     [build, rows, substitutions, total],
   );
+  const scrollToPurchaseReferences = () => {
+    document.getElementById("purchase-reference-list")?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
   const statusMeta =
     status === "pass"
       ? {
@@ -334,7 +340,7 @@ export function BuildCardInner({
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             {build
-              ? `${build.targetUseCase.join(" + ")}. Click any part to compare alternatives.`
+              ? `${build.targetUseCase.join(" + ")}. Use Compare / Replace on any row to review alternatives.`
               : "Tuned for 4K editing and high-FPS gaming. Updated 2 mins ago."}
           </p>
         </div>
@@ -392,7 +398,8 @@ export function BuildCardInner({
           <div>
             <h3 className="text-base font-semibold">Components</h3>
             <p className="text-xs text-muted-foreground">
-              Click any row to view alternatives, or use the action buttons.
+              Compare parts, preview replacements, then open the shopping list or purchase
+              references.
             </p>
           </div>
           <div
@@ -407,7 +414,7 @@ export function BuildCardInner({
           </div>
         </div>
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[860px] text-left">
+          <table className="w-full min-w-[780px] text-left">
             <thead>
               <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
                 <th className="px-6 py-4 font-medium">Category</th>
@@ -419,124 +426,139 @@ export function BuildCardInner({
               </tr>
             </thead>
             <tbody className="divide-y divide-border text-sm">
-              {rows.map((part) => (
-                <tr
-                  key={part.id}
-                  onClick={() => onFocus?.(part.category)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter" || event.key === " ") {
-                      event.preventDefault();
-                      onFocus?.(part.category);
-                    }
-                  }}
-                  role={onFocus ? "button" : undefined}
-                  tabIndex={onFocus ? 0 : undefined}
-                  aria-label={`Compare or replace ${part.categoryLabel}`}
-                  className={cn(
-                    "group transition-colors",
-                    onFocus &&
-                      "cursor-pointer hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
-                    focusedCategory === part.category &&
-                      "bg-primary/10 outline outline-1 -outline-offset-1 outline-primary/50",
-                  )}
-                >
-                  <td className="px-6 py-4 font-mono text-xs">
-                    <span
-                      className={cn(
-                        "rounded-md px-2 py-0.5",
-                        focusedCategory === part.category
-                          ? "bg-primary/20 text-primary"
-                          : "text-muted-foreground",
-                      )}
-                    >
-                      {part.categoryLabel}
-                    </span>
+              {rows.length === 0 ? (
+                <tr>
+                  <td
+                    colSpan={onFocus || onCompare ? 4 : 3}
+                    className="px-6 py-8 text-center text-sm text-muted-foreground"
+                  >
+                    No build parts are selected yet. Ask the advisor for a recommendation to fill
+                    this card.
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="space-y-2">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <span>{part.name}</span>
-                        {part.owned && (
-                          <Badge className="rounded-md bg-success/15 text-[10px] text-success">
-                            Already owned
-                          </Badge>
+                </tr>
+              ) : (
+                rows.map((part) => (
+                  <tr
+                    key={part.id}
+                    onClick={() => onFocus?.(part.category)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        onFocus?.(part.category);
+                      }
+                    }}
+                    role={onFocus ? "button" : undefined}
+                    tabIndex={onFocus ? 0 : undefined}
+                    aria-label={`Compare or replace ${part.categoryLabel}`}
+                    className={cn(
+                      "group transition-colors",
+                      onFocus &&
+                        "cursor-pointer hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                      focusedCategory === part.category &&
+                        "bg-primary/10 outline outline-1 -outline-offset-1 outline-primary/50",
+                    )}
+                  >
+                    <td className="px-6 py-4 font-mono text-xs">
+                      <span
+                        className={cn(
+                          "rounded-md px-2 py-0.5",
+                          focusedCategory === part.category
+                            ? "bg-primary/20 text-primary"
+                            : "text-muted-foreground",
                         )}
-                        {focusedCategory === part.category && (
-                          <Badge className="rounded-md bg-primary/15 text-[10px] text-primary">
-                            <Eye className="mr-1 size-3" /> Currently Viewing
-                          </Badge>
+                      >
+                        {part.categoryLabel}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="space-y-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span>{part.name}</span>
+                          {part.owned && (
+                            <Badge className="rounded-md bg-success/15 text-[10px] text-success">
+                              Already owned
+                            </Badge>
+                          )}
+                          {focusedCategory === part.category && (
+                            <Badge className="rounded-md bg-primary/15 text-[10px] text-primary">
+                              <Eye className="mr-1 size-3" /> Currently Viewing
+                            </Badge>
+                          )}
+                        </div>
+                        {(part.brandModel ||
+                          part.retailer ||
+                          part.stockStatus ||
+                          part.purchaseUrl) && (
+                          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                            {part.brandModel && part.brandModel !== part.name && (
+                              <span>{part.brandModel}</span>
+                            )}
+                            {part.retailer && <span>{part.retailer}</span>}
+                            {part.stockStatus && (
+                              <span
+                                className={cn(
+                                  "rounded-md border px-2 py-0.5",
+                                  part.stockStatus === "In stock" &&
+                                    "border-success/25 bg-success/10 text-success",
+                                  part.stockStatus === "Low stock" &&
+                                    "border-warning/25 bg-warning/10 text-warning",
+                                  part.stockStatus === "Out of stock" &&
+                                    "border-destructive/25 bg-destructive/10 text-destructive",
+                                )}
+                              >
+                                {part.stockStatus}
+                              </span>
+                            )}
+                            {part.purchaseUrl && (
+                              <a
+                                href={part.purchaseUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                                onClick={(event) => event.stopPropagation()}
+                              >
+                                <ExternalLink className="size-3" />
+                                View product
+                              </a>
+                            )}
+                          </div>
+                        )}
+                        {(onFocus || onCompare) && (
+                          <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
+                            <ArrowRightLeft className="size-3" />
+                            Compare or replace this {part.categoryLabel.toLowerCase()}
+                          </div>
+                        )}
+                        {part.specs.length > 0 && (
+                          <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                            {part.specs.map((spec) => (
+                              <span
+                                key={spec}
+                                className="rounded-md border border-border bg-background/60 px-2 py-1"
+                              >
+                                {spec}
+                              </span>
+                            ))}
+                          </div>
                         )}
                       </div>
-                      {(part.brandModel || part.retailer || part.stockStatus || part.purchaseUrl) && (
-                        <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          {part.brandModel && part.brandModel !== part.name && (
-                            <span>{part.brandModel}</span>
-                          )}
-                          {part.retailer && <span>{part.retailer}</span>}
-                          {part.stockStatus && (
-                            <span
-                              className={cn(
-                                "rounded-md border px-2 py-0.5",
-                                part.stockStatus === "In stock" &&
-                                  "border-success/25 bg-success/10 text-success",
-                                part.stockStatus === "Low stock" &&
-                                  "border-warning/25 bg-warning/10 text-warning",
-                                part.stockStatus === "Out of stock" &&
-                                  "border-destructive/25 bg-destructive/10 text-destructive",
-                              )}
-                            >
-                              {part.stockStatus}
-                            </span>
-                          )}
-                          {part.purchaseUrl && (
-                            <a
-                              href={part.purchaseUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-primary hover:underline"
-                              onClick={(event) => event.stopPropagation()}
-                            >
-                              <ExternalLink className="size-3" />
-                              View product
-                            </a>
-                          )}
-                        </div>
-                      )}
-                      {(onFocus || onCompare) && (
-                        <div className="inline-flex w-fit items-center gap-2 rounded-lg border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-medium text-primary">
-                          <ArrowRightLeft className="size-3" />
-                          Compare or replace this {part.categoryLabel.toLowerCase()}
-                        </div>
-                      )}
-                      {part.specs.length > 0 && (
-                        <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                          {part.specs.map((spec) => (
-                            <span
-                              key={spec}
-                              className="rounded-md border border-border bg-background/60 px-2 py-1"
-                            >
-                              {spec}
-                            </span>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-right font-mono">
-                    {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
-                  </td>
-                  {(onFocus || onCompare) && (
-                    <td className="px-6 py-4 text-right">
-                      <RowActions
-                        category={part.category}
-                        categoryLabel={part.categoryLabel}
-                        onCompare={onCompare}
-                        onFocus={onFocus}
-                      />
                     </td>
-                  )}
-                </tr>
-              ))}
+                    <td className="px-6 py-4 text-right font-mono">
+                      {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
+                    </td>
+                    {(onFocus || onCompare) && (
+                      <td className="px-6 py-4 text-right">
+                        <RowActions
+                          category={part.category}
+                          categoryLabel={part.categoryLabel}
+                          onCompare={onCompare}
+                          onFocus={onFocus}
+                        />
+                      </td>
+                    )}
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
@@ -612,29 +634,38 @@ export function BuildCardInner({
               ))}
             </div>
           )}
-          <div className="mt-6 flex gap-4">
-            <Button variant="secondary" className="flex-1 rounded-xl py-6 font-semibold">
-              Save Draft
+          <div className="mt-6 flex flex-wrap gap-3">
+            <Button
+              variant="secondary"
+              className="min-w-[180px] flex-1 rounded-xl py-6 font-semibold"
+              onClick={scrollToPurchaseReferences}
+            >
+              <SaveDraftIcon />
+              Save Build Below
             </Button>
-            <Button className="flex-1 rounded-xl py-6 font-semibold shadow-glow">
+            <Button
+              className="min-w-[180px] flex-1 rounded-xl py-6 font-semibold shadow-glow"
+              onClick={scrollToPurchaseReferences}
+            >
+              <ShoppingBagIcon />
               View Purchase References
             </Button>
             <Collapsible
               open={shoppingListOpen}
               onOpenChange={setShoppingListOpen}
-              className="flex-1"
+              className="min-w-[180px] flex-1"
             >
               <CollapsibleTrigger asChild>
-                <Button variant="secondary" className="flex-1 rounded-xl py-6 font-semibold">
+                <Button variant="secondary" className="w-full rounded-xl py-6 font-semibold">
                   <ListChecks className="mr-2 size-4" />
-                  Review Parts List
+                  Open Shopping List
                 </Button>
               </CollapsibleTrigger>
             </Collapsible>
             {onReportBuildResult && (
               <Button
                 variant="secondary"
-                className="flex-1 rounded-xl py-6 font-semibold"
+                className="min-w-[180px] flex-1 rounded-xl py-6 font-semibold"
                 onClick={onReportBuildResult}
               >
                 Report Build Result
@@ -784,6 +815,7 @@ function ShoppingListPanel({
         .filter((check) => check.severity !== "pass")
         .map((check) => check.message)
     : [];
+  const hasShoppingRows = build ? shoppingParts.length > 0 : rows.length > 0;
 
   return (
     <section className="rounded-2xl border border-border bg-card p-5">
@@ -825,6 +857,18 @@ function ShoppingListPanel({
       </div>
 
       <div className="mt-5 overflow-x-auto rounded-xl border border-border">
+        {!hasShoppingRows ? (
+          <div className="flex items-start gap-3 p-5 text-sm text-muted-foreground">
+            <ListChecks className="mt-0.5 size-4 shrink-0 text-primary" />
+            <div>
+              <p className="font-medium text-foreground">Shopping list is not available yet</p>
+              <p className="mt-1">
+                Generate or refresh a recommendation first. Once parts are selected, this panel
+                shows copy-friendly purchase planning details.
+              </p>
+            </div>
+          </div>
+        ) : (
         <table className="w-full min-w-[1080px] text-left text-sm">
           <thead>
             <tr className="border-b border-border bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
@@ -909,6 +953,7 @@ function ShoppingListPanel({
                 ))}
           </tbody>
         </table>
+        )}
       </div>
 
       <div className="mt-5 grid gap-4 lg:grid-cols-[1fr_1fr]">
@@ -1177,7 +1222,7 @@ function RowActions({
 }) {
   const isPrimary =
     category === "gpu" || category === "cpu" || category === "GPU" || category === "CPU";
-  const compareLabel = isPrimary ? "Compare / Replace" : "Replace";
+  const compareLabel = isPrimary ? "Compare / Replace" : "Find Replacement";
 
   return (
     <div className="flex flex-wrap items-center justify-end gap-2">
@@ -1198,4 +1243,12 @@ function RowActions({
       </span>
     </div>
   );
+}
+
+function SaveDraftIcon() {
+  return <Clipboard className="mr-2 size-4" />;
+}
+
+function ShoppingBagIcon() {
+  return <ExternalLink className="mr-2 size-4" />;
 }
