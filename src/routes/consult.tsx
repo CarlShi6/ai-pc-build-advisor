@@ -915,9 +915,24 @@ function ConsultPage() {
       setCurrentSavedBuildId(null);
       setCurrentFeedbackSummary(undefined);
       handleCompareOpenChange(false);
+      const budgetDelta = nextState.build.budget - nextState.build.totalPrice;
+      const budgetSummary =
+        budgetDelta >= 0
+          ? `$${Math.abs(budgetDelta).toLocaleString()} under budget`
+          : `$${Math.abs(budgetDelta).toLocaleString()} over budget`;
+      const compatibilitySummary =
+        nextState.build.compatibilityStatus === "pass"
+          ? "Compatibility checks pass."
+          : nextState.build.compatibilityStatus === "warning"
+            ? `${nextState.build.compatibilityWarnings.length} compatibility note${nextState.build.compatibilityWarnings.length === 1 ? "" : "s"} need review.`
+            : `${nextState.build.confidenceScore.failCount} blocking compatibility issue${nextState.build.confidenceScore.failCount === 1 ? "" : "s"} must be fixed.`;
+      const nextAction =
+        nextState.build.compatibilityStatus === "pass"
+          ? "Next: review the shopping list."
+          : "Next: review the compatibility notes.";
+      const replacementSummary = `New total $${nextState.build.totalPrice.toLocaleString()}, ${budgetSummary}. ${compatibilitySummary} ${nextAction}`;
       setToast({
-        message:
-          successMessage ?? `Replaced ${categoryLabels[part.category]} with ${part.displayName}.`,
+        message: `${successMessage ?? `Replaced ${categoryLabels[part.category]} with ${part.displayName}.`} ${replacementSummary}`,
         tone: "success",
       });
     } catch {

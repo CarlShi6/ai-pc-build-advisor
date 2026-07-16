@@ -87,6 +87,10 @@ function getValueScore(part: Part) {
     return part.valueScore;
   }
 
+  if (typeof part.valueRating === "number") {
+    return part.valueRating;
+  }
+
   const performanceScore = getPerformanceScore(part);
   const displayPrice = Math.max(getDisplayPrice(part), 1);
 
