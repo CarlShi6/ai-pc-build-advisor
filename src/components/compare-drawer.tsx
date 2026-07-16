@@ -196,6 +196,10 @@ function getValueRating(part: Part) {
     return part.valueScore;
   }
 
+  if (typeof part.valueRating === "number") {
+    return part.valueRating;
+  }
+
   const fit = getPerformanceFit(part);
 
   if (fit !== null) {
@@ -223,6 +227,298 @@ function getDisplayPrice(part: Part) {
 
 function formatSignedNumber(value: number) {
   return value > 0 ? `+${value}` : `${value}`;
+}
+
+type PartDecisionInsight = {
+  part: Part;
+  decision: PartDecisionMetadata;
+  candidateBuild: Build;
+  priceDifference: number;
+  performanceDifference: number | null;
+  powerDifference: number | null;
+  bestFor: string;
+  worthIt: string;
+  favorableSwap: boolean;
+  gains: string[];
+  losses: string[];
+  budgetImpact: string;
+  platformImpact: string;
+  suggestedAction: string;
+};
+
+function getUseCaseFit(part: Part) {
+  const gaming = getNumberSpec(part, ["gaming4kScore", "gaming1440pScore", "gamingScore"]);
+  const productivity = getNumberSpec(part, ["productivityScore"]);
+
+  if (part.category === "gpu") {
+    const vram = getNumberSpec(part, ["vramGb"]);
+
+    if ((productivity ?? 0) > (gaming ?? 0) && (vram ?? 0) >= 16) {
+      return "Best for GPU-accelerated creator work, rendering, and high-VRAM workloads.";
+    }
+
+    if ((gaming ?? 0) >= 90) {
+      return "Best for high-refresh 1440p or demanding 4K gaming.";
+    }
+
+    return "Best for balanced mainstream gaming without overspending on the graphics tier.";
+  }
+
+  if (part.category === "cpu") {
+    if ((productivity ?? 0) > (gaming ?? 0) + 5) {
+      return "Best for creator work, compiling, streaming, and heavy multitasking.";
+    }
+
+    if ((gaming ?? 0) > (productivity ?? 0) + 5) {
+      return "Best for gaming-focused builds where frame-rate performance matters most.";
+    }
+
+    return "Best for a balanced mix of gaming, general use, and productivity.";
+  }
+
+  return (
+    part.recommendationReason ??
+    `Best for builds that prioritize this ${categoryLabels[part.category].toLowerCase()} configuration.`
+  );
+}
+
+function getPlatformImpact(candidateBuild: Build, part: Part) {
+  const relatedCategories =
+    part.category === "gpu"
+      ? ["gpu", "psu", "case"]
+      : part.category === "cpu"
+        ? ["cpu", "motherboard", "ram", "cooler"]
+        : [part.category];
+  const relevantChecks = candidateBuild.compatibilityChecks.filter((check) =>
+    check.checkedPartCategories.some((category) => relatedCategories.includes(category)),
+  );
+  const issues = relevantChecks.filter(
+    (check) => check.severity === "warning" || check.severity === "fail",
+  );
+
+  if (issues.length > 0) {
+    return issues.map((check) => check.message).join(" ");
+  }
+
+  if (part.category === "gpu") {
+    return "No PSU or case compatibility change is flagged by the available checks.";
+  }
+
+  if (part.category === "cpu") {
+    return "No motherboard, memory, or cooler compatibility change is flagged by the available checks.";
+  }
+
+  return "No supporting-part compatibility change is flagged by the available checks.";
+}
+
+function getPartDecisionInsight(
+  build: Build,
+  currentPart: Part,
+  part: Part,
+  decision: PartDecisionMetadata,
+): PartDecisionInsight {
+  const candidateBuild = buildCandidate(build, part);
+  const priceDifference = getDisplayPrice(part) - getDisplayPrice(currentPart);
+  const performance = getPerformanceFit(part);
+  const currentPerformance = getPerformanceFit(currentPart);
+  const performanceDifference =
+    performance !== null && currentPerformance !== null ? performance - currentPerformance : null;
+  const power = getNumberSpec(part, ["powerDrawW", "tdpW", "wattageW"]);
+  const currentPower = getNumberSpec(currentPart, ["powerDrawW", "tdpW", "wattageW"]);
+  const powerDifference = power !== null && currentPower !== null ? power - currentPower : null;
+  const gains: string[] = [];
+  const losses: string[] = [];
+
+  if (performanceDifference !== null && performanceDifference !== 0) {
+    (performanceDifference > 0 ? gains : losses).push(
+      `${Math.abs(performanceDifference)} points of measured performance fit`,
+    );
+  }
+
+  const gaming = getNumberSpec(part, ["gaming4kScore", "gaming1440pScore", "gamingScore"]);
+  const currentGaming = getNumberSpec(currentPart, [
+    "gaming4kScore",
+    "gaming1440pScore",
+    "gamingScore",
+  ]);
+  if (gaming !== null && currentGaming !== null && gaming !== currentGaming) {
+    (gaming > currentGaming ? gains : losses).push(
+      `${Math.abs(gaming - currentGaming)} points of gaming fit`,
+    );
+  }
+
+  const productivity = getNumberSpec(part, ["productivityScore"]);
+  const currentProductivity = getNumberSpec(currentPart, ["productivityScore"]);
+  if (
+    productivity !== null &&
+    currentProductivity !== null &&
+    productivity !== currentProductivity
+  ) {
+    (productivity > currentProductivity ? gains : losses).push(
+      `${Math.abs(productivity - currentProductivity)} points of creator/productivity fit`,
+    );
+  }
+
+  const capacity = getNumberSpec(part, ["vramGb", "capacityGb", "capacityTb", "cores"]);
+  const currentCapacity = getNumberSpec(currentPart, [
+    "vramGb",
+    "capacityGb",
+    "capacityTb",
+    "cores",
+  ]);
+  if (capacity !== null && currentCapacity !== null && capacity !== currentCapacity) {
+    const label =
+      part.category === "gpu"
+        ? "GB of VRAM"
+        : part.category === "cpu"
+          ? "CPU cores"
+          : "capacity units";
+    (capacity > currentCapacity ? gains : losses).push(
+      `${Math.abs(capacity - currentCapacity)} ${label}`,
+    );
+  }
+
+  if (priceDifference < 0) {
+    gains.push(`${formatMoney(Math.abs(priceDifference))} back in the build budget`);
+  } else if (priceDifference > 0) {
+    losses.push(`${formatMoney(priceDifference)} of budget headroom`);
+  }
+
+  if (powerDifference !== null && powerDifference !== 0) {
+    (powerDifference < 0 ? gains : losses).push(
+      `${Math.abs(powerDifference)}W ${powerDifference < 0 ? "less" : "more"} listed power demand`,
+    );
+  }
+
+  if (gains.length === 0) {
+    gains.push("A same-category alternative with a similar measured fit");
+  }
+  if (losses.length === 0) {
+    losses.push("No major measurable downside in the available catalog data");
+  }
+
+  const budgetDelta = build.budget - candidateBuild.totalPrice;
+  const budgetImpact =
+    budgetDelta >= 0
+      ? `${formatMoney(candidateBuild.totalPrice)} total, ${formatMoney(budgetDelta)} under budget.`
+      : `${formatMoney(candidateBuild.totalPrice)} total, ${formatMoney(Math.abs(budgetDelta))} over budget.`;
+  const compatibilitySafe = candidateBuild.compatibilityStatus !== "fail";
+  let worthIt: string;
+  let favorableSwap = false;
+
+  if (part.id === currentPart.id) {
+    worthIt =
+      "Keep it if the current performance target is already met; changing parts is optional.";
+    favorableSwap = true;
+  } else if (!compatibilitySafe) {
+    worthIt = "Not yet — resolve the blocking compatibility issue before considering this swap.";
+  } else if (priceDifference <= 0 && (performanceDifference ?? 0) >= 0) {
+    worthIt = "Yes — it is no more expensive and does not give up measured performance fit.";
+    favorableSwap = true;
+  } else if (
+    priceDifference < 0 &&
+    candidateBuild.compatibilityStatus === "pass" &&
+    build.compatibilityStatus !== "pass" &&
+    Math.abs(priceDifference) >= 100
+  ) {
+    worthIt = `Yes for budget and compatibility — it saves ${formatMoney(Math.abs(priceDifference))} and clears the current warning, but gives up ${Math.abs(performanceDifference ?? 0)} points of measured performance fit.`;
+    favorableSwap = true;
+  } else if (
+    priceDifference < 0 &&
+    build.totalPrice > build.budget &&
+    candidateBuild.totalPrice <= build.budget &&
+    (performanceDifference ?? 0) >= -10
+  ) {
+    worthIt = `Yes for value — it saves ${formatMoney(Math.abs(priceDifference))}, brings the build within budget, and gives up only ${Math.abs(performanceDifference ?? 0)} points of measured performance fit.`;
+    favorableSwap = true;
+  } else if (priceDifference < 0 && (performanceDifference ?? 0) > -6) {
+    worthIt =
+      "Yes for value — the savings are meaningful and the measured performance loss is small.";
+    favorableSwap = true;
+  } else if (priceDifference > 0 && (performanceDifference ?? 0) > 0) {
+    const costPerPoint = priceDifference / Math.max(performanceDifference ?? 1, 1);
+    favorableSwap = costPerPoint <= 25 && candidateBuild.totalPrice <= build.budget;
+    worthIt = favorableSwap
+      ? "Yes for performance — the gain is proportionate and the full build remains within budget."
+      : "Only if you need the extra performance — the price premium is large for the measured gain or pushes the budget.";
+  } else if (decision.bestValue && candidateBuild.totalPrice <= build.budget) {
+    worthIt = "Yes for value — this is the strongest price-to-fit option in the comparison.";
+    favorableSwap = true;
+  } else {
+    worthIt =
+      "Probably not — the available data does not show a clear gain for the price difference.";
+  }
+
+  return {
+    part,
+    decision,
+    candidateBuild,
+    priceDifference,
+    performanceDifference,
+    powerDifference,
+    bestFor: getUseCaseFit(part),
+    worthIt,
+    favorableSwap,
+    gains: gains.slice(0, 4),
+    losses: losses.slice(0, 4),
+    budgetImpact,
+    platformImpact: getPlatformImpact(candidateBuild, part),
+    suggestedAction:
+      part.id === currentPart.id
+        ? "Keep the current part, or compare a highlighted alternative for a different priority."
+        : candidateBuild.compatibilityStatus === "fail"
+          ? "Review the blocking compatibility check before replacing this part."
+          : "Preview the swap, then confirm the new total and compatibility notes.",
+  };
+}
+
+function getQuickVerdict(
+  build: Build,
+  parts: Part[],
+  currentPart: Part,
+  preferredPartIds: Array<string | null | undefined>,
+) {
+  const uniqueParts = Array.from(
+    new Map([currentPart, ...parts].map((part) => [part.id, part])).values(),
+  );
+  const decisions = getPartDecisionMetadata(build, uniqueParts, currentPart);
+  const preferredIds = preferredPartIds.filter((id): id is string => Boolean(id));
+  const scored = uniqueParts.map((part) => {
+    const decision =
+      decisions.find((item) => item.partId === part.id) ??
+      getPartDecisionMetadata(build, [part], currentPart)[0];
+    const insight = getPartDecisionInsight(build, currentPart, part, decision);
+    const preferredIndex = preferredIds.indexOf(part.id);
+    const score =
+      (decision.compatibilityImpact.status === "pass"
+        ? 24
+        : decision.compatibilityImpact.status === "warning"
+          ? 8
+          : -100) +
+      (decision.bestValue ? 8 : 0) +
+      (decision.bestPerformance ? 5 : 0) +
+      (decision.bestBudgetFit ? 7 : 0) +
+      (decision.beginnerFriendly ? 5 : 0) +
+      (insight.candidateBuild.totalPrice <= build.budget ? 4 : -6) +
+      (part.id === currentPart.id ? 2 : 0) +
+      (preferredIndex >= 0 ? 40 - preferredIndex : 0);
+
+    return { part, decision, insight, score };
+  });
+  const best = scored.sort((left, right) => right.score - left.score)[0];
+  const bestAlternative = scored
+    .filter((item) => item.part.id !== currentPart.id)
+    .sort((left, right) => right.score - left.score)[0];
+  const preferredWinner = preferredIds.includes(best?.part.id);
+  const recommended =
+    best && best.part.id !== currentPart.id && !best.insight.favorableSwap && !preferredWinner
+      ? (scored.find((item) => item.part.id === currentPart.id) ?? best)
+      : best;
+
+  return {
+    recommended,
+    comparisonAlternative: recommended?.part.id === currentPart.id ? bestAlternative : recommended,
+  };
 }
 
 function getComparisonDeltaBadges(build: Build, part: Part, selectedPart: Part) {
@@ -639,6 +935,11 @@ export function ComparePanel({
   const displayedTab =
     activeTab === "compare" && selectedCompareParts.length < 2 ? "recommended" : activeTab;
   const canReplacePart = usageStatus?.canReplacePart ?? true;
+  const verdictParts = selectedCompareParts.length >= 2 ? selectedCompareParts : recommendedParts;
+  const quickVerdict = getQuickVerdict(build, verdictParts, currentSelectedPart, [
+    recommendedReplacementId,
+    recommendedSubstitution?.substitutePartId,
+  ]);
 
   function toggleComparePart(part: Part) {
     setSelectedIds((current) => {
@@ -750,7 +1051,25 @@ export function ComparePanel({
       </div>
 
       <div ref={drawerBodyRef} className="min-h-0 flex-1 overflow-y-auto px-4 pb-20 pt-4 xl:px-6">
-        <CurrentSelection build={build} part={selectedPart} plan={plan} onUpgraded={onUpgraded} />
+        {quickVerdict.recommended && (
+          <QuickVerdictSection
+            currentPart={currentSelectedPart}
+            verdict={quickVerdict.recommended}
+            onPreviewSwap={previewSwap}
+          />
+        )}
+
+        {quickVerdict.comparisonAlternative && (
+          <DecisionSummaryArea
+            build={build}
+            currentPart={currentSelectedPart}
+            alternative={quickVerdict.comparisonAlternative}
+          />
+        )}
+
+        <div className="mt-4">
+          <CurrentSelection build={build} part={selectedPart} plan={plan} onUpgraded={onUpgraded} />
+        </div>
 
         {recommendedReplacementId && (
           <div className="mt-4 rounded-xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
@@ -1036,6 +1355,200 @@ function RecommendedSwapPanel({
         </Button>
       </div>
     </section>
+  );
+}
+
+function QuickVerdictSection({
+  currentPart,
+  verdict,
+  onPreviewSwap,
+}: {
+  currentPart: Part;
+  verdict: {
+    part: Part;
+    decision: PartDecisionMetadata;
+    insight: PartDecisionInsight;
+  };
+  onPreviewSwap: (part: Part) => void;
+}) {
+  const recommendsCurrent = verdict.part.id === currentPart.id;
+
+  return (
+    <section className="rounded-2xl border border-success/30 bg-gradient-to-br from-success/10 via-card to-primary/5 p-5">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
+          <Badge className="rounded-md border border-success/30 bg-success/15 text-success">
+            <Sparkles className="mr-1 size-3" /> Quick Verdict
+          </Badge>
+          <p className="mt-4 text-xs uppercase tracking-[0.2em] text-muted-foreground">
+            Recommended option
+          </p>
+          <h3 className="mt-1 text-xl font-bold">{verdict.part.displayName}</h3>
+          <p className="mt-2 max-w-3xl text-sm text-muted-foreground">
+            {verdict.decision.recommendationReason}
+          </p>
+        </div>
+        {recommendsCurrent ? (
+          <Badge variant="secondary" className="rounded-md px-3 py-2">
+            Keep current part
+          </Badge>
+        ) : (
+          <Button className="rounded-xl shadow-glow" onClick={() => onPreviewSwap(verdict.part)}>
+            <ArrowRightLeft className="mr-2 size-4" /> Preview recommended swap
+          </Button>
+        )}
+      </div>
+
+      <div className="mt-5 grid gap-3 lg:grid-cols-3">
+        <VerdictDetail label="Why this choice" value={verdict.decision.tradeOffSummary} />
+        <VerdictDetail label="Best for" value={verdict.insight.bestFor} />
+        <VerdictDetail label="Worth the difference?" value={verdict.insight.worthIt} />
+      </div>
+    </section>
+  );
+}
+
+function VerdictDetail({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-xl border border-border/80 bg-background/70 p-3">
+      <p className="text-xs uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="mt-2 text-sm font-medium leading-relaxed">{value}</p>
+    </div>
+  );
+}
+
+function DecisionSummaryArea({
+  build,
+  currentPart,
+  alternative,
+}: {
+  build: Build;
+  currentPart: Part;
+  alternative: {
+    part: Part;
+    decision: PartDecisionMetadata;
+    insight: PartDecisionInsight;
+  };
+}) {
+  const pairDecisions = getPartDecisionMetadata(
+    build,
+    [currentPart, alternative.part],
+    currentPart,
+  );
+  const currentDecision =
+    pairDecisions.find((decision) => decision.partId === currentPart.id) ?? pairDecisions[0];
+  const currentInsight = getPartDecisionInsight(build, currentPart, currentPart, currentDecision);
+  const alternativeDecision =
+    pairDecisions.find((decision) => decision.partId === alternative.part.id) ??
+    alternative.decision;
+  const alternativeInsight = getPartDecisionInsight(
+    build,
+    currentPart,
+    alternative.part,
+    alternativeDecision,
+  );
+
+  return (
+    <section className="mt-4 rounded-2xl border border-border bg-card/60 p-4">
+      <div>
+        <h3 className="text-base font-semibold">Decision summary</h3>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Current baseline versus the leading alternative, including full-build impact.
+        </p>
+      </div>
+      <div className="mt-4 grid gap-3 xl:grid-cols-2">
+        <DecisionOptionCard insight={currentInsight} isCurrent />
+        <DecisionOptionCard insight={alternativeInsight} />
+      </div>
+    </section>
+  );
+}
+
+function DecisionOptionCard({
+  insight,
+  isCurrent = false,
+}: {
+  insight: PartDecisionInsight;
+  isCurrent?: boolean;
+}) {
+  const { part, decision, candidateBuild } = insight;
+  const performanceFit = getPerformanceFit(part);
+  const valueRating = part.valueRating ?? part.valueScore ?? getValueRating(part);
+  const power = getNumberSpec(part, ["powerDrawW", "tdpW", "wattageW"]);
+
+  return (
+    <article
+      className={cn(
+        "rounded-xl border p-4",
+        isCurrent ? "border-primary/30 bg-primary/5" : "border-success/30 bg-success/[0.05]",
+      )}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <Badge
+            className={cn(
+              "rounded-md",
+              isCurrent ? "bg-primary/15 text-primary" : "bg-success/15 text-success",
+            )}
+          >
+            {isCurrent ? "Current part" : "Leading alternative"}
+          </Badge>
+          <h4 className="mt-3 font-bold">{part.displayName}</h4>
+          <p className="mt-1 font-mono text-lg font-bold">{formatMoney(getDisplayPrice(part))}</p>
+        </div>
+        {!isCurrent && (
+          <DeltaBadge
+            label={
+              insight.priceDifference === 0
+                ? "Same price"
+                : `${formatSignedMoney(insight.priceDifference)} vs current`
+            }
+            tone={insight.priceDifference <= 0 ? "success" : "warning"}
+          />
+        )}
+      </div>
+
+      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+        <DecisionMetric
+          label="Performance fit"
+          value={
+            performanceFit !== null
+              ? `${performanceFit}/100${insight.performanceDifference && !isCurrent ? ` (${formatSignedNumber(insight.performanceDifference)})` : ""}`
+              : "Category fit"
+          }
+        />
+        <DecisionMetric label="Value rating" value={`${valueRating}/100`} />
+        <DecisionMetric label="Budget impact" value={insight.budgetImpact} />
+        <DecisionMetric
+          label="Power impact"
+          value={
+            power !== null
+              ? `${power}W${insight.powerDifference && !isCurrent ? ` (${formatSignedNumber(insight.powerDifference)}W)` : ""}`
+              : getPartPowerRequirement(part)
+          }
+        />
+      </div>
+
+      <div className="mt-3 rounded-lg border border-border bg-background/60 p-3">
+        <CompatibilityImpactBadge impact={decision.compatibilityImpact} />
+        <p className="mt-2 text-xs text-muted-foreground">{insight.platformImpact}</p>
+        {candidateBuild.compatibilityWarnings.length > 0 && (
+          <p className="mt-1 text-xs text-warning">
+            {candidateBuild.compatibilityWarnings.length} compatibility note
+            {candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} to review.
+          </p>
+        )}
+      </div>
+    </article>
+  );
+}
+
+function DecisionMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-border bg-background/60 px-3 py-2">
+      <p className="text-[11px] uppercase tracking-[0.14em] text-muted-foreground">{label}</p>
+      <p className="mt-1 text-sm font-medium leading-snug">{value}</p>
+    </div>
   );
 }
 
@@ -1621,7 +2134,13 @@ function CompareTab({
 
   return (
     <div className="space-y-4">
-      <DecisionSummary parts={parts} decisions={decisionMetadata} />
+      <TradeoffSections
+        build={build}
+        parts={parts}
+        selectedPart={selectedPart}
+        decisions={decisionMetadata}
+        onPreviewSwap={onPreviewSwap}
+      />
       <ComparisonTable
         build={build}
         fields={getCategoryComparisonFields(selectedPart.category)}
@@ -1637,41 +2156,117 @@ function CompareTab({
   );
 }
 
-function DecisionSummary({
+function TradeoffSections({
+  build,
   parts,
+  selectedPart,
   decisions,
+  onPreviewSwap,
 }: {
+  build: Build;
   parts: Part[];
+  selectedPart: Part;
   decisions: PartDecisionMetadata[];
+  onPreviewSwap: (part: Part) => void;
 }) {
+  const alternatives = parts.filter((part) => part.id !== selectedPart.id);
+
   return (
     <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
-      <div className="mb-3">
-        <h3 className="text-base font-semibold">Decision guide</h3>
+      <div className="mb-4">
+        <h3 className="text-base font-semibold">Tradeoffs that change the decision</h3>
         <p className="mt-1 text-xs text-muted-foreground">
-          Rule-based labels from price, budget, performance, power, and compatibility checks.
+          Each alternative is evaluated against the current part and the full build, not only its
+          raw specifications.
         </p>
       </div>
-      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {decisions.map((decision) => {
-          const part = parts.find((candidate) => candidate.id === decision.partId);
-
-          if (!part) {
-            return null;
-          }
+      <div className="grid gap-4 xl:grid-cols-2">
+        {alternatives.map((part) => {
+          const decision =
+            decisions.find((candidate) => candidate.partId === part.id) ??
+            getPartDecisionMetadata(build, [part], selectedPart)[0];
+          const insight = getPartDecisionInsight(build, selectedPart, part, decision);
 
           return (
-            <article key={decision.partId} className="rounded-xl border border-border bg-card p-3">
-              <div className="mb-2 flex flex-wrap gap-1.5">
-                <DecisionBadges decision={decision} />
+            <article key={part.id} className="rounded-xl border border-border bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <div className="mb-2 flex flex-wrap gap-1.5">
+                    <DecisionBadges decision={decision} />
+                  </div>
+                  <h4 className="font-semibold leading-snug">{part.displayName}</h4>
+                  <p className="mt-1 text-sm text-muted-foreground">{insight.bestFor}</p>
+                </div>
+                <DeltaBadge
+                  label={formatSignedMoney(insight.priceDifference)}
+                  tone={insight.priceDifference <= 0 ? "success" : "warning"}
+                />
               </div>
-              <h4 className="text-sm font-semibold leading-snug">{part.displayName}</h4>
-              <p className="mt-2 text-xs text-muted-foreground">{decision.recommendationReason}</p>
+
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                <TradeoffList title="What you gain" items={insight.gains} tone="gain" />
+                <TradeoffList title="What you lose" items={insight.losses} tone="loss" />
+              </div>
+
+              <div className="mt-3 space-y-2 rounded-xl border border-border bg-background/60 p-3 text-xs">
+                <p>
+                  <span className="font-semibold text-foreground">Budget:</span>{" "}
+                  <span className="text-muted-foreground">{insight.budgetImpact}</span>
+                </p>
+                <p>
+                  <span className="font-semibold text-foreground">PSU / case / platform:</span>{" "}
+                  <span className="text-muted-foreground">{insight.platformImpact}</span>
+                </p>
+                <p>
+                  <span className="font-semibold text-foreground">Worth it:</span>{" "}
+                  <span className="text-muted-foreground">{insight.worthIt}</span>
+                </p>
+              </div>
+
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="max-w-md text-xs text-muted-foreground">{insight.suggestedAction}</p>
+                <Button className="rounded-xl" onClick={() => onPreviewSwap(part)}>
+                  Preview swap
+                </Button>
+              </div>
             </article>
           );
         })}
       </div>
     </section>
+  );
+}
+
+function TradeoffList({
+  title,
+  items,
+  tone,
+}: {
+  title: string;
+  items: string[];
+  tone: "gain" | "loss";
+}) {
+  return (
+    <div
+      className={cn(
+        "rounded-xl border p-3",
+        tone === "gain"
+          ? "border-success/25 bg-success/[0.06]"
+          : "border-warning/25 bg-warning/[0.06]",
+      )}
+    >
+      <p className={cn("text-sm font-semibold", tone === "gain" ? "text-success" : "text-warning")}>
+        {title}
+      </p>
+      <ul className="mt-2 space-y-1.5 text-xs text-muted-foreground">
+        {items.map((item) => (
+          <li key={item} className="flex gap-2">
+            <span aria-hidden="true">{tone === "gain" ? "+" : "−"}</span>
+            <span>{item}</span>
+          </li>
+        ))}
+      </ul>
+    </div>
   );
 }
 
@@ -2047,6 +2642,13 @@ function PreviewSwapPanel({
     getPartDecisionMetadata(build, [currentPart, previewPart], currentPart).find(
       (item) => item.partId === previewPart.id,
     ) ?? getPartDecisionMetadata(build, [previewPart], currentPart)[0];
+  const budgetDelta = build.budget - candidateBuild.totalPrice;
+  const compatibilityNote =
+    candidateBuild.compatibilityStatus === "pass"
+      ? "All available compatibility checks pass."
+      : candidateBuild.compatibilityStatus === "warning"
+        ? `${candidateBuild.compatibilityWarnings.length} compatibility note${candidateBuild.compatibilityWarnings.length === 1 ? "" : "s"} need review.`
+        : `${candidateBuild.confidenceScore.failCount} blocking compatibility issue${candidateBuild.confidenceScore.failCount === 1 ? "" : "s"} must be fixed.`;
   const [dealMessage, setDealMessage] = useState<string | null>(null);
 
   async function handlePreviewAffiliateClick(link: AffiliateLink) {
@@ -2125,6 +2727,26 @@ function PreviewSwapPanel({
           </div>
         </div>
         <InfoRow label="Power requirement" value={getPartPowerRequirement(previewPart)} />
+      </div>
+
+      <div className="mt-3 grid gap-3 lg:grid-cols-3">
+        <DecisionMetric
+          label="Budget after replacement"
+          value={
+            budgetDelta >= 0
+              ? `${formatMoney(budgetDelta)} under budget`
+              : `${formatMoney(Math.abs(budgetDelta))} over budget`
+          }
+        />
+        <DecisionMetric label="Full-build compatibility" value={compatibilityNote} />
+        <DecisionMetric
+          label="Suggested next action"
+          value={
+            decision.compatibilityImpact.status === "pass"
+              ? "Replace, then review the shopping list and final total."
+              : "Review the listed compatibility notes before replacing."
+          }
+        />
       </div>
 
       <div className="mt-4 rounded-xl border border-border bg-background/60 p-4">
