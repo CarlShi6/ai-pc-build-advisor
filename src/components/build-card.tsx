@@ -224,7 +224,7 @@ export function PerfStat({
 }) {
   const bar = tone === "success" ? "bg-success" : "bg-primary";
   return (
-    <div className="flex flex-col items-center rounded-2xl border border-border bg-card p-4 text-center">
+    <div className="surface-panel flex flex-col items-center rounded-2xl p-4 text-center">
       <p className="mb-2 text-xs uppercase tracking-widest text-muted-foreground">{label}</p>
       <div className="text-2xl font-bold">{value}</div>
       <div className="mt-3 h-1 w-full overflow-hidden rounded-full bg-secondary">
@@ -393,8 +393,8 @@ export function BuildCardInner({
         />
       )}
 
-      <div className="overflow-hidden rounded-2xl border border-border bg-card">
-        <div className="flex items-center justify-between border-b border-border bg-secondary/40 p-4">
+      <div className="surface-panel overflow-hidden rounded-2xl">
+        <div className="flex items-center justify-between border-b border-border/80 bg-surface-elevated/65 p-4">
           <div>
             <h3 className="text-base font-semibold">Components</h3>
             <p className="text-xs text-muted-foreground">
@@ -451,9 +451,9 @@ export function BuildCardInner({
                     tabIndex={onFocus ? 0 : undefined}
                     aria-label={`Compare or replace ${part.categoryLabel}`}
                     className={cn(
-                      "group transition-colors",
+                      "group transition-colors duration-200",
                       onFocus &&
-                        "cursor-pointer hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
+                        "cursor-pointer hover:bg-surface-elevated/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40",
                       focusedCategory === part.category &&
                         "bg-primary/10 outline outline-1 -outline-offset-1 outline-primary/50",
                     )}
@@ -534,7 +534,7 @@ export function BuildCardInner({
                             {part.specs.map((spec) => (
                               <span
                                 key={spec}
-                                className="rounded-md border border-border bg-background/60 px-2 py-1"
+                                className="rounded-md border border-border/80 bg-surface-subtle px-2 py-1"
                               >
                                 {spec}
                               </span>
@@ -565,7 +565,7 @@ export function BuildCardInner({
       </div>
 
       {!compact && (
-        <div className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
+        <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.08] via-card to-card p-6 shadow-card">
           <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-center">
             <div>
               <h4 className="text-lg font-bold text-primary">Build Insight</h4>
@@ -818,7 +818,7 @@ function ShoppingListPanel({
   const hasShoppingRows = build ? shoppingParts.length > 0 : rows.length > 0;
 
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="surface-panel rounded-2xl p-5">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <Badge className="mb-3 rounded-md border border-primary/30 bg-primary/10 text-primary">
@@ -1009,7 +1009,7 @@ function SummaryTile({
   valueClass?: string;
 }) {
   return (
-    <div className="rounded-xl border border-border bg-background/60 p-3">
+    <div className="surface-inset rounded-xl p-3">
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className={cn("mt-1 text-sm font-semibold", valueClass)}>{value}</p>
     </div>
@@ -1035,7 +1035,7 @@ function PostBuildFeedbackSummaryCard({
   onReportBuildResult?: () => void;
 }) {
   return (
-    <section className="rounded-2xl border border-border bg-card p-5">
+    <section className="surface-panel rounded-2xl p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 className="text-base font-bold">Post-Build Result</h3>
@@ -1070,7 +1070,7 @@ function PostBuildFeedbackSummaryCard({
 
 function FeedbackMetric({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-border bg-background/60 p-3">
+    <div className="surface-inset rounded-xl p-3">
       <p className="text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
       <p className="mt-1 text-sm font-semibold">{value}</p>
     </div>
@@ -1113,7 +1113,7 @@ function SmartSubstitutions({
   const visibleSuggestions = suggestions.slice(0, 3);
 
   return (
-    <section className="rounded-2xl border border-primary/20 bg-card p-5">
+    <section className="surface-panel rounded-2xl p-5">
       <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -1142,7 +1142,7 @@ function SmartSubstitutions({
           return (
             <article
               key={`${suggestion.originalPartId}-${suggestion.substitutePartId}`}
-              className="flex min-h-56 flex-col rounded-xl border border-border bg-background/60 p-4"
+              className="surface-inset flex min-h-56 flex-col rounded-xl p-4"
             >
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <Badge className="rounded-md bg-primary/15 text-primary">

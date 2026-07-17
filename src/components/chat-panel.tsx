@@ -69,14 +69,14 @@ export function ChatPanel({
   return (
     <aside
       className={cn(
-        "flex h-full min-h-0 w-full flex-col overflow-hidden border-t border-border bg-background/95 backdrop-blur-sm lg:w-[390px] lg:border-l lg:border-t-0 xl:w-[410px]",
+        "flex h-full min-h-0 w-full flex-col overflow-hidden border-t border-border/80 bg-card/88 shadow-elevated backdrop-blur-xl lg:w-[390px] lg:border-l lg:border-t-0 xl:w-[410px]",
         className,
       )}
     >
-      <div className="shrink-0 border-b border-border px-5 py-4">
-        <div className="flex items-center gap-2 text-primary">
+      <div className="shrink-0 border-b border-border/80 bg-surface-subtle/55 px-5 py-4">
+        <div className="flex items-center gap-3">
           <div className="flex size-8 items-center justify-center rounded-lg border border-primary/30 bg-primary/10">
-            <MessageSquareText className="size-4" />
+            <MessageSquareText className="size-4 text-primary" />
           </div>
           <div>
             <p className="text-sm font-semibold">AI Consultation Assistant</p>
@@ -87,7 +87,7 @@ export function ChatPanel({
       </div>
 
       {showStarterPrompts && (
-        <div className="shrink-0 border-b border-border/80 px-5 py-4">
+        <div className="shrink-0 border-b border-border/80 bg-background/25 px-5 py-4">
           <div className="mb-3 flex items-center justify-between gap-3">
             <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">
               Demo Starters
@@ -101,7 +101,7 @@ export function ChatPanel({
                 type="button"
                 onClick={() => onSend(reply)}
                 disabled={isGenerating}
-                className="max-w-full rounded-md border border-border bg-card px-3 py-1.5 text-left text-xs leading-snug transition-colors hover:bg-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                className="max-w-full rounded-xl border border-border/80 bg-surface-elevated/65 px-3 py-2 text-left text-xs leading-snug text-foreground transition-all hover:border-primary/30 hover:bg-primary/5 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {reply}
               </button>
@@ -117,7 +117,7 @@ export function ChatPanel({
               <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/15">
                 <span className="text-xs font-bold uppercase text-primary">AI</span>
               </div>
-              <div className="min-w-0 rounded-2xl rounded-tl-none border border-border bg-card p-4">
+              <div className="min-w-0 rounded-2xl rounded-tl-none border border-border/80 bg-surface-elevated/70 p-4 shadow-card">
                 <StructuredAssistantMessage text={m.text} />
                 {m.fallbackUsed && (
                   <p className="mt-2 text-xs text-muted-foreground">
@@ -162,7 +162,7 @@ export function ChatPanel({
             <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-primary/30 bg-primary/15">
               <span className="text-xs font-bold uppercase text-primary">AI</span>
             </div>
-            <div className="rounded-2xl rounded-tl-none border border-border bg-card p-4 text-sm text-muted-foreground">
+            <div className="rounded-2xl rounded-tl-none border border-border/80 bg-surface-elevated/70 p-4 text-sm text-muted-foreground shadow-card">
               <div className="flex items-center gap-2 font-medium text-foreground">
                 <LoaderCircle className="size-4 animate-spin text-primary" />
                 Updating recommendation
@@ -180,7 +180,7 @@ export function ChatPanel({
           e.preventDefault();
           onSend(input);
         }}
-        className="shrink-0 border-t border-border bg-card/85 p-5 backdrop-blur-sm"
+        className="shrink-0 border-t border-border/80 bg-card/95 p-5 shadow-[0_-18px_48px_-36px_rgba(0,0,0,0.9)] backdrop-blur-xl"
       >
         {limitSlot && <div className="mb-4">{limitSlot}</div>}
         {showStarterPrompts && (
@@ -196,7 +196,7 @@ export function ChatPanel({
             onChange={(e) => onInputChange(e.target.value)}
             type="text"
             placeholder="Share budget, use case, preferred look, or brand..."
-            className="w-full rounded-xl border border-border bg-background px-5 py-4 pr-14 text-sm transition-all focus:outline-none focus:ring-2 focus:ring-primary/30 disabled:opacity-60"
+            className="w-full rounded-xl border border-input bg-surface-subtle px-5 py-4 pr-14 text-sm shadow-inner transition-all placeholder:text-muted-foreground/80 focus:border-primary/55 focus:outline-none focus:ring-2 focus:ring-primary/15 disabled:opacity-60"
             disabled={isGenerating}
           />
           <button
