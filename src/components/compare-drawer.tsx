@@ -53,14 +53,14 @@ const CATEGORY_ICONS: Partial<Record<PartCategory, string>> = {
 };
 
 const CATEGORY_VISUALS: Partial<Record<PartCategory, string>> = {
-  cpu: "from-sky-500/20 via-primary/10 to-cyan-500/10",
+  cpu: "from-tech/15 via-primary/10 to-card",
   gpu: "from-emerald-500/20 via-primary/10 to-lime-500/10",
   motherboard: "from-violet-500/20 via-primary/10 to-fuchsia-500/10",
   ram: "from-amber-500/20 via-primary/10 to-yellow-500/10",
-  ssd: "from-teal-500/20 via-primary/10 to-cyan-500/10",
+  ssd: "from-teal-500/15 via-primary/10 to-card",
   psu: "from-rose-500/20 via-primary/10 to-orange-500/10",
   case: "from-slate-500/20 via-primary/10 to-zinc-500/10",
-  cooler: "from-blue-500/20 via-primary/10 to-indigo-500/10",
+  cooler: "from-tech/15 via-primary/10 to-surface-elevated",
 };
 
 function formatMoney(value: number) {
@@ -871,8 +871,8 @@ export function ComparePanel({
     }
 
     return (
-      <aside className="order-2 flex min-h-[70vh] min-w-0 flex-col overflow-hidden border-y border-primary/20 bg-background lg:h-full lg:min-h-0 lg:border-x lg:border-y-0">
-        <div className="flex items-start justify-between gap-4 border-b border-border bg-background/95 px-4 py-5 xl:px-6">
+      <aside className="order-2 flex min-h-[70vh] min-w-0 flex-col overflow-hidden border-y border-border/80 bg-surface-subtle/95 shadow-elevated lg:h-full lg:min-h-0 lg:border-x lg:border-y-0">
+        <div className="flex items-start justify-between gap-4 border-b border-border/80 bg-card/95 px-4 py-5 xl:px-6">
           <div>
             <Badge className="mb-3 w-fit rounded-md border border-primary/30 bg-primary/10 text-primary">
               <Sparkles className="mr-1 size-3" /> AI-assisted Compare
@@ -973,8 +973,8 @@ export function ComparePanel({
   }
 
   return (
-    <aside className="order-2 flex min-h-[70vh] min-w-0 flex-col overflow-hidden border-y border-primary/20 bg-background lg:h-full lg:min-h-0 lg:border-x lg:border-y-0">
-      <div className="sticky top-0 z-20 border-b border-border bg-background/95 px-4 pb-4 pt-5 backdrop-blur xl:px-6">
+    <aside className="order-2 flex min-h-[70vh] min-w-0 flex-col overflow-hidden border-y border-border/80 bg-surface-subtle/95 shadow-elevated lg:h-full lg:min-h-0 lg:border-x lg:border-y-0">
+      <div className="sticky top-0 z-20 border-b border-border/80 bg-card/95 px-4 pb-4 pt-5 backdrop-blur-xl xl:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="space-y-3">
             <Badge className="w-fit rounded-md border border-primary/30 bg-primary/10 text-primary">
@@ -991,7 +991,7 @@ export function ComparePanel({
             </div>
           </div>
           <div className="flex items-start gap-2">
-            <div className="rounded-xl border border-border bg-card px-4 py-3 text-right">
+            <div className="surface-inset rounded-xl px-4 py-3 text-right">
               <p className="text-xs uppercase tracking-widest text-muted-foreground">
                 Current total
               </p>
@@ -1012,7 +1012,7 @@ export function ComparePanel({
         </div>
 
         <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-          <div className="flex rounded-full border border-border bg-card p-1">
+          <div className="flex rounded-full border border-border/80 bg-surface-elevated/80 p-1 shadow-inner">
             {visibleTabs.map(({ key, label, icon: Icon }) => (
               <button
                 key={key}
@@ -1020,8 +1020,8 @@ export function ComparePanel({
                 className={cn(
                   "inline-flex items-center gap-2 rounded-full px-4 py-2 text-sm font-medium transition-colors",
                   displayedTab === key
-                    ? "bg-primary text-primary-foreground shadow-glow"
-                    : "text-muted-foreground hover:text-foreground",
+                    ? "bg-primary/15 text-primary shadow-sm ring-1 ring-primary/25"
+                    : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
                 )}
                 onClick={() => setActiveTab(key as ExplorerTab)}
               >
@@ -1374,7 +1374,7 @@ function QuickVerdictSection({
   const recommendsCurrent = verdict.part.id === currentPart.id;
 
   return (
-    <section className="rounded-2xl border border-success/30 bg-gradient-to-br from-success/10 via-card to-primary/5 p-5">
+    <section className="rounded-2xl border border-success/30 bg-gradient-to-br from-success/12 via-card to-card p-5 shadow-elevated">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <Badge className="rounded-md border border-success/30 bg-success/15 text-success">
@@ -1449,7 +1449,7 @@ function DecisionSummaryArea({
   );
 
   return (
-    <section className="mt-4 rounded-2xl border border-border bg-card/60 p-4">
+    <section className="surface-panel mt-4 rounded-2xl p-4">
       <div>
         <h3 className="text-base font-semibold">Decision summary</h3>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -1480,7 +1480,7 @@ function DecisionOptionCard({
     <article
       className={cn(
         "rounded-xl border p-4",
-        isCurrent ? "border-primary/30 bg-primary/5" : "border-success/30 bg-success/[0.05]",
+        isCurrent ? "border-border bg-surface-elevated/65" : "border-success/30 bg-success/[0.05]",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -1488,7 +1488,9 @@ function DecisionOptionCard({
           <Badge
             className={cn(
               "rounded-md",
-              isCurrent ? "bg-primary/15 text-primary" : "bg-success/15 text-success",
+              isCurrent
+                ? "border-border bg-secondary text-muted-foreground"
+                : "bg-success/15 text-success",
             )}
           >
             {isCurrent ? "Current part" : "Leading alternative"}
@@ -1566,7 +1568,7 @@ function CurrentSelection({
   const hasAdvancedCompare = canUseFeature(plan, "advanced_compare");
 
   return (
-    <section className="rounded-xl border border-primary/20 bg-primary/5 p-4">
+    <section className="surface-panel rounded-2xl p-4">
       <div className="grid gap-4 lg:grid-cols-[72px_1fr_280px] lg:items-center">
         <PartVisual part={part} />
         <div className="min-w-0">
@@ -2188,7 +2190,7 @@ function TradeoffSections({
           const insight = getPartDecisionInsight(build, selectedPart, part, decision);
 
           return (
-            <article key={part.id} className="rounded-xl border border-border bg-card p-4">
+            <article key={part.id} className="surface-inset rounded-xl p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div>
                   <div className="mb-2 flex flex-wrap gap-1.5">
@@ -2682,8 +2684,8 @@ function PreviewSwapPanel({
     <section
       ref={panelRef}
       className={cn(
-        "mt-5 rounded-xl border border-primary/25 bg-primary/5 p-4 transition-all duration-500",
-        isHighlighted && "border-primary/70 bg-primary/10 ring-2 ring-primary/25 shadow-glow",
+        "surface-panel mt-5 rounded-2xl p-4 transition-all duration-500",
+        isHighlighted && "border-primary/60 ring-2 ring-primary/20 shadow-glow",
       )}
     >
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -2854,7 +2856,7 @@ function CompareTray({
   return (
     <div
       ref={trayRef}
-      className="sticky bottom-0 z-20 border-t border-border bg-background/95 px-6 py-2 backdrop-blur"
+      className="sticky bottom-0 z-20 border-t border-border/80 bg-card/95 px-6 py-3 shadow-[0_-18px_48px_-38px_rgba(0,0,0,0.95)] backdrop-blur-xl"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-2">

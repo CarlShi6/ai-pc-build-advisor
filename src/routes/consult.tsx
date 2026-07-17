@@ -991,8 +991,7 @@ function ConsultPage() {
         message,
         conversationHistory: chatMessages
           .filter(
-            (chatMessage) =>
-              chatMessage.role === "user" || chatMessage.id !== "assistant-welcome",
+            (chatMessage) => chatMessage.role === "user" || chatMessage.id !== "assistant-welcome",
           )
           .slice(-8)
           .map((chatMessage) => ({
@@ -1246,7 +1245,7 @@ function ConsultPage() {
   }
 
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-background text-foreground">
+    <div className="app-shell flex h-screen flex-col overflow-hidden bg-background text-foreground">
       <TopBar
         authSession={authSession}
         entitlement={entitlement}
@@ -1262,8 +1261,8 @@ function ConsultPage() {
             : "lg:grid-cols-[minmax(0,1fr)_390px] xl:grid-cols-[minmax(0,1fr)_410px]"
         }`}
       >
-        <section className="order-3 min-h-0 min-w-0 bg-card/30 lg:order-1 lg:overflow-y-auto">
-          <div className="mx-auto max-w-6xl space-y-6 px-6 py-6 md:px-8">
+        <section className="order-3 min-h-0 min-w-0 bg-transparent lg:order-1 lg:overflow-y-auto">
+          <div className="mx-auto max-w-6xl space-y-7 px-5 py-7 sm:px-6 md:px-8 md:py-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <Badge className="mb-3 rounded-md border border-primary/30 bg-primary/10 text-primary">
@@ -1321,12 +1320,12 @@ function ConsultPage() {
               </div>
             ) : build ? (
               <>
-                <section className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+                <section className="surface-panel rounded-2xl p-5">
                   <div className="mb-4 flex items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
                         <Sparkles className="size-4 text-primary" />
-                        <h2 className="text-lg font-bold text-primary">Your Build Needs</h2>
+                        <h2 className="text-lg font-bold">Your Build Needs</h2>
                       </div>
                       <p className="mt-1 text-sm text-muted-foreground">
                         Collected from the guided advisor chat on the right.
@@ -1516,11 +1515,11 @@ function ConsultPage() {
                     </section>
                   )}
 
-                  <section className="rounded-2xl border border-primary/20 bg-primary/5 p-6">
+                  <section className="surface-panel rounded-2xl p-6">
                     <div className="mb-4 flex items-center justify-between gap-3">
                       <div className="flex items-center gap-2">
                         <ShoppingBag className="size-4 text-primary" />
-                        <h2 className="text-xl font-bold text-primary">Recommendation Summary</h2>
+                        <h2 className="text-xl font-bold">Recommendation Summary</h2>
                       </div>
                       {isLoadingDetails && (
                         <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-background/70 px-3 py-1 text-xs text-muted-foreground">
@@ -1556,7 +1555,7 @@ function ConsultPage() {
                         />
                       </div>
                     ) : (
-                      <div className="rounded-2xl border border-primary/15 bg-background/60 p-4 text-sm text-muted-foreground">
+                      <div className="surface-inset rounded-2xl p-4 text-sm text-muted-foreground">
                         {isLoadingDetails
                           ? "Refreshing the recommendation summary..."
                           : "Recommendation summary will appear after the build finishes loading."}
@@ -1565,7 +1564,7 @@ function ConsultPage() {
                   </section>
                 </div>
 
-                <section id="purchase-reference-list" className="rounded-2xl border border-border bg-card p-6">
+                <section id="purchase-reference-list" className="surface-panel rounded-2xl p-6">
                   <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
@@ -1615,7 +1614,9 @@ function ConsultPage() {
                       <div className="flex items-center gap-3 p-5 text-sm text-muted-foreground">
                         <LoaderCircle className="size-4 animate-spin text-primary" />
                         <div>
-                          <p className="font-medium text-foreground">Preparing purchase references</p>
+                          <p className="font-medium text-foreground">
+                            Preparing purchase references
+                          </p>
                           <p className="mt-1">
                             Matching selected parts to demo retailer metadata and price notes.
                           </p>
@@ -1893,7 +1894,7 @@ function ConsultPage() {
 
 function NeedsCard({ label, value, updated }: { label: string; value: string; updated?: boolean }) {
   return (
-    <div className="rounded-2xl border border-primary/15 bg-background/60 p-4">
+    <div className="surface-inset rounded-2xl p-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
         {updated && (
@@ -2102,7 +2103,7 @@ function SavedBuildsPanel({
 
 function SummaryBlock({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-2xl border border-primary/15 bg-background/60 p-4">
+    <div className="surface-inset rounded-2xl p-4">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
       <p className="mt-2 leading-relaxed">{value}</p>
     </div>
@@ -2111,7 +2112,7 @@ function SummaryBlock({ label, value }: { label: string; value: string }) {
 
 function SummaryList({ label, values }: { label: string; values: string[] }) {
   return (
-    <div className="rounded-2xl border border-primary/15 bg-background/60 p-4">
+    <div className="surface-inset rounded-2xl p-4">
       <p className="text-xs uppercase tracking-[0.2em] text-muted-foreground">{label}</p>
       <div className="mt-3 space-y-2">
         {values.map((value) => (
