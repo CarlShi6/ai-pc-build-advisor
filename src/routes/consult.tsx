@@ -34,6 +34,7 @@ import {
   ApiClientError,
 } from "@/lib/apiClient";
 import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
+import { DEMO_STARTERS } from "@/lib/demo-starters";
 import { mergeCustomerNeeds } from "@/lib/needParser";
 import { getDynamicSubstitutionSuggestions } from "@/lib/substitution-engine";
 import { trackAnalyticsEvent } from "@/lib/analytics";
@@ -77,13 +78,7 @@ const DEFAULT_RECOMMENDATION_INPUT: RecommendedBuildInput = {
   targetUseCase: ["4K video editing", "casual gaming"],
 };
 
-const QUICK_REPLIES = [
-  "Build me a $1500 gaming PC for 1080p/1440p.",
-  "I want a $2000 1440p high refresh gaming PC.",
-  "I want a white aesthetic PC build.",
-  "Should I upgrade from a 5070 Ti to a 5080?",
-  "Give me a cheaper alternative without losing too much performance.",
-];
+const QUICK_REPLIES = [...DEMO_STARTERS];
 
 const INITIAL_CHAT_MESSAGES: ChatMessage[] = [
   {

@@ -270,6 +270,7 @@ describe("price trend UI states and accessibility", () => {
 
     expect(markup).toContain("No price observations");
     expect(markup).not.toContain("$0.00");
+    expect(markup).not.toContain("min-h-[17rem]");
   });
 
   it("maps typed unknown-part API errors to catalog language", () => {
@@ -351,5 +352,18 @@ describe("price trend UI states and accessibility", () => {
     expect(markup).toContain("shipping unknown");
     expect(markup).toContain("Unavailable / not rankable");
     expect(markup).toContain("No comparable price can be ranked");
+  });
+
+  it("keeps successful chart analysis collapsed behind an accessible disclosure", () => {
+    const markup = renderView({
+      key: "cpu-i7-14700k:30d",
+      status: "success",
+      response: response(),
+    });
+
+    expect(markup).toContain("<details");
+    expect(markup).not.toContain("<details open");
+    expect(markup).toContain("Show price chart and trend explanation");
+    expect(markup).toContain("Observation details (1)");
   });
 });
