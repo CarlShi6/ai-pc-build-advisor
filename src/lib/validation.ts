@@ -82,7 +82,7 @@ export function validateBuild(value: unknown): Build {
   }
 
   const selectedCategories = value.parts
-    .filter((part) => !part.owned && !["fan", "accessory"].includes(part.category))
+    .filter((part) => !["fan", "accessory"].includes(part.category))
     .map((part) => part.category);
   if (new Set(selectedCategories).size !== selectedCategories.length) {
     throw new ValidationError("Build payload contains duplicate primary part categories.");

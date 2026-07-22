@@ -50,6 +50,28 @@ describe("validateBuild", () => {
       "Build total does not match the selected parts.",
     );
   });
+
+  it("rejects an owned and selected part in the same primary category", () => {
+    const build = getRecommendedBuildData({ budget: 2_500 });
+    const cpu = build.parts.find((part) => part.category === "cpu");
+
+    expect(cpu).toBeDefined();
+    expect(() =>
+      validateBuild({
+        ...build,
+        parts: [
+          ...build.parts,
+          {
+            ...cpu!,
+            id: "owned-cpu",
+            owned: true,
+            price: 0,
+            source: "user_owned",
+          },
+        ],
+      }),
+    ).toThrow("Build payload contains duplicate primary part categories.");
+  });
 });
 
 describe("validateSafeExternalUrl", () => {

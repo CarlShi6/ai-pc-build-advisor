@@ -41,7 +41,7 @@ Validate and harden the existing public MVP journey from landing page to recomme
 
 ## Analytics Instrumentation
 
-The MVP emits bounded, typed first-party events to `/api/analytics/events`. Event properties are limited to primitive values, key and value lengths are capped, and arbitrary nested data is discarded.
+The MVP emits bounded, typed first-party events to `/api/analytics/events`. Request bodies over 8 KiB are rejected before normalization, event properties are limited to primitive values, key and value lengths are capped, and arbitrary nested data is discarded.
 
 - `landing_cta_clicked`
 - `consultation_load_succeeded`
@@ -67,7 +67,7 @@ The server currently writes accepted events as structured logs. No external anal
 ## Validation Utilities
 
 - Recommendation inputs are normalized and bounded before reaching build-selection logic.
-- Returned builds are checked for required identity, parts, finite prices, unique primary categories, total consistency, compatibility metadata, and confidence score range before entering client state.
+- Returned builds are checked for required identity, parts, finite prices, unique primary categories across both owned and selected parts, total consistency, compatibility metadata, and confidence score range before entering client state.
 - External purchase URLs are restricted to HTTP and HTTPS.
 - Analytics event names and properties are allow-listed and normalized.
 
@@ -77,30 +77,32 @@ Vitest regression coverage verifies:
 
 - Recommendation input normalization and invalid-budget rejection.
 - Generated build acceptance and inconsistent-total rejection.
+- Rejection of owned and selected parts that share a primary category.
 - Safe purchase URL acceptance and executable-scheme rejection.
 - Analytics allow-listing and property sanitization.
 - API-level 400 behavior for invalid recommendation input.
 - API-level acceptance of supported analytics events.
+- API-level rejection of analytics request bodies over 8 KiB.
 
 ## Manual QA Checklist
 
 - [x] Landing page build call to action navigates correctly.
 - [x] Initial recommendation and purchase references load successfully.
 - [x] Advisor send and response states remain usable with the configured provider.
-- [ ] Retrying an advisor prompt does not duplicate the user message.
-- [ ] Rapidly switching compare categories does not show stale alternatives.
+- [x] Retrying a failed advisor prompt keeps a single user chat message and does not duplicate it.
+- [x] Rapid keyboard switching from CPU to GPU compare finishes with GPU-only alternatives and no stale CPU results.
 - [x] GPU compare opens with a populated Quick Verdict and alternatives.
 - [x] Replacement preview and confirmation update build total, compatibility, usage, and purchase references together.
-- [ ] Rapid replacement clicks do not submit duplicate operations.
+- [x] A rapid replacement double-click applies one replacement and consumes one swap.
 - [x] Shopping list opens and remains usable at desktop and 390px widths.
-- [ ] Purchase-reference link validation failure is covered by automated tests, not manual navigation.
-- [ ] Saved build load, rename, delete, and feedback paths still work.
+- [x] An invalid executable-scheme purchase URL shows the intended visible error and opens no tab.
+- [x] Saved build load, rename, delete, and feedback paths complete successfully.
 - [x] No console warning or error occurs during the exercised core flow.
 
 ## Known Limitations
 
 - Retailer prices, availability, and purchase metadata remain demo/reference data rather than live inventory.
-- Analytics events are emitted to structured server logs only; durable storage, dashboards, consent controls, and external analytics integrations remain future work.
+- Analytics events are emitted to structured server logs only. The MVP endpoint has an 8 KiB request cap and bounded normalized fields, but no endpoint-specific authentication or durable rate limiter; deployment-level abuse controls, durable storage, dashboards, consent controls, and external analytics integrations remain future work.
 - The app still uses local/mock fallbacks when production AI or persistence services are not configured.
 - Automated browser end-to-end coverage is not introduced in this milestone; the core journey is covered by build checks, unit/API regression tests, and manual QA.
 - Authentication and checkout remain the existing mock/development implementations where production providers are unavailable.

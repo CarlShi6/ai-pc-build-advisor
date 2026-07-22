@@ -66,6 +66,7 @@ class ApiRouteError extends Error {
 }
 
 const MOCK_BUILD_ID = "mock-build";
+const MAX_ANALYTICS_EVENT_BYTES = 8 * 1024;
 
 function jsonResponse(payload: unknown, init?: ResponseInit) {
   return new Response(JSON.stringify(payload), {
@@ -128,6 +129,24 @@ async function readJson<T>(request: Request): Promise<T> {
   }
 }
 
+async function readBoundedJson<T>(request: Request, maxBytes: number): Promise<T> {
+  const declaredLength = Number(request.headers.get("content-length"));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw new ApiRouteError(413, `Request body must not exceed ${maxBytes} bytes.`);
+  }
+
+  const body = await request.text();
+  if (new TextEncoder().encode(body).byteLength > maxBytes) {
+    throw new ApiRouteError(413, `Request body must not exceed ${maxBytes} bytes.`);
+  }
+
+  try {
+    return JSON.parse(body) as T;
+  } catch {
+    throw new ApiRouteError(400, "Request body must be valid JSON.");
+  }
+}
+
 export async function handleInternalApiRequest(request: Request): Promise<Response | null> {
   const url = new URL(request.url);
   const pathname = normalizeApiPath(url.pathname);
@@ -143,7 +162,7 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["POST"]);
       }
 
-      const input = await readJson<unknown>(request);
+      const input = await readBoundedJson<unknown>(request, MAX_ANALYTICS_EVENT_BYTES);
       const event = normalizeAnalyticsEvent(input, {
         eventId: crypto.randomUUID(),
         occurredAt: new Date().toISOString(),

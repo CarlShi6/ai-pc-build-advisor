@@ -39,4 +39,24 @@ describe("Milestone 34 API validation", () => {
     await expect(response?.json()).resolves.toEqual({ accepted: true });
     expect(console.info).toHaveBeenCalledOnce();
   });
+
+  it("rejects oversized analytics requests before they can amplify structured logs", async () => {
+    vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const response = await handleInternalApiRequest(
+      new Request("http://localhost/api/analytics/events", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          event: "advisor_request_succeeded",
+          padding: "x".repeat(8 * 1024),
+        }),
+      }),
+    );
+
+    expect(response?.status).toBe(413);
+    await expect(response?.json()).resolves.toEqual({
+      message: "Request body must not exceed 8192 bytes.",
+    });
+    expect(console.info).not.toHaveBeenCalled();
+  });
 });
