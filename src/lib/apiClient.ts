@@ -58,15 +58,22 @@ export function getPartPriceHistory(partId: string, range: PriceHistoryRange = "
   );
 }
 
-class ApiClientError extends Error {
+export class ApiClientError extends Error {
   status: number;
   retryable: boolean;
+  code?: string;
 
-  constructor(message: string, status: number, retryable = TRANSIENT_STATUS_CODES.has(status)) {
+  constructor(
+    message: string,
+    status: number,
+    retryable = TRANSIENT_STATUS_CODES.has(status),
+    code?: string,
+  ) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
     this.retryable = retryable;
+    this.code = code;
   }
 }
 
@@ -138,12 +145,25 @@ async function requestJsonOnce<T>(input: string, init: RequestInit | undefined, 
   }
 
   if (!response.ok) {
-    const message =
+    const topLevelMessage =
       payload && typeof payload === "object" && "message" in payload
         ? String(payload.message)
-        : "The request could not be completed.";
+        : null;
+    const nestedError =
+      payload &&
+      typeof payload === "object" &&
+      "error" in payload &&
+      payload.error &&
+      typeof payload.error === "object"
+        ? payload.error
+        : null;
+    const message =
+      nestedError && "message" in nestedError
+        ? String(nestedError.message)
+        : (topLevelMessage ?? "The request could not be completed.");
+    const code = nestedError && "code" in nestedError ? String(nestedError.code) : undefined;
 
-    throw new ApiClientError(message, response.status);
+    throw new ApiClientError(message, response.status, undefined, code);
   }
 
   return payload as T;
@@ -414,4 +434,4 @@ export async function replaceBuildPart(
   };
 }
 
-export { ApiClientError, getRecommendedReplacementForWarning };
+export { getRecommendedReplacementForWarning };

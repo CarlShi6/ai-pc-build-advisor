@@ -26,6 +26,7 @@ import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { AffiliateDisclosure } from "@/components/AffiliateDisclosure";
 import { ProFeatureLock } from "@/components/ProFeatureLock";
+import { PriceTrendPanel } from "@/components/price-trend-panel";
 import {
   AlertTriangle,
   ArrowRightLeft,
@@ -1072,6 +1073,11 @@ export function ComparePanel({
         <div className="mt-4">
           <CurrentSelection build={build} part={selectedPart} plan={plan} onUpgraded={onUpgraded} />
         </div>
+
+        <PriceTrendPanel
+          partId={(previewPart ?? selectedPart).id}
+          partName={(previewPart ?? selectedPart).displayName}
+        />
 
         {recommendedReplacementId && (
           <div className="mt-4 rounded-xl border border-success/25 bg-success/10 px-4 py-3 text-sm text-success">
