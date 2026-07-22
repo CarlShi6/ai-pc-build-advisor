@@ -27,9 +27,9 @@ export function TopBar({
   const planLabel = entitlement?.active && entitlement.plan === "build_pro" ? "Build Pro active" : "Free";
 
   return (
-    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border bg-background/80 px-6 backdrop-blur-md">
+    <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border/80 bg-background/88 px-6 shadow-card backdrop-blur-xl">
       <Link to="/" className="flex items-center gap-3">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-primary shadow-glow">
+        <div className="flex size-8 items-center justify-center rounded-lg border border-primary/40 bg-primary shadow-glow">
           <div className="size-3 rotate-45 rounded-sm bg-primary-foreground" />
         </div>
         <span className="text-lg font-bold tracking-tight">
@@ -37,7 +37,7 @@ export function TopBar({
         </span>
       </Link>
 
-      <nav className="flex rounded-full border border-border bg-card p-1">
+      <nav className="flex rounded-full border border-border/80 bg-surface-elevated/80 p-1 shadow-inner">
         {MODES.map((m) => {
           const active = pathname.startsWith(m.to);
           return (
@@ -47,8 +47,8 @@ export function TopBar({
               className={cn(
                 "rounded-full px-6 py-1.5 text-sm font-medium transition-all",
                 active
-                  ? "bg-primary text-primary-foreground shadow-glow"
-                  : "text-muted-foreground hover:text-foreground",
+                  ? "bg-primary/15 text-primary shadow-sm ring-1 ring-primary/25"
+                  : "text-muted-foreground hover:bg-background/50 hover:text-foreground",
               )}
             >
               {m.label}
@@ -82,7 +82,7 @@ export function TopBar({
           {isSignedIn ? (
             <button
               type="button"
-              className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="rounded-lg border border-border bg-card/50 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"
               onClick={onSignOutClick}
             >
               Sign out
@@ -90,14 +90,14 @@ export function TopBar({
           ) : (
             <button
               type="button"
-              className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground"
+              className="rounded-lg border border-border bg-card/50 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-surface-elevated hover:text-foreground"
               onClick={onSignInClick}
             >
               Sign in
             </button>
           )}
         </div>
-        <div className="size-10 rounded-full border border-border bg-secondary" />
+        <div className="size-10 rounded-full border border-border bg-surface-elevated shadow-inner" />
       </div>
     </header>
   );
