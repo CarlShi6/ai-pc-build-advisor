@@ -1,10 +1,7 @@
 import OpenAI from "openai";
 import { createCandidateBuild } from "@/lib/build-advisor";
 import { getServerConfig } from "@/lib/config.server";
-import {
-  buildAdvisorSystemPrompt,
-  buildResponseQualityContext,
-} from "@/lib/ai/response-quality";
+import { buildAdvisorSystemPrompt, buildResponseQualityContext } from "@/lib/ai/response-quality";
 import {
   normalizeAdvisorActions,
   type AdvisorProviderResponse,
@@ -110,11 +107,27 @@ function getResponseText(response: Awaited<ReturnType<OpenAI["responses"]["creat
     return response.output_text;
   }
 
-  return response.output
-    .flatMap((item) => ("content" in item ? item.content : []))
-    .map((content) => ("text" in content ? content.text : ""))
-    .filter(Boolean)
-    .join("\n");
+  if (!("output" in response) || !Array.isArray(response.output)) {
+    return "";
+  }
+
+  const texts: string[] = [];
+
+  for (const item of response.output) {
+    const contents = "content" in item && Array.isArray(item.content) ? item.content : [];
+
+    for (const content of contents as unknown[]) {
+      if (typeof content !== "object" || content === null || !("text" in content)) {
+        continue;
+      }
+
+      if (typeof content.text === "string" && content.text) {
+        texts.push(content.text);
+      }
+    }
+  }
+
+  return texts.join("\n");
 }
 
 export const openAiAdvisorProvider: AiProvider = {

@@ -409,7 +409,7 @@ export function evaluateCompatibilityRules(build: Build): CompatibilityRuleResul
 
 export function getCompatibilityWarnings(checks: CompatibilityRuleResult[]): CompatibilityWarning[] {
   return checks
-    .filter((check) => check.severity !== "pass")
+    .filter((check): check is CompatibilityRuleResult & { severity: CompatibilityWarning["severity"] } => check.severity !== "pass")
     .map((check) => ({
       id: check.id,
       severity: check.severity,

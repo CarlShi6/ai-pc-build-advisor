@@ -14,6 +14,8 @@ import { clearSessionCookie, createSessionCookie } from "@/lib/persistence/mock-
 import { searchProducts } from "@/lib/product-search/search-service";
 import { runSupabaseSmokeTest } from "@/lib/supabase/smoke-test.server";
 import { createStripeCheckoutSession } from "@/lib/stripe.server";
+import { normalizeAnalyticsEvent } from "@/lib/analytics";
+import { normalizeRecommendedBuildInput, ValidationError } from "@/lib/validation";
 import type {
   AdvisorRequestPayload,
   AdvisorResponsePayload,
@@ -136,6 +138,26 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
   }
 
   try {
+    if (pathname === "/api/analytics/events") {
+      if (request.method !== "POST") {
+        return methodNotAllowed(["POST"]);
+      }
+
+      const input = await readJson<unknown>(request);
+      const event = normalizeAnalyticsEvent(input, {
+        eventId: crypto.randomUUID(),
+        occurredAt: new Date().toISOString(),
+        path: "/",
+      });
+
+      if (!event) {
+        throw new ApiRouteError(400, "Analytics event is invalid or unsupported.");
+      }
+
+      console.info(JSON.stringify({ type: "product_analytics", ...event }));
+      return jsonResponse({ accepted: true }, { status: 202 });
+    }
+
     if (pathname === "/api/auth/session") {
       if (request.method !== "GET") {
         return methodNotAllowed(["GET"]);
@@ -236,7 +258,8 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
         return methodNotAllowed(["POST"]);
       }
 
-      const input = await readJson<RecommendedBuildInput>(request);
+      const rawInput = await readJson<RecommendedBuildInput>(request);
+      const input = normalizeRecommendedBuildInput(rawInput);
       const payload: RecommendBuildResponse = { build: getRecommendedBuildData(input) };
       return jsonResponse(payload);
     }
@@ -630,6 +653,10 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
   } catch (error) {
     if (error instanceof ApiRouteError) {
       return jsonResponse({ message: error.message }, { status: error.status });
+    }
+
+    if (error instanceof ValidationError) {
+      return jsonResponse({ message: error.message }, { status: 400 });
     }
 
     console.error(error);

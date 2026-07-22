@@ -79,6 +79,7 @@ type BuildCardProps = {
   onApplySubstitution?: (part: Part, suggestion: SubstitutionSuggestion) => void;
   feedbackSummary?: PostBuildFeedbackSummary;
   onReportBuildResult?: () => void;
+  onShoppingListOpen?: () => void;
   compact?: boolean;
 };
 
@@ -182,7 +183,7 @@ function getShoppingListParts(build: Build) {
   ).filter((part): part is Part => Boolean(part));
 }
 
-function normalizeRows(build?: Build, parts?: LegacyBuildPart[]) {
+function normalizeRows(build?: Build, parts?: LegacyBuildPart[]): BuildCardRow[] {
   if (build) {
     return build.parts.map((part) => ({
       id: part.id,
@@ -194,7 +195,9 @@ function normalizeRows(build?: Build, parts?: LegacyBuildPart[]) {
       specs: getPartSummarySpecs(part),
       brandModel: getBrandModel(part),
       retailer: part.owned ? undefined : part.retailer,
-      stockStatus: part.owned ? undefined : formatStockStatus(part.stockStatus ?? part.availability),
+      stockStatus: part.owned
+        ? undefined
+        : formatStockStatus(part.stockStatus ?? part.availability),
       purchaseUrl: part.owned ? undefined : getPurchaseUrl(part),
       specSummary: getSpecSummary(part),
     }));
@@ -244,6 +247,7 @@ export function BuildCard({
   onApplySubstitution,
   feedbackSummary,
   onReportBuildResult,
+  onShoppingListOpen,
   compact = false,
 }: BuildCardProps) {
   return (
@@ -257,6 +261,7 @@ export function BuildCard({
       onApplySubstitution={onApplySubstitution}
       feedbackSummary={feedbackSummary}
       onReportBuildResult={onReportBuildResult}
+      onShoppingListOpen={onShoppingListOpen}
       compact={compact}
     />
   );
@@ -272,6 +277,7 @@ export function BuildCardInner({
   onApplySubstitution,
   feedbackSummary,
   onReportBuildResult,
+  onShoppingListOpen,
   compact = false,
 }: BuildCardProps) {
   const [shoppingListOpen, setShoppingListOpen] = useState(false);
@@ -652,7 +658,12 @@ export function BuildCardInner({
             </Button>
             <Collapsible
               open={shoppingListOpen}
-              onOpenChange={setShoppingListOpen}
+              onOpenChange={(open) => {
+                setShoppingListOpen(open);
+                if (open) {
+                  onShoppingListOpen?.();
+                }
+              }}
               className="min-w-[180px] flex-1"
             >
               <CollapsibleTrigger asChild>
@@ -733,7 +744,9 @@ function createShoppingListText({
   parts.forEach((part) => {
     const specs = getPartSummarySpecs(part);
     const retailer = part.owned ? undefined : part.retailer;
-    const stockStatus = part.owned ? undefined : formatStockStatus(part.stockStatus ?? part.availability);
+    const stockStatus = part.owned
+      ? undefined
+      : formatStockStatus(part.stockStatus ?? part.availability);
     const purchaseUrl = part.owned ? undefined : getPurchaseUrl(part);
     const notes = [
       ...getCompatibilityNotesForPart(build, part),
@@ -806,7 +819,9 @@ function ShoppingListPanel({
 }) {
   const shoppingParts = build ? getShoppingListParts(build) : [];
   const estimatedWattage = build ? getEstimatedSystemWattage(shoppingParts) : null;
-  const budgetImpact = build ? formatBudgetImpact(total, build.budget) : "Budget target not provided";
+  const budgetImpact = build
+    ? formatBudgetImpact(total, build.budget)
+    : "Budget target not provided";
   const suggestedNextAction = build
     ? getSuggestedNextAction(build, total)
     : "Generate a current recommendation, then review retailer prices.";
@@ -869,90 +884,90 @@ function ShoppingListPanel({
             </div>
           </div>
         ) : (
-        <table className="w-full min-w-[1080px] text-left text-sm">
-          <thead>
-            <tr className="border-b border-border bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
-              <th className="px-4 py-3 font-medium">Category</th>
-              <th className="px-4 py-3 font-medium">Part</th>
-              <th className="px-4 py-3 font-medium">Key specs</th>
-              <th className="px-4 py-3 font-medium">Retailer</th>
-              <th className="px-4 py-3 font-medium">Stock</th>
-              <th className="px-4 py-3 font-medium">Compatibility / replacement note</th>
-              <th className="px-4 py-3 text-right font-medium">Price</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {build
-              ? shoppingParts.map((part) => {
-                  const purchaseUrl = getPurchaseUrl(part);
-                  const stockStatus = formatStockStatus(part.stockStatus ?? part.availability);
-                  const notes = [
-                    ...getCompatibilityNotesForPart(build, part),
-                    getReplacementNote(part, substitutions),
-                  ].filter(Boolean);
+          <table className="w-full min-w-[1080px] text-left text-sm">
+            <thead>
+              <tr className="border-b border-border bg-secondary/40 text-xs uppercase tracking-wider text-muted-foreground">
+                <th className="px-4 py-3 font-medium">Category</th>
+                <th className="px-4 py-3 font-medium">Part</th>
+                <th className="px-4 py-3 font-medium">Key specs</th>
+                <th className="px-4 py-3 font-medium">Retailer</th>
+                <th className="px-4 py-3 font-medium">Stock</th>
+                <th className="px-4 py-3 font-medium">Compatibility / replacement note</th>
+                <th className="px-4 py-3 text-right font-medium">Price</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border">
+              {build
+                ? shoppingParts.map((part) => {
+                    const purchaseUrl = getPurchaseUrl(part);
+                    const stockStatus = formatStockStatus(part.stockStatus ?? part.availability);
+                    const notes = [
+                      ...getCompatibilityNotesForPart(build, part),
+                      getReplacementNote(part, substitutions),
+                    ].filter(Boolean);
 
-                  return (
+                    return (
+                      <tr key={part.id}>
+                        <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
+                          {categoryLabels[part.category]}
+                        </td>
+                        <td className="px-4 py-3 font-medium">{part.displayName}</td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {getSpecSummary(part) || getPartSummarySpecs(part).join(" | ") || "N/A"}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {part.owned ? (
+                            "Already owned"
+                          ) : (
+                            <div className="space-y-1">
+                              <p>{part.retailer ?? "N/A"}</p>
+                              {purchaseUrl && (
+                                <a
+                                  href={purchaseUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="inline-flex items-center gap-1 text-primary hover:underline"
+                                >
+                                  <ExternalLink className="size-3" />
+                                  View product
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">
+                          {part.owned ? "N/A" : (stockStatus ?? "N/A")}
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground">{notes.join(" ")}</td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
+                        </td>
+                      </tr>
+                    );
+                  })
+                : rows.map((part) => (
                     <tr key={part.id}>
                       <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                        {categoryLabels[part.category]}
+                        {part.categoryLabel}
                       </td>
-                      <td className="px-4 py-3 font-medium">{part.displayName}</td>
+                      <td className="px-4 py-3 font-medium">{part.name}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {getSpecSummary(part) || getPartSummarySpecs(part).join(" | ") || "N/A"}
+                        {part.specs.join(" | ") || "N/A"}
                       </td>
+                      <td className="px-4 py-3 text-muted-foreground">{part.retailer ?? "N/A"}</td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {part.owned ? (
-                          "Already owned"
-                        ) : (
-                          <div className="space-y-1">
-                            <p>{part.retailer ?? "N/A"}</p>
-                            {purchaseUrl && (
-                              <a
-                                href={purchaseUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex items-center gap-1 text-primary hover:underline"
-                              >
-                                <ExternalLink className="size-3" />
-                                View product
-                              </a>
-                            )}
-                          </div>
-                        )}
+                        {part.stockStatus ?? "N/A"}
                       </td>
                       <td className="px-4 py-3 text-muted-foreground">
-                        {part.owned ? "N/A" : stockStatus ?? "N/A"}
+                        Review against the final selected build before purchasing.
                       </td>
-                      <td className="px-4 py-3 text-muted-foreground">{notes.join(" ")}</td>
                       <td className="px-4 py-3 text-right font-mono">
                         {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
                       </td>
                     </tr>
-                  );
-                })
-              : rows.map((part) => (
-                  <tr key={part.id}>
-                    <td className="px-4 py-3 font-mono text-xs text-muted-foreground">
-                      {part.categoryLabel}
-                    </td>
-                    <td className="px-4 py-3 font-medium">{part.name}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {part.specs.join(" | ") || "N/A"}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">{part.retailer ?? "N/A"}</td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      {part.stockStatus ?? "N/A"}
-                    </td>
-                    <td className="px-4 py-3 text-muted-foreground">
-                      Review against the final selected build before purchasing.
-                    </td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {part.owned ? "$0 - Already owned" : formatMoney(part.price)}
-                    </td>
-                  </tr>
-                ))}
-          </tbody>
-        </table>
+                  ))}
+            </tbody>
+          </table>
         )}
       </div>
 

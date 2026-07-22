@@ -2,6 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { ArrowRight, Cpu, GitCompare, ShieldCheck, ShoppingBag, Sparkles } from "lucide-react";
 import { TopBar } from "@/components/top-bar";
 import { Button } from "@/components/ui/button";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -39,12 +40,20 @@ function Landing() {
           </p>
           <div className="mt-10 flex flex-wrap justify-center gap-3">
             <Button asChild size="lg" className="rounded-xl px-6 shadow-glow">
-              <Link to="/consult">
+              <Link
+                to="/consult"
+                onClick={() => trackAnalyticsEvent("landing_cta_clicked", { journey: "build" })}
+              >
                 Start build advisor <ArrowRight className="ml-2 size-4" />
               </Link>
             </Button>
             <Button asChild size="lg" variant="secondary" className="rounded-xl px-6">
-              <Link to="/compare">Compare sample parts</Link>
+              <Link
+                to="/compare"
+                onClick={() => trackAnalyticsEvent("landing_cta_clicked", { journey: "compare" })}
+              >
+                Compare sample parts
+              </Link>
             </Button>
           </div>
 

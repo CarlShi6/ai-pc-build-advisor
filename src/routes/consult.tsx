@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { BuildCard } from "@/components/build-card";
 import { ChatPanel, type ChatMessage } from "@/components/chat-panel";
 import { ComparePanel } from "@/components/compare-drawer";
@@ -36,6 +36,8 @@ import {
 import { canUseFeature, getPlanForEntitlement } from "@/lib/monetization";
 import { mergeCustomerNeeds } from "@/lib/needParser";
 import { getDynamicSubstitutionSuggestions } from "@/lib/substitution-engine";
+import { trackAnalyticsEvent } from "@/lib/analytics";
+import { validateSafeExternalUrl } from "@/lib/validation";
 import type { ActiveCompareContext, AdvisorSuggestedAction } from "@/lib/ai/types";
 import type { CustomerNeeds, RecommendedBuildInput } from "@/types/api";
 import type {
@@ -384,6 +386,7 @@ function ConsultPage() {
   const [customerNeeds, setCustomerNeeds] = useState<CustomerNeeds>({});
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(INITIAL_CHAT_MESSAGES);
   const [chatInput, setChatInput] = useState("");
+  const [failedChatMessage, setFailedChatMessage] = useState<string | null>(null);
   const [toast, setToast] = useState<{
     message: string;
     tone: "success" | "error" | "notice";
@@ -409,6 +412,9 @@ function ConsultPage() {
     useState<SavedBuildSummary["feedbackSummary"]>();
   const [feedbackTarget, setFeedbackTarget] = useState<{ id: string; name: string } | null>(null);
   const [isSavingFeedback, setIsSavingFeedback] = useState(false);
+  const initialLoadRequestId = useRef(0);
+  const compareRequestId = useRef(0);
+  const replacementInFlight = useRef(false);
   const plan = getPlanForEntitlement(entitlement);
   const hasPurchaseChecklist = canUseFeature(plan, "purchase_checklist");
   const hasFullExport = canUseFeature(plan, "build_export");
@@ -436,71 +442,78 @@ function ConsultPage() {
     };
   }, [build, compareCategory, compareParts, customerNeeds.budget, isCompareOpen]);
 
-  useEffect(() => {
-    let active = true;
+  const loadInitialBuild = useCallback(async (isRetry = false) => {
+    const requestId = ++initialLoadRequestId.current;
+    setIsLoadingBuild(true);
+    setIsLoadingDetails(false);
+    setBuildError(null);
+    setDetailsError(null);
 
-    async function loadBuild() {
-      setIsLoadingBuild(true);
-      setIsLoadingDetails(false);
-      setBuildError(null);
-      setDetailsError(null);
-
-      try {
-        const recommendedBuild = await getRecommendedBuild(DEFAULT_RECOMMENDATION_INPUT);
-
-        if (!active) {
-          return;
-        }
-
-        setBuild(recommendedBuild);
-        setCurrentSavedBuildId(null);
-        setCurrentFeedbackSummary(undefined);
-        setIsLoadingBuild(false);
-        setIsLoadingDetails(true);
-
-        try {
-          const preview = await getCartPreview(recommendedBuild);
-
-          if (!active) {
-            return;
-          }
-
-          setCartPreview(preview.items);
-          setEmployeeSummary(preview.employeeSummary);
-        } catch {
-          if (!active) {
-            return;
-          }
-
-          setDetailsError(
-            "The purchase references and recommendation summary could not be loaded from the mock API.",
-          );
-        } finally {
-          if (active) {
-            setIsLoadingDetails(false);
-          }
-        }
-      } catch {
-        if (!active) {
-          return;
-        }
-
-        setBuildError(
-          "The internal recommendation API could not be loaded. Please refresh and try again.",
-        );
-      } finally {
-        if (active) {
-          setIsLoadingBuild(false);
-        }
-      }
+    if (isRetry) {
+      trackAnalyticsEvent("consultation_load_retried");
     }
 
-    void loadBuild();
+    try {
+      const recommendedBuild = await getRecommendedBuild(DEFAULT_RECOMMENDATION_INPUT);
+
+      if (requestId !== initialLoadRequestId.current) {
+        return;
+      }
+
+      setBuild(recommendedBuild);
+      setCurrentSavedBuildId(null);
+      setCurrentFeedbackSummary(undefined);
+      setIsLoadingBuild(false);
+      setIsLoadingDetails(true);
+      trackAnalyticsEvent("consultation_load_succeeded", {
+        build_id: recommendedBuild.id,
+        part_count: recommendedBuild.parts.length,
+      });
+
+      try {
+        const preview = await getCartPreview(recommendedBuild);
+
+        if (requestId !== initialLoadRequestId.current) {
+          return;
+        }
+
+        setCartPreview(preview.items);
+        setEmployeeSummary(preview.employeeSummary);
+      } catch {
+        if (requestId !== initialLoadRequestId.current) {
+          return;
+        }
+
+        setDetailsError(
+          "The purchase references and recommendation summary could not be loaded. Your validated build is still available.",
+        );
+      } finally {
+        if (requestId === initialLoadRequestId.current) {
+          setIsLoadingDetails(false);
+        }
+      }
+    } catch {
+      if (requestId !== initialLoadRequestId.current) {
+        return;
+      }
+
+      setBuildError("The recommendation service could not load a valid build. Retry when ready.");
+      trackAnalyticsEvent("consultation_load_failed");
+    } finally {
+      if (requestId === initialLoadRequestId.current) {
+        setIsLoadingBuild(false);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadInitialBuild();
 
     return () => {
-      active = false;
+      initialLoadRequestId.current += 1;
+      compareRequestId.current += 1;
     };
-  }, []);
+  }, [loadInitialBuild]);
 
   useEffect(() => {
     void refreshAuthState();
@@ -526,6 +539,7 @@ function ConsultPage() {
     setIsCompareOpen(open);
 
     if (!open) {
+      compareRequestId.current += 1;
       setCompareCategory(null);
       setCompareParts([]);
       setCompareError(null);
@@ -843,8 +857,13 @@ function ConsultPage() {
     );
   }
 
-  async function openCompare(category: string, nextRecommendedReplacementId?: string | null) {
+  async function openCompare(
+    category: string,
+    nextRecommendedReplacementId?: string | null,
+    isRetry = false,
+  ) {
     const normalizedCategory = normalizeCategory(category);
+    const requestId = ++compareRequestId.current;
 
     setCompareCategory(normalizedCategory);
     setCompareError(null);
@@ -852,18 +871,36 @@ function ConsultPage() {
     setRecommendedReplacementId(nextRecommendedReplacementId ?? null);
     setIsCompareOpen(true);
     setIsLoadingCompare(true);
+    trackAnalyticsEvent(isRetry ? "compare_load_retried" : "compare_opened", {
+      category: normalizedCategory,
+    });
 
     try {
       const categoryParts = await getPartsByCategory(normalizedCategory);
       const comparedParts = await getCompareParts(categoryParts.map((part) => part.id));
 
+      if (requestId !== compareRequestId.current) {
+        return;
+      }
+
       setCompareParts(comparedParts);
+      trackAnalyticsEvent("compare_load_succeeded", {
+        category: normalizedCategory,
+        alternative_count: comparedParts.length,
+      });
     } catch {
+      if (requestId !== compareRequestId.current) {
+        return;
+      }
+
       setCompareError(
         `The ${normalizedCategory.toUpperCase()} alternatives could not be loaded from the internal API.`,
       );
+      trackAnalyticsEvent("compare_load_failed", { category: normalizedCategory });
     } finally {
-      setIsLoadingCompare(false);
+      if (requestId === compareRequestId.current) {
+        setIsLoadingCompare(false);
+      }
     }
   }
 
@@ -879,11 +916,15 @@ function ConsultPage() {
   }
 
   async function handleReplacePart(part: Part, successMessage?: string) {
-    if (!build) {
+    if (!build || replacementInFlight.current) {
       return;
     }
 
     if (usageStatus && !usageStatus.canReplacePart) {
+      trackAnalyticsEvent("replacement_blocked", {
+        category: part.category,
+        reason: "usage_limit",
+      });
       setShowUsageUpgrade(true);
       setToast({
         message: REPLACEMENT_LIMIT_UPGRADE_COPY,
@@ -892,8 +933,13 @@ function ConsultPage() {
       return;
     }
 
+    replacementInFlight.current = true;
     setIsReplacingPart(true);
     setDetailsError(null);
+    trackAnalyticsEvent("replacement_started", {
+      category: part.category,
+      replacement_id: part.id,
+    });
 
     try {
       const nextState = await replaceBuildPart(build, part);
@@ -901,6 +947,10 @@ function ConsultPage() {
       setUsageStatus(replacementUsage.usage);
 
       if (!replacementUsage.consumed) {
+        trackAnalyticsEvent("replacement_blocked", {
+          category: part.category,
+          reason: "usage_not_consumed",
+        });
         setShowUsageUpgrade(true);
         setToast({
           message: replacementUsage.message ?? REPLACEMENT_LIMIT_UPGRADE_COPY,
@@ -935,6 +985,12 @@ function ConsultPage() {
         message: `${successMessage ?? `Replaced ${categoryLabels[part.category]} with ${part.displayName}.`} ${replacementSummary}`,
         tone: "success",
       });
+      trackAnalyticsEvent("replacement_succeeded", {
+        category: part.category,
+        replacement_id: part.id,
+        total_price: nextState.build.totalPrice,
+        compatibility_status: nextState.build.compatibilityStatus,
+      });
     } catch {
       setDetailsError(
         "The selected part could not be applied through the internal API. Please try again.",
@@ -943,7 +999,12 @@ function ConsultPage() {
         message: `Could not replace ${categoryLabels[part.category]} right now. Please try again.`,
         tone: "error",
       });
+      trackAnalyticsEvent("replacement_failed", {
+        category: part.category,
+        replacement_id: part.id,
+      });
     } finally {
+      replacementInFlight.current = false;
       setIsReplacingPart(false);
     }
   }
@@ -967,31 +1028,40 @@ function ConsultPage() {
     await openCompare(category, recommendedPart?.id ?? null);
   }
 
-  async function handleChatSend(rawMessage: string) {
+  async function handleChatSend(rawMessage: string, isRetry = false) {
     const message = rawMessage.trim();
 
     if (!message || isGeneratingRecommendation) {
       return;
     }
 
-    const userMessage: ChatMessage = {
-      id: createMessageId(),
-      role: "user",
-      text: message,
-    };
+    if (!isRetry) {
+      const userMessage: ChatMessage = {
+        id: createMessageId(),
+        role: "user",
+        text: message,
+      };
+      setChatMessages((current) => [...current, userMessage]);
+    }
 
-    setChatMessages((current) => [...current, userMessage]);
     setChatInput("");
-
+    setFailedChatMessage(null);
     setIsGeneratingRecommendation(true);
     setDetailsError(null);
+    trackAnalyticsEvent(isRetry ? "advisor_request_retried" : "advisor_request_started", {
+      message_length: message.length,
+      has_build: Boolean(build),
+      compare_open: Boolean(activeCompareContext),
+    });
 
     try {
       const advisorResponse = await askAdvisor({
         message,
         conversationHistory: chatMessages
           .filter(
-            (chatMessage) => chatMessage.role === "user" || chatMessage.id !== "assistant-welcome",
+            (chatMessage) =>
+              (chatMessage.role === "user" || chatMessage.id !== "assistant-welcome") &&
+              !chatMessage.id.startsWith("advisor-error-"),
           )
           .slice(-8)
           .map((chatMessage) => ({
@@ -1024,11 +1094,18 @@ function ConsultPage() {
           fallbackUsed: advisorResponse.fallbackUsed,
         },
       ]);
+      trackAnalyticsEvent("advisor_request_succeeded", {
+        provider: advisorResponse.provider,
+        fallback_used: Boolean(advisorResponse.fallbackUsed),
+        action_count: advisorResponse.suggestedActions?.length ?? 0,
+        usage_consumed: advisorResponse.usageConsumed,
+      });
 
       if (!advisorResponse.usageConsumed) {
         return;
       }
     } catch {
+      setFailedChatMessage(message);
       setDetailsError(
         "Advisor request failed. The current build is still available, and compare, replacement, and shopping-list tools remain usable.",
       );
@@ -1039,11 +1116,15 @@ function ConsultPage() {
       setChatMessages((current) => [
         ...current,
         {
-          id: createMessageId(),
+          id: `advisor-error-${createMessageId()}`,
           role: "assistant",
           text: "I could not reach the advisor service this time. Your current build is unchanged, and compatibility checks remain available. Try one of the demo prompts again in a moment.",
         },
       ]);
+      trackAnalyticsEvent("advisor_request_failed", {
+        has_build: Boolean(build),
+        compare_open: Boolean(activeCompareContext),
+      });
     } finally {
       setIsGeneratingRecommendation(false);
       setIsLoadingDetails(false);
@@ -1055,16 +1136,16 @@ function ConsultPage() {
     updatedFields: Array<keyof CustomerNeeds>,
   ) {
     const mergedNeeds = mergeCustomerNeeds(customerNeeds, nextNeeds);
-    setCustomerNeeds(mergedNeeds);
-    setAdvisorUpdatedFields((current) => {
-      const next = new Set(current);
-      updatedFields.forEach((field) => next.add(field));
-      return next;
-    });
     setIsLoadingDetails(true);
 
     try {
       const nextState = await refreshBuildAndDetails(mergedNeeds);
+      setCustomerNeeds(mergedNeeds);
+      setAdvisorUpdatedFields((current) => {
+        const next = new Set(current);
+        updatedFields.forEach((field) => next.add(field));
+        return next;
+      });
       setBuild(nextState.build);
       setCartPreview(nextState.cartPreview);
       setEmployeeSummary(nextState.employeeSummary);
@@ -1074,9 +1155,9 @@ function ConsultPage() {
       setToast({ message: "Build needs updated from advisor action.", tone: "success" });
     } catch {
       setDetailsError(
-        "The build needs were updated, but the recommendation could not refresh right now.",
+        "The recommendation could not refresh, so your previous needs and build were kept together.",
       );
-      setToast({ message: "Could not refresh the build after updating needs.", tone: "error" });
+      setToast({ message: "Could not refresh the build. No needs were changed.", tone: "error" });
     } finally {
       setIsLoadingDetails(false);
     }
@@ -1158,6 +1239,18 @@ function ConsultPage() {
     item: CartPreviewItemModel,
     link: NonNullable<CartPreviewItemModel["affiliateLinks"]>[number],
   ) {
+    let purchaseUrl: string;
+
+    try {
+      purchaseUrl = validateSafeExternalUrl(link.url);
+    } catch {
+      setToast({
+        message: "This purchase link is invalid and was not opened.",
+        tone: "error",
+      });
+      return;
+    }
+
     const openedWindow = window.open("about:blank", "_blank");
 
     if (!openedWindow) {
@@ -1170,13 +1263,17 @@ function ConsultPage() {
     }
 
     openedWindow.opener = null;
-    await trackAffiliateClick({
+    openedWindow.location.href = purchaseUrl;
+    trackAnalyticsEvent("affiliate_link_opened", {
+      part_id: item.partId,
+      merchant: link.merchant,
+    });
+    void trackAffiliateClick({
       partId: item.partId,
       merchant: link.merchant,
-      url: link.url,
+      url: purchaseUrl,
       buildId: build?.id,
     });
-    openedWindow.location.href = link.url;
   }
 
   function renderWarningActions(warning: CompatibilityWarningModel) {
@@ -1306,15 +1403,21 @@ function ConsultPage() {
                   <div className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-destructive/30 bg-background">
                     <AlertTriangle className="size-4 text-destructive" />
                   </div>
-                  <div>
+                  <div className="flex-1">
                     <h2 className="text-lg font-bold text-destructive">
                       Build recommendation unavailable
                     </h2>
                     <p className="mt-2 text-sm text-destructive/90">{buildError}</p>
-                    <p className="mt-2 text-sm text-muted-foreground">
-                      Refresh the page, then run a starter prompt from the chat to verify the demo
-                      flow.
-                    </p>
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      className="mt-4 rounded-md"
+                      onClick={() => void loadInitialBuild(true)}
+                      disabled={isLoadingBuild}
+                    >
+                      {isLoadingBuild && <LoaderCircle className="mr-2 size-4 animate-spin" />}
+                      Retry recommendation
+                    </Button>
                   </div>
                 </div>
               </div>
@@ -1406,6 +1509,12 @@ function ConsultPage() {
                   substitutions={substitutionSuggestions}
                   feedbackSummary={currentFeedbackSummary}
                   onReportBuildResult={() => void handleOpenFeedbackForCurrentBuild()}
+                  onShoppingListOpen={() =>
+                    trackAnalyticsEvent("shopping_list_opened", {
+                      build_id: build.id,
+                      item_count: build.parts.length,
+                    })
+                  }
                   onApplySubstitution={(part, suggestion) =>
                     void handleReplacePart(
                       part,
@@ -1813,6 +1922,11 @@ function ConsultPage() {
             onUpgraded={() => void refreshMonetizationState()}
             onOpenChange={handleCompareOpenChange}
             onReplace={(part) => void handleReplacePart(part)}
+            onRetry={() =>
+              compareCategory
+                ? void openCompare(compareCategory, recommendedReplacementId, true)
+                : undefined
+            }
           />
         )}
 
@@ -1828,8 +1942,12 @@ function ConsultPage() {
               <UpgradeCard compact onUpgraded={() => void refreshMonetizationState()} />
             ) : undefined
           }
+          failedMessage={failedChatMessage}
           onInputChange={setChatInput}
           onSend={(value) => void handleChatSend(value)}
+          onRetry={() =>
+            failedChatMessage ? void handleChatSend(failedChatMessage, true) : undefined
+          }
           onActionClick={(action) => void handleAdvisorAction(action)}
         />
       </main>
