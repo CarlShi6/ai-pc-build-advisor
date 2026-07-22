@@ -18,6 +18,7 @@ import type {
   UsageStatus,
 } from "@/types/monetization";
 import type { AdvisorApiRequest, AdvisorApiResponse } from "@/lib/ai/types";
+import type { PriceHistoryResponse } from "@/types/pricing";
 import type {
   ProductSearchQuery,
   ProductSearchResponse,
@@ -96,6 +97,8 @@ export interface OffersResponse {
   partId: string;
   offers: PartOffer[];
 }
+
+export type PartPriceHistoryResponse = PriceHistoryResponse;
 
 export interface CartPreviewRequest {
   build: Build;

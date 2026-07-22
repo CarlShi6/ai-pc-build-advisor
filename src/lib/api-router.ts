@@ -15,6 +15,8 @@ import { searchProducts } from "@/lib/product-search/search-service";
 import { runSupabaseSmokeTest } from "@/lib/supabase/smoke-test.server";
 import { createStripeCheckoutSession } from "@/lib/stripe.server";
 import { normalizeAnalyticsEvent } from "@/lib/analytics";
+import { getPriceRepository } from "@/lib/pricing/repository";
+import { normalizePriceHistoryRange, PriceValidationError } from "@/lib/pricing/validation";
 import { normalizeRecommendedBuildInput, ValidationError } from "@/lib/validation";
 import type {
   AdvisorRequestPayload,
@@ -35,6 +37,7 @@ import type {
   EntitlementStatusResponse,
   OffersResponse,
   PartsResponse,
+  PartPriceHistoryResponse,
   PostBuildFeedbackRequest,
   PostBuildFeedbackResponse,
   ProductSearchRequest,
@@ -54,6 +57,7 @@ import type {
   SignUpPayload,
   SignUpResponse,
 } from "@/types/api";
+import type { PriceApiErrorCode, PriceApiErrorResponse } from "@/types/pricing";
 
 class ApiRouteError extends Error {
   status: number;
@@ -86,6 +90,11 @@ function methodNotAllowed(allowedMethods: string[]) {
       headers: { Allow: allowedMethods.join(", ") },
     },
   );
+}
+
+function priceErrorResponse(status: number, code: PriceApiErrorCode, message: string) {
+  const payload: PriceApiErrorResponse = { error: { code, message } };
+  return jsonResponse(payload, { status });
 }
 
 function normalizeApiPath(pathname: string) {
@@ -254,6 +263,40 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       const ids = getIdsFromSearchParams(url);
       const payload: ComparePartsResponse = { parts: getComparePartsData(ids) };
       return jsonResponse(payload);
+    }
+
+    const partPricesMatch = pathname.match(/^\/api\/parts\/([^/]+)\/prices$/);
+    if (partPricesMatch) {
+      if (request.method !== "GET") {
+        return methodNotAllowed(["GET"]);
+      }
+
+      const partId = decodeURIComponent(partPricesMatch[1]);
+      const priceRepository = getPriceRepository();
+      if (!priceRepository.hasCanonicalPart(partId)) {
+        return priceErrorResponse(404, "UNKNOWN_PART", "Canonical part not found.");
+      }
+
+      let range;
+      try {
+        range = normalizePriceHistoryRange(url.searchParams.get("range") ?? "30d");
+      } catch (error) {
+        if (error instanceof PriceValidationError) {
+          return priceErrorResponse(400, "INVALID_RANGE", error.message);
+        }
+        throw error;
+      }
+
+      const payload = priceRepository.getCurrentPriceSummary(partId, range);
+      if (!payload) {
+        return priceErrorResponse(
+          404,
+          "NO_PRICE_DATA",
+          "No price observations are available for this part and range.",
+        );
+      }
+
+      return jsonResponse(payload satisfies PartPriceHistoryResponse);
     }
 
     if (pathname === "/api/products/search") {

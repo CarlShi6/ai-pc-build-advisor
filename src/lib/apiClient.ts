@@ -6,6 +6,7 @@ import type {
   PartOffer,
   OffersResponse,
   PartsResponse,
+  PartPriceHistoryResponse,
   PostBuildFeedbackRequest,
   PostBuildFeedbackResponse,
   RecommendBuildResponse,
@@ -35,6 +36,7 @@ import type {
   SignUpPayload,
   SignUpResponse,
 } from "@/types/api";
+import type { PriceHistoryRange } from "@/types/pricing";
 import type {
   Build,
   PostBuildFeedbackInput,
@@ -49,6 +51,12 @@ import { validateBuild } from "@/lib/validation";
 
 const API_REQUEST_TIMEOUT_MS = 12_000;
 const TRANSIENT_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
+
+export function getPartPriceHistory(partId: string, range: PriceHistoryRange = "30d") {
+  return requestJson<PartPriceHistoryResponse>(
+    `/api/parts/${encodeURIComponent(partId)}/prices?range=${encodeURIComponent(range)}`,
+  );
+}
 
 class ApiClientError extends Error {
   status: number;
