@@ -36,8 +36,10 @@ export function ChatPanel({
   quickReplies,
   usageSlot,
   limitSlot,
+  failedMessage,
   onInputChange,
   onSend,
+  onRetry,
   onActionClick,
 }: {
   className?: string;
@@ -47,14 +49,15 @@ export function ChatPanel({
   quickReplies: string[];
   usageSlot?: ReactNode;
   limitSlot?: ReactNode;
+  failedMessage?: string | null;
   onInputChange: (value: string) => void;
   onSend: (value: string) => void;
+  onRetry?: () => void;
   onActionClick?: (action: AdvisorSuggestedAction) => void;
 }) {
   const messagesRef = useRef<HTMLDivElement | null>(null);
   const showStarterPrompts =
-    messages.length === 0 ||
-    (messages.length === 1 && messages[0]?.role === "assistant");
+    messages.length === 0 || (messages.length === 1 && messages[0]?.role === "assistant");
 
   useEffect(() => {
     const container = messagesRef.current;
@@ -80,7 +83,9 @@ export function ChatPanel({
           </div>
           <div>
             <p className="text-sm font-semibold">AI Consultation Assistant</p>
-            <p className="text-xs text-muted-foreground">Collect needs, explain tradeoffs, and tune your build.</p>
+            <p className="text-xs text-muted-foreground">
+              Collect needs, explain tradeoffs, and tune your build.
+            </p>
           </div>
         </div>
         {usageSlot && <div className="mt-3">{usageSlot}</div>}
@@ -183,9 +188,26 @@ export function ChatPanel({
         className="shrink-0 border-t border-border/80 bg-card/95 p-5 shadow-[0_-18px_48px_-36px_rgba(0,0,0,0.9)] backdrop-blur-xl"
       >
         {limitSlot && <div className="mb-4">{limitSlot}</div>}
+        {failedMessage && (
+          <div
+            role="alert"
+            className="mb-4 rounded-xl border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive"
+          >
+            <p className="font-semibold">The last advisor request did not complete.</p>
+            <p className="mt-1 line-clamp-2 text-destructive/85">{failedMessage}</p>
+            <button
+              type="button"
+              onClick={onRetry}
+              disabled={isGenerating || !onRetry}
+              className="mt-2 rounded-md border border-destructive/30 bg-background px-3 py-1.5 font-medium transition-colors hover:bg-destructive/10 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              Retry last request
+            </button>
+          </div>
+        )}
         {showStarterPrompts && (
           <div className="mb-3 flex items-center gap-2 text-xs text-muted-foreground">
-          <Sparkles className="size-3.5 text-primary" />
+            <Sparkles className="size-3.5 text-primary" />
             Try a starter above or type your own budget, target resolution, look, or upgrade
             question.
           </div>
@@ -202,10 +224,14 @@ export function ChatPanel({
           <button
             type="submit"
             aria-label="Send"
-            disabled={isGenerating}
+            disabled={isGenerating || input.trim().length === 0}
             className="absolute right-3 top-1/2 flex size-9 -translate-y-1/2 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-glow transition-all hover:bg-primary-glow disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isGenerating ? <LoaderCircle className="size-4 animate-spin" /> : <ArrowRight className="size-4" />}
+            {isGenerating ? (
+              <LoaderCircle className="size-4 animate-spin" />
+            ) : (
+              <ArrowRight className="size-4" />
+            )}
           </button>
         </div>
       </form>
@@ -286,7 +312,10 @@ function getActionLabel(action: AdvisorSuggestedAction) {
         ? "Use RGB style"
         : `Use ${action.appearancePreference} style`;
     case "update_brand_preference":
-      return `Use ${[action.cpuBrandPreference?.toUpperCase(), action.gpuBrandPreference?.toUpperCase()]
+      return `Use ${[
+        action.cpuBrandPreference?.toUpperCase(),
+        action.gpuBrandPreference?.toUpperCase(),
+      ]
         .filter(Boolean)
         .join(" / ")} preference`;
     case "update_experience_level":

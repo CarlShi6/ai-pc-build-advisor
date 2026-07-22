@@ -659,6 +659,7 @@ export function ComparePanel({
   substitutionSuggestions = [],
   onOpenChange,
   onReplace,
+  onRetry,
   plan = "free",
   usageStatus,
   startWithOwnedPartForm = false,
@@ -676,6 +677,7 @@ export function ComparePanel({
   substitutionSuggestions?: SubstitutionSuggestion[];
   onOpenChange: (open: boolean) => void;
   onReplace: (part: Part) => void;
+  onRetry?: () => void;
   plan?: PlanType;
   usageStatus?: UsageStatus | null;
   startWithOwnedPartForm?: boolean;
@@ -1096,12 +1098,18 @@ export function ComparePanel({
             <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-sm text-destructive">
               <div className="flex items-start gap-3">
                 <AlertTriangle className="mt-0.5 size-4 shrink-0" />
-                <div>
+                <div className="flex-1">
                   <p className="font-semibold">Compare options unavailable</p>
                   <p className="mt-1">{errorMessage}</p>
-                  <p className="mt-2 text-destructive/80">
-                    Close the drawer and open Compare / Replace from the part row again.
-                  </p>
+                  <Button
+                    size="sm"
+                    variant="secondary"
+                    className="mt-3 rounded-md"
+                    onClick={onRetry}
+                    disabled={!onRetry}
+                  >
+                    Retry compare options
+                  </Button>
                 </div>
               </div>
             </div>
@@ -2563,14 +2571,12 @@ function DeltaBadge({ label, tone }: { label: string; tone: "success" | "warning
 }
 
 function DecisionBadges({ decision }: { decision: PartDecisionMetadata }) {
-  const badges = [
-    decision.bestValue && { label: "Best Value", tone: "success" as const },
-    decision.bestPerformance && { label: "Best Performance", tone: "neutral" as const },
-    decision.bestBudgetFit && { label: "Best Budget Fit", tone: "success" as const },
-    decision.beginnerFriendly && { label: "Beginner Friendly", tone: "success" as const },
-  ].filter((badge): badge is { label: string; tone: "success" | "warning" | "neutral" } =>
-    Boolean(badge),
-  );
+  const badges: Array<{ label: string; tone: "success" | "warning" | "neutral" }> = [];
+
+  if (decision.bestValue) badges.push({ label: "Best Value", tone: "success" });
+  if (decision.bestPerformance) badges.push({ label: "Best Performance", tone: "neutral" });
+  if (decision.bestBudgetFit) badges.push({ label: "Best Budget Fit", tone: "success" });
+  if (decision.beginnerFriendly) badges.push({ label: "Beginner Friendly", tone: "success" });
 
   if (badges.length === 0) {
     return <DeltaBadge label="Compare carefully" tone="neutral" />;

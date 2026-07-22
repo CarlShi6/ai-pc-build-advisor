@@ -45,25 +45,81 @@ import type {
 import type { AffiliateClickEvent, Entitlement, UsageStatus } from "@/types/monetization";
 import type { AuthSession } from "@/lib/persistence/types";
 import type { Part } from "@/types/parts";
+import { validateBuild } from "@/lib/validation";
+
+const API_REQUEST_TIMEOUT_MS = 12_000;
+const TRANSIENT_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 
 class ApiClientError extends Error {
   status: number;
+  retryable: boolean;
 
-  constructor(message: string, status: number) {
+  constructor(message: string, status: number, retryable = TRANSIENT_STATUS_CODES.has(status)) {
     super(message);
     this.name = "ApiClientError";
     this.status = status;
+    this.retryable = retryable;
   }
 }
 
-async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(input, {
-    ...init,
-    headers: {
-      "content-type": "application/json",
-      ...(init?.headers ?? {}),
-    },
-  });
+type RequestOptions = {
+  retries?: number;
+  timeoutMs?: number;
+};
+
+function waitForRetry(attempt: number) {
+  return new Promise((resolve) => globalThis.setTimeout(resolve, 150 * (attempt + 1)));
+}
+
+async function requestJson<T>(
+  input: string,
+  init?: RequestInit,
+  options: RequestOptions = {},
+): Promise<T> {
+  const retries = options.retries ?? (init?.method === undefined || init.method === "GET" ? 1 : 0);
+  let attempt = 0;
+
+  while (true) {
+    try {
+      return await requestJsonOnce<T>(input, init, options.timeoutMs ?? API_REQUEST_TIMEOUT_MS);
+    } catch (error) {
+      if (!(error instanceof ApiClientError) || !error.retryable || attempt >= retries) {
+        throw error;
+      }
+
+      await waitForRetry(attempt);
+      attempt += 1;
+    }
+  }
+}
+
+async function requestJsonOnce<T>(input: string, init: RequestInit | undefined, timeoutMs: number) {
+  const controller = new AbortController();
+  const timeout = globalThis.setTimeout(() => controller.abort(), timeoutMs);
+  let response: Response;
+
+  try {
+    response = await fetch(input, {
+      ...init,
+      headers: {
+        "content-type": "application/json",
+        ...(init?.headers ?? {}),
+      },
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (error instanceof DOMException && error.name === "AbortError") {
+      throw new ApiClientError("The request timed out. Please try again.", 0, true);
+    }
+
+    throw new ApiClientError(
+      "The service could not be reached. Check your connection and retry.",
+      0,
+      true,
+    );
+  } finally {
+    globalThis.clearTimeout(timeout);
+  }
 
   let payload: unknown = null;
 
@@ -86,12 +142,16 @@ async function requestJson<T>(input: string, init?: RequestInit): Promise<T> {
 }
 
 export async function getRecommendedBuild(input?: RecommendedBuildInput): Promise<Build> {
-  const response = await requestJson<RecommendBuildResponse>("/api/build/recommend", {
-    method: "POST",
-    body: JSON.stringify(input ?? {}),
-  });
+  const response = await requestJson<RecommendBuildResponse>(
+    "/api/build/recommend",
+    {
+      method: "POST",
+      body: JSON.stringify(input ?? {}),
+    },
+    { retries: 1 },
+  );
 
-  return response.build;
+  return validateBuild(response.build);
 }
 
 export async function getAuthSession(): Promise<AuthSession> {
@@ -151,19 +211,27 @@ export async function searchProducts(
 }
 
 export async function checkCompatibility(build: Build): Promise<Build> {
-  const response = await requestJson<CompatibilityCheckResponse>("/api/build/compatibility-check", {
-    method: "POST",
-    body: JSON.stringify({ build }),
-  });
+  const response = await requestJson<CompatibilityCheckResponse>(
+    "/api/build/compatibility-check",
+    {
+      method: "POST",
+      body: JSON.stringify({ build }),
+    },
+    { retries: 1 },
+  );
 
-  return response.build;
+  return validateBuild(response.build);
 }
 
 export async function getCartPreview(build: Build): Promise<CartPreviewResponse> {
-  return requestJson<CartPreviewResponse>("/api/cart/preview", {
-    method: "POST",
-    body: JSON.stringify({ build }),
-  });
+  return requestJson<CartPreviewResponse>(
+    "/api/cart/preview",
+    {
+      method: "POST",
+      body: JSON.stringify({ build }),
+    },
+    { retries: 1 },
+  );
 }
 
 export async function getOffers(partId: string): Promise<PartOffer[]> {
@@ -266,9 +334,7 @@ export async function resetMockMonetizationState(): Promise<ResetMonetizationRes
   });
 }
 
-export async function askAdvisor(
-  payload: AdvisorRequestPayload,
-): Promise<AdvisorResponsePayload> {
+export async function askAdvisor(payload: AdvisorRequestPayload): Promise<AdvisorResponsePayload> {
   return requestJson<AdvisorResponsePayload>("/api/ai/advisor", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -279,9 +345,7 @@ export async function getSavedBuilds(): Promise<{ builds: SavedBuildSummary[]; l
   return requestJson<SavedBuildsResponse>("/api/builds/saved");
 }
 
-export async function saveCurrentBuild(
-  payload: SaveBuildRequest,
-): Promise<SaveBuildResponse> {
+export async function saveCurrentBuild(payload: SaveBuildRequest): Promise<SaveBuildResponse> {
   return requestJson<SaveBuildResponse>("/api/builds/save", {
     method: "POST",
     body: JSON.stringify(payload),
@@ -289,9 +353,7 @@ export async function saveCurrentBuild(
 }
 
 export async function getSavedBuild(id: string): Promise<SavedBuild> {
-  const response = await requestJson<SavedBuildResponse>(
-    `/api/builds/${encodeURIComponent(id)}`,
-  );
+  const response = await requestJson<SavedBuildResponse>(`/api/builds/${encodeURIComponent(id)}`);
 
   return response.savedBuild;
 }
@@ -331,9 +393,7 @@ export async function replaceBuildPart(
 }> {
   const draftBuild: Build = {
     ...build,
-    parts: build.parts.map((part) =>
-      part.category === replacement.category ? replacement : part,
-    ),
+    parts: build.parts.map((part) => (part.category === replacement.category ? replacement : part)),
   };
 
   const nextBuild = await checkCompatibility(draftBuild);
