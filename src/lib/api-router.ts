@@ -17,6 +17,9 @@ import { createStripeCheckoutSession } from "@/lib/stripe.server";
 import { normalizeAnalyticsEvent } from "@/lib/analytics";
 import { getPriceRepository } from "@/lib/pricing/repository";
 import { normalizePriceHistoryRange, PriceValidationError } from "@/lib/pricing/validation";
+import { getRetailPriceProvider } from "@/lib/pricing/current-offer-service.server";
+import { BEST_BUY_DISCLOSURE } from "@/lib/pricing/best-buy-provider.server";
+import { seedParts } from "@/data/seedParts";
 import { normalizeRecommendedBuildInput, ValidationError } from "@/lib/validation";
 import type {
   AdvisorRequestPayload,
@@ -58,6 +61,7 @@ import type {
   SignUpResponse,
 } from "@/types/api";
 import type { PriceApiErrorCode, PriceApiErrorResponse } from "@/types/pricing";
+import type { RetailPriceProvider } from "@/types/current-offer";
 
 class ApiRouteError extends Error {
   status: number;
@@ -156,7 +160,10 @@ async function readBoundedJson<T>(request: Request, maxBytes: number): Promise<T
   }
 }
 
-export async function handleInternalApiRequest(request: Request): Promise<Response | null> {
+export async function handleInternalApiRequest(
+  request: Request,
+  dependencies: { retailPriceProvider?: RetailPriceProvider } = {},
+): Promise<Response | null> {
   const url = new URL(request.url);
   const pathname = normalizeApiPath(url.pathname);
   const store = getPersistenceStore();
@@ -297,6 +304,31 @@ export async function handleInternalApiRequest(request: Request): Promise<Respon
       }
 
       return jsonResponse(payload satisfies PartPriceHistoryResponse);
+    }
+
+    const currentOfferMatch = pathname.match(/^\/api\/parts\/([^/]+)\/current-offer$/);
+    if (currentOfferMatch) {
+      if (request.method !== "GET") {
+        return methodNotAllowed(["GET"]);
+      }
+
+      const partId = decodeURIComponent(currentOfferMatch[1]);
+      if (!seedParts.some((part) => part.id === partId)) {
+        return jsonResponse({
+          partId,
+          providerId: "best_buy",
+          status: "unavailable",
+          offer: null,
+          disclosure: BEST_BUY_DISCLOSURE,
+          fetchedAt: null,
+          expiresAt: null,
+          cached: false,
+          reason: "UNKNOWN_PART",
+        });
+      }
+
+      const retailPriceProvider = dependencies.retailPriceProvider ?? getRetailPriceProvider();
+      return jsonResponse(await retailPriceProvider.getCurrentOffer(partId));
     }
 
     if (pathname === "/api/products/search") {

@@ -23,6 +23,8 @@ export function getServerConfig() {
     openAiApiKey: process.env.OPENAI_API_KEY,
     aiProviderApiKey: process.env.AI_PROVIDER_API_KEY,
     aiProviderModel: process.env.AI_PROVIDER_MODEL ?? "gpt-4.1-mini",
+    priceProvider: process.env.PRICE_PROVIDER,
+    bestBuyApiKey: process.env.BEST_BUY_API_KEY,
     persistenceProvider: process.env.PERSISTENCE_PROVIDER,
     stripeSecretKey: process.env.STRIPE_SECRET_KEY,
     stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,

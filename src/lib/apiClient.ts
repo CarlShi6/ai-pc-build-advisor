@@ -37,6 +37,7 @@ import type {
   SignUpResponse,
 } from "@/types/api";
 import type { PriceHistoryRange } from "@/types/pricing";
+import type { CurrentOfferApiResponse } from "@/types/current-offer";
 import type {
   Build,
   PostBuildFeedbackInput,
@@ -55,6 +56,12 @@ const TRANSIENT_STATUS_CODES = new Set([408, 425, 429, 500, 502, 503, 504]);
 export function getPartPriceHistory(partId: string, range: PriceHistoryRange = "30d") {
   return requestJson<PartPriceHistoryResponse>(
     `/api/parts/${encodeURIComponent(partId)}/prices?range=${encodeURIComponent(range)}`,
+  );
+}
+
+export function getPartCurrentOffer(partId: string) {
+  return requestJson<CurrentOfferApiResponse>(
+    `/api/parts/${encodeURIComponent(partId)}/current-offer`,
   );
 }
 
