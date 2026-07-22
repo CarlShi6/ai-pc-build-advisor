@@ -977,35 +977,31 @@ export function ComparePanel({
 
   return (
     <aside className="order-2 flex min-h-[70vh] min-w-0 flex-col overflow-hidden border-y border-border/80 bg-surface-subtle/95 shadow-elevated lg:h-full lg:min-h-0 lg:border-x lg:border-y-0">
-      <div className="sticky top-0 z-20 border-b border-border/80 bg-card/95 px-4 pb-4 pt-5 backdrop-blur-xl xl:px-6">
+      <div className="sticky top-0 z-20 border-b border-border/80 bg-card/95 px-4 py-3 backdrop-blur-xl xl:px-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="space-y-3">
-            <Badge className="w-fit rounded-md border border-primary/30 bg-primary/10 text-primary">
-              <Sparkles className="mr-1 size-3" /> AI-assisted Compare
-            </Badge>
+          <div className="min-w-0">
             <div>
               <h2 className="text-xl font-semibold leading-tight">
                 Compare {sectionTitle} decisions
               </h2>
-              <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                See which option best fits your budget, performance needs, compatibility, and
-                beginner risk while the advisor chat stays open.
+              <p className="mt-1 text-xs text-muted-foreground">
+                Focus: {sectionTitle} · {Math.max(0, sameCategoryParts.length - 1)} alternatives
               </p>
             </div>
           </div>
           <div className="flex items-start gap-2">
-            <div className="surface-inset rounded-xl px-4 py-3 text-right">
+            <div className="surface-inset rounded-lg px-3 py-2 text-right">
               <p className="text-xs uppercase tracking-widest text-muted-foreground">
                 Current total
               </p>
-              <p className="font-mono text-2xl font-bold text-primary">
+              <p className="font-mono text-lg font-bold text-primary">
                 {formatMoney(build.totalPrice)}
               </p>
             </div>
             <Button
               size="icon"
-              variant="ghost"
-              className="rounded-md"
+              variant="secondary"
+              className="rounded-md border border-border"
               aria-label="Close compare panel"
               onClick={() => onOpenChange(false)}
             >
@@ -1014,7 +1010,7 @@ export function ComparePanel({
           </div>
         </div>
 
-        <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
           <div className="flex rounded-full border border-border/80 bg-surface-elevated/80 p-1 shadow-inner">
             {visibleTabs.map(({ key, label, icon: Icon }) => (
               <button
@@ -1046,9 +1042,6 @@ export function ComparePanel({
                 {mode}
               </Button>
             ))}
-            <Badge variant="secondary" className="rounded-md">
-              {Math.max(0, sameCategoryParts.length - 1)} alternatives
-            </Badge>
           </div>
         </div>
       </div>
@@ -1351,11 +1344,12 @@ function RecommendedSwapPanel({
       </div>
 
       <div className="mt-4 flex flex-wrap justify-end gap-3">
-        <Button variant="secondary" className="rounded-xl" onClick={onPreview}>
+        <Button className="rounded-xl shadow-glow" onClick={onPreview}>
           Preview swap
         </Button>
         <Button
-          className="rounded-xl shadow-glow"
+          variant="secondary"
+          className="rounded-xl"
           disabled={!canReplacePart || isReplacing}
           onClick={onApply}
         >
@@ -1413,11 +1407,16 @@ function QuickVerdictSection({
         )}
       </div>
 
-      <div className="mt-5 grid gap-3 lg:grid-cols-3">
-        <VerdictDetail label="Why this choice" value={verdict.decision.tradeOffSummary} />
-        <VerdictDetail label="Best for" value={verdict.insight.bestFor} />
-        <VerdictDetail label="Worth the difference?" value={verdict.insight.worthIt} />
-      </div>
+      <details className="mt-4 rounded-xl border border-border/80 bg-background/55">
+        <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          Show verdict reasoning
+        </summary>
+        <div className="grid gap-3 border-t border-border/80 p-3 lg:grid-cols-3">
+          <VerdictDetail label="Why this choice" value={verdict.decision.tradeOffSummary} />
+          <VerdictDetail label="Best for" value={verdict.insight.bestFor} />
+          <VerdictDetail label="Worth the difference?" value={verdict.insight.worthIt} />
+        </div>
+      </details>
     </section>
   );
 }
@@ -1464,16 +1463,30 @@ function DecisionSummaryArea({
 
   return (
     <section className="surface-panel mt-4 rounded-2xl p-4">
-      <div>
-        <h3 className="text-base font-semibold">Decision summary</h3>
-        <p className="mt-1 text-xs text-muted-foreground">
-          Current baseline versus the leading alternative, including full-build impact.
-        </p>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h3 className="text-base font-semibold">Decision summary</h3>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Leading alternative: {alternative.part.displayName}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2 text-xs">
+          <DeltaBadge
+            label={`${formatSignedMoney(alternativeInsight.priceDifference)} vs current`}
+            tone={alternativeInsight.priceDifference <= 0 ? "success" : "warning"}
+          />
+          <CompatibilityImpactBadge impact={alternativeDecision.compatibilityImpact} />
+        </div>
       </div>
-      <div className="mt-4 grid gap-3 xl:grid-cols-2">
-        <DecisionOptionCard insight={currentInsight} isCurrent />
-        <DecisionOptionCard insight={alternativeInsight} />
-      </div>
+      <details className="mt-3 rounded-xl border border-border bg-background/45">
+        <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          Compare current and alternative details
+        </summary>
+        <div className="grid gap-3 border-t border-border p-3 xl:grid-cols-2">
+          <DecisionOptionCard insight={currentInsight} isCurrent />
+          <DecisionOptionCard insight={alternativeInsight} />
+        </div>
+      </details>
     </section>
   );
 }
@@ -1991,9 +2004,13 @@ function PartCard({
 
       <div className="mt-auto pt-4">
         <div className="grid gap-2 sm:grid-cols-2">
+          <Button className="rounded-xl sm:order-1" disabled={isCurrent} onClick={onPreviewSwap}>
+            <ArrowRightLeft className="mr-2 size-4" />
+            Preview swap
+          </Button>
           <Button
-            variant={isSelected ? "default" : "secondary"}
-            className="rounded-xl"
+            variant="secondary"
+            className="rounded-xl sm:order-2"
             disabled={compareDisabled}
             onClick={onToggleCompare}
           >
@@ -2007,15 +2024,11 @@ function PartCard({
               </>
             )}
           </Button>
-          <Button className="rounded-xl" disabled={isCurrent} onClick={onPreviewSwap}>
-            <ArrowRightLeft className="mr-2 size-4" />
-            Preview swap
-          </Button>
           {purchaseUrl && (
-            <Button variant="ghost" className="rounded-xl sm:col-span-2" asChild>
+            <Button variant="ghost" className="rounded-xl sm:order-3 sm:col-span-2" asChild>
               <a href={purchaseUrl} target="_blank" rel="noreferrer">
                 <ShoppingBag className="mr-2 size-4" />
-                View product
+                Product details
               </a>
             </Button>
           )}

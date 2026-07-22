@@ -132,7 +132,7 @@ export function PriceTrendView({
         </div>
       </div>
 
-      <div className="mt-4 min-h-[17rem]">
+      <div className={cn("mt-4", state.status === "loading" && "min-h-40")}>
         {state.status === "loading" ? (
           <PriceTrendLoadingState />
         ) : state.status === "error" ? (
@@ -154,7 +154,6 @@ function PriceTrendLoadingState() {
           <div key={item} className="h-16 animate-pulse rounded-xl bg-primary/10" />
         ))}
       </div>
-      <div className="h-32 animate-pulse rounded-xl bg-primary/10" aria-hidden="true" />
       <p className="text-xs text-muted-foreground">Loading development sample observations…</p>
     </div>
   );
@@ -266,68 +265,83 @@ function PriceTrendSuccessState({
         </p>
       )}
 
-      <div className="rounded-xl border border-border bg-background/55 p-3">
-        <svg
-          className="h-auto min-h-32 w-full"
-          viewBox="0 0 100 48"
-          preserveAspectRatio="none"
-          role="img"
-          aria-labelledby={`${chartTitleId}-chart-title ${chartTitleId}-chart-description`}
-        >
-          <title id={`${chartTitleId}-chart-title`}>Comparable sample price trend</title>
-          <desc id={`${chartTitleId}-chart-description`}>{trendSummary}</desc>
-          <line x1="6" x2="94" y1="42" y2="42" className="stroke-border" strokeWidth="0.5" />
-          {chart.comparablePoints.length > 1 && (
-            <polyline
-              points={chart.polylinePoints}
-              fill="none"
-              className="stroke-primary"
-              strokeWidth="1.5"
-              vectorEffect="non-scaling-stroke"
-            />
-          )}
-          {chart.comparablePoints.map((point) => (
-            <circle
-              key={point.id}
-              cx={point.x}
-              cy={point.y}
-              r="1.8"
-              className="fill-primary stroke-background"
-              strokeWidth="0.8"
-              vectorEffect="non-scaling-stroke"
-            />
-          ))}
-          {chart.unavailablePoints.map((point) =>
-            point.kind === "unknown_shipping" ? (
+      <details className="rounded-xl border border-border bg-background/55">
+        <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary">
+          Show price chart and trend explanation
+        </summary>
+        <div className="border-t border-border p-3">
+          <svg
+            className="h-auto min-h-32 w-full"
+            viewBox="0 0 100 48"
+            preserveAspectRatio="none"
+            role="img"
+            aria-labelledby={`${chartTitleId}-chart-title ${chartTitleId}-chart-description`}
+          >
+            <title id={`${chartTitleId}-chart-title`}>Comparable sample price trend</title>
+            <desc id={`${chartTitleId}-chart-description`}>{trendSummary}</desc>
+            <line x1="6" x2="94" y1="42" y2="42" className="stroke-border" strokeWidth="0.5" />
+            {chart.comparablePoints.length > 1 && (
+              <polyline
+                points={chart.polylinePoints}
+                fill="none"
+                className="stroke-primary"
+                strokeWidth="1.5"
+                vectorEffect="non-scaling-stroke"
+              />
+            )}
+            {chart.comparablePoints.map((point) => (
               <circle
                 key={point.id}
                 cx={point.x}
                 cy={point.y}
                 r="1.8"
-                fill="none"
-                className="stroke-warning"
-                strokeWidth="1.2"
+                className="fill-primary stroke-background"
+                strokeWidth="0.8"
                 vectorEffect="non-scaling-stroke"
               />
-            ) : (
-              <g key={point.id} className="stroke-destructive" vectorEffect="non-scaling-stroke">
-                <line x1={point.x - 1.5} x2={point.x + 1.5} y1={point.y - 1.5} y2={point.y + 1.5} />
-                <line x1={point.x - 1.5} x2={point.x + 1.5} y1={point.y + 1.5} y2={point.y - 1.5} />
-              </g>
-            ),
-          )}
-        </svg>
-        <p className="mt-2 text-xs text-muted-foreground">{trendSummary}</p>
-        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
-          <span>● Comparable in-stock total</span>
-          <span>○ In stock, shipping unknown</span>
-          <span>× Unavailable / not rankable</span>
+            ))}
+            {chart.unavailablePoints.map((point) =>
+              point.kind === "unknown_shipping" ? (
+                <circle
+                  key={point.id}
+                  cx={point.x}
+                  cy={point.y}
+                  r="1.8"
+                  fill="none"
+                  className="stroke-warning"
+                  strokeWidth="1.2"
+                  vectorEffect="non-scaling-stroke"
+                />
+              ) : (
+                <g key={point.id} className="stroke-destructive" vectorEffect="non-scaling-stroke">
+                  <line
+                    x1={point.x - 1.5}
+                    x2={point.x + 1.5}
+                    y1={point.y - 1.5}
+                    y2={point.y + 1.5}
+                  />
+                  <line
+                    x1={point.x - 1.5}
+                    x2={point.x + 1.5}
+                    y1={point.y + 1.5}
+                    y2={point.y - 1.5}
+                  />
+                </g>
+              ),
+            )}
+          </svg>
+          <p className="mt-2 text-xs text-muted-foreground">{trendSummary}</p>
+          <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
+            <span>● Comparable in-stock total</span>
+            <span>○ In stock, shipping unknown</span>
+            <span>× Unavailable / not rankable</span>
+          </div>
+          <p className="mt-2 text-[11px] text-muted-foreground">
+            Observed samples are connected chronologically. Lines do not imply continuous price
+            tracking between sparse observations.
+          </p>
         </div>
-        <p className="mt-2 text-[11px] text-muted-foreground">
-          Observed samples are connected chronologically. Lines do not imply continuous price
-          tracking between sparse observations.
-        </p>
-      </div>
+      </details>
 
       <ObservationDetails response={response} />
     </div>
