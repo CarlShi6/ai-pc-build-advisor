@@ -91,10 +91,10 @@ function CartPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="app-shell min-h-screen bg-background text-foreground">
       <TopBar />
       <main className="mx-auto max-w-6xl space-y-6 px-6 py-6">
-        <section className="overflow-hidden rounded-2xl border border-border bg-card shadow-sm">
+        <section className="surface-panel overflow-hidden rounded-2xl">
           <div className="flex flex-wrap items-stretch gap-0 divide-y divide-border md:divide-y-0 md:divide-x">
             <BuildStripItem icon={<Cpu className="size-4.5" />} label="CPU" value={cpu.displayName} />
             <BuildStripItem icon={<MonitorPlay className="size-4.5" />} label="GPU" value={gpu.displayName} highlight />
@@ -123,8 +123,8 @@ function CartPage() {
               </div>
             </div>
 
-            <div className="overflow-hidden rounded-2xl border border-border bg-card">
-              <div className="border-b border-border p-4 font-semibold">Parts to Check</div>
+            <div className="surface-panel overflow-hidden rounded-2xl">
+              <div className="border-b border-border/80 bg-surface-elevated/60 p-4 font-semibold">Parts to Check</div>
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
@@ -173,7 +173,7 @@ function CartPage() {
           </section>
 
           <aside className="space-y-5">
-            <div className="rounded-2xl border border-border bg-card p-5">
+            <div className="surface-panel rounded-2xl p-5">
               <h3 className="mb-3 flex items-center gap-2 text-base font-semibold">
                 <ClipboardList className="size-4 text-primary" /> Buyer Checklist
               </h3>
@@ -185,7 +185,7 @@ function CartPage() {
                       <li key={item}>
                         <button
                           onClick={() => toggle(index)}
-                          className="flex w-full items-center gap-3 rounded-xl border border-border bg-background/50 p-3 text-left text-sm transition-colors hover:border-primary/40"
+                          className="surface-inset flex w-full items-center gap-3 rounded-xl p-3 text-left text-sm transition-all hover:border-primary/35 hover:bg-primary/[0.04]"
                         >
                           <span
                             className={`flex size-5 items-center justify-center rounded-md border ${
@@ -221,7 +221,7 @@ function CartPage() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-primary/20 bg-primary/5 p-5">
+            <div className="rounded-2xl border border-primary/20 bg-gradient-to-br from-primary/[0.08] via-card to-card p-5 shadow-card">
               <h3 className="mb-3 flex items-center gap-2 text-base font-bold text-primary">
                 <ShoppingBag className="size-4" /> Reference Summary
               </h3>
