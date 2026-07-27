@@ -4,7 +4,7 @@ import {
   CheckCircle2, ChevronRight, CircleDollarSign, ClipboardList, Cpu, Fan, Gauge,
   GitCompareArrows, HardDrive, ImageOff, Info, Layers3, MemoryStick, MonitorCog,
   PackageCheck, PanelLeft, Power, Send, ShieldCheck, ShoppingBag,
-  SlidersHorizontal, Sparkles, Target, X, Zap,
+  SlidersHorizontal, Sparkles, Target, X, Zap, Search,
 } from "lucide-react";
 import { useMemo, useState, type ComponentType } from "react";
 
@@ -38,6 +38,43 @@ const parts: Part[] = [
 
 const replacement = { name: "NVIDIA GeForce RTX 4070 Ti SUPER 16GB", price: 799 };
 
+type ComparisonProduct = {
+  id: string;
+  name: string;
+  price: number;
+  retailer: string;
+  label: string;
+  compatibility: string;
+  gaming: string;
+  productivity: string;
+  value: string;
+  vram: string;
+  power: string;
+  psu: string;
+  length: string;
+  resolution: string;
+  performanceDelta: string;
+};
+
+function comparisonCatalog(part: Part): ComparisonProduct[] {
+  if (part.id === "gpu") {
+    return [
+      { id: "4080s", name: part.name, price: 999, retailer: "Best Buy", label: "CURRENT PICK", compatibility: "Fully compatible", gaming: "Excellent · 98/100", productivity: "Excellent · 94/100", value: "86/100", vram: "16GB GDDR6X", power: "320W", psu: "750W", length: "304mm", resolution: "1440p ultra / 4K", performanceDelta: "Baseline" },
+      { id: "4070tis", name: "NVIDIA GeForce RTX 4070 Ti SUPER 16GB", price: 799, retailer: "Newegg", label: "AI PICK", compatibility: "Fully compatible", gaming: "Excellent · 91/100", productivity: "Excellent · 89/100", value: "94/100", vram: "16GB GDDR6X", power: "285W", psu: "700W", length: "285mm", resolution: "1440p ultra", performanceDelta: "−8% at 1440p" },
+      { id: "7900xt", name: "AMD Radeon RX 7900 XT 20GB", price: 699, retailer: "Amazon", label: "BEST VALUE", compatibility: "Fully compatible", gaming: "Excellent · 93/100", productivity: "Strong · 80/100", value: "97/100", vram: "20GB GDDR6", power: "315W", psu: "750W", length: "276mm", resolution: "1440p ultra / 4K", performanceDelta: "−5% raster" },
+      { id: "5070ti", name: "NVIDIA GeForce RTX 5070 Ti 16GB", price: 749, retailer: "Newegg", label: "USER CHOICE", compatibility: "Fully compatible", gaming: "Excellent · 94/100", productivity: "Excellent · 91/100", value: "95/100", vram: "16GB GDDR7", power: "300W", psu: "750W", length: "300mm", resolution: "1440p ultra / 4K", performanceDelta: "−3% at 1440p" },
+      { id: "4070s", name: "NVIDIA GeForce RTX 4070 SUPER 12GB", price: 599, retailer: "Best Buy", label: "LOWER COST", compatibility: "Fully compatible", gaming: "Strong · 84/100", productivity: "Strong · 82/100", value: "96/100", vram: "12GB GDDR6X", power: "220W", psu: "650W", length: "267mm", resolution: "1440p high", performanceDelta: "−18% at 1440p" },
+    ];
+  }
+
+  return [
+    { id: `${part.id}-current`, name: part.name, price: part.price, retailer: part.retailer, label: "CURRENT PICK", compatibility: part.compatibility, gaming: "Excellent fit", productivity: "Strong fit", value: "89/100", vram: part.specs[0], power: part.specs[3] ?? "Optimized", psu: "No change", length: "Fit verified", resolution: "Build target met", performanceDelta: "Baseline" },
+    { id: `${part.id}-ai`, name: `${part.category} Performance Alternative`, price: Math.max(79, part.price - 30), retailer: "Newegg", label: "AI PICK", compatibility: "Fully compatible", gaming: "Excellent fit", productivity: "Excellent fit", value: "94/100", vram: part.specs[0], power: "Lower draw", psu: "No change", length: "Fit verified", resolution: "Build target met", performanceDelta: "+3% target workload" },
+    { id: `${part.id}-value`, name: `${part.category} Value Alternative`, price: Math.max(59, part.price - 65), retailer: "Amazon", label: "BEST VALUE", compatibility: "Fully compatible", gaming: "Strong fit", productivity: "Strong fit", value: "97/100", vram: part.specs[0], power: "Lower draw", psu: "No change", length: "Fit verified", resolution: "Build target met", performanceDelta: "−4% target workload" },
+    { id: `${part.id}-user`, name: `${part.category} User-Selected Option`, price: part.price + 35, retailer: "Best Buy", label: "USER CHOICE", compatibility: "Compatible with note", gaming: "Excellent fit", productivity: "Excellent fit", value: "86/100", vram: part.specs[0], power: "Slightly higher", psu: "Review advised", length: "Fit verified", resolution: "Build target exceeded", performanceDelta: "+5% target workload" },
+  ];
+}
+
 function BrandMark() {
   return <div className="brand-mark" aria-hidden="true"><span /></div>;
 }
@@ -50,6 +87,142 @@ function ProductVisual({ part, failed, onFail }: { part: Part; failed: boolean; 
         <span className="visual-grid" /><Icon size={47} strokeWidth={1.25} /><span className="visual-label">{part.eyebrow}</span>
       </>}
     </button>
+  );
+}
+
+function CompareWorkspace({
+  part,
+  buildTotal,
+  budget,
+  onClose,
+  onReplace,
+}: {
+  part: Part;
+  buildTotal: number;
+  budget: number;
+  onClose: () => void;
+  onReplace: (part: Part) => void;
+}) {
+  const catalog = useMemo(() => comparisonCatalog(part), [part]);
+  const [slots, setSlots] = useState([catalog[0], catalog[1], catalog[3] ?? catalog[2]]);
+  const [queries, setQueries] = useState(slots.map((slot) => slot.name));
+  const [selectedSlot, setSelectedSlot] = useState(1);
+
+  const setSlotProduct = (slotIndex: number, name: string) => {
+    setQueries((current) => current.map((query, index) => index === slotIndex ? name : query));
+    const match = catalog.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
+    if (!match) return;
+    setSlots((current) => current.map((slot, index) => index === slotIndex ? match : slot));
+  };
+
+  const selected = slots[selectedSlot];
+  const selectedBuildTotal = buildTotal - part.price + selected.price;
+  const budgetDelta = budget - selectedBuildTotal;
+  const rows = [
+    ["Price", ...slots.map((slot) => `$${slot.price.toLocaleString()}`)],
+    ["Gaming fit", ...slots.map((slot) => slot.gaming)],
+    ["Productivity fit", ...slots.map((slot) => slot.productivity)],
+    ["Value", ...slots.map((slot) => slot.value)],
+    [part.id === "gpu" ? "VRAM" : "Primary specification", ...slots.map((slot) => slot.vram)],
+    [part.id === "gpu" ? "Board power" : "Power / thermal", ...slots.map((slot) => slot.power)],
+    ["Recommended PSU", ...slots.map((slot) => slot.psu)],
+    [part.id === "gpu" ? "Physical length" : "Physical fit", ...slots.map((slot) => slot.length)],
+    ["Target resolution", ...slots.map((slot) => slot.resolution)],
+    ["New build total", ...slots.map((slot) => `$${(buildTotal - part.price + slot.price).toLocaleString()}`)],
+    ["Budget remaining", ...slots.map((slot) => `$${(budget - (buildTotal - part.price + slot.price)).toLocaleString()}`)],
+    ["Compatibility impact", ...slots.map((slot) => slot.compatibility)],
+  ];
+
+  return (
+    <section className="wide-compare-workspace" aria-label={`${part.category} comparison workspace`}>
+      <div className="wide-compare-scroll">
+        <header className="wide-compare-header">
+          <div>
+            <span className="section-kicker">{part.category.toUpperCase()} COMPARISON</span>
+            <h1>Compare three. Choose with confidence.</h1>
+            <p>Every slot is locked to {part.category}. Whole-build effects are calculated below.</p>
+          </div>
+          <button className="icon-button" onClick={onClose} aria-label="Close comparison"><X size={18} /></button>
+        </header>
+
+        <div className="compare-slot-grid">
+          {slots.map((slot, slotIndex) => {
+            const displayPart = { ...part, name: slot.name, price: slot.price, retailer: slot.retailer };
+            return (
+              <article className={`compare-slot ${selectedSlot === slotIndex ? "decision-selected" : ""}`} key={`${slot.id}-${slotIndex}`}>
+                <label className="catalog-search">
+                  <span><Search size={13} /> Search {part.category}</span>
+                  <input
+                    list={`catalog-${part.id}-${slotIndex}`}
+                    value={queries[slotIndex]}
+                    onChange={(event) => setSlotProduct(slotIndex, event.target.value)}
+                    onFocus={(event) => event.currentTarget.select()}
+                    aria-label={`Search ${part.category} catalog for comparison slot ${slotIndex + 1}`}
+                  />
+                  <datalist id={`catalog-${part.id}-${slotIndex}`}>
+                    {catalog.map((candidate) => <option value={candidate.name} key={candidate.id} />)}
+                  </datalist>
+                </label>
+                <ProductVisual part={displayPart} failed={false} onFail={() => {}} />
+                <span className={`compare-label label-${slot.label.toLowerCase().replaceAll(" ", "-")}`}>{slot.label}</span>
+                <h2>{slot.name}</h2>
+                <div className="compare-price"><strong>${slot.price}</strong><span>at {slot.retailer}</span></div>
+                <span className={`slot-compatibility ${slot.compatibility.includes("note") ? "warning" : ""}`}>
+                  {slot.compatibility.includes("note") ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
+                  {slot.compatibility}
+                </span>
+                <button className={selectedSlot === slotIndex ? "slot-action active" : "slot-action"} onClick={() => setSelectedSlot(slotIndex)}>
+                  {selectedSlot === slotIndex ? <Check size={14} /> : <GitCompareArrows size={14} />}
+                  {slotIndex === 0 ? "Keep current" : selectedSlot === slotIndex ? "Selected replacement" : "Replace with this"}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+
+        <div className="aligned-comparison" role="table" aria-label="Aligned product comparison">
+          {rows.map(([label, ...values], rowIndex) => (
+            <div className={`comparison-row ${rowIndex >= 9 ? "whole-build-row" : ""}`} role="row" key={label}>
+              <div className="comparison-metric" role="rowheader">{label}</div>
+              {values.map((value, valueIndex) => (
+                <div className={selectedSlot === valueIndex ? "selected-value" : ""} role="cell" key={`${label}-${valueIndex}`}>
+                  {label === "Compatibility impact" && <ShieldCheck size={14} />}
+                  {value}
+                </div>
+              ))}
+            </div>
+          ))}
+        </div>
+
+        <section className="structured-differences">
+          <div className="structure-heading"><span className="section-kicker">STRUCTURED DIFFERENCES</span><h2>What changes in the whole build</h2></div>
+          <div className="difference-grid">
+            <div><CircleDollarSign size={17} /><span><small>PRICE DELTA</small><strong>{selected.price - part.price > 0 ? "+" : "−"}${Math.abs(selected.price - part.price)}</strong></span></div>
+            <div><Gauge size={17} /><span><small>PERFORMANCE DELTA</small><strong>{selected.performanceDelta}</strong></span></div>
+            <div><Target size={17} /><span><small>VALUE DELTA</small><strong>{selected.id === catalog[0].id ? "Baseline" : "+8 points"}</strong></span></div>
+            <div><Zap size={17} /><span><small>POWER DELTA</small><strong>{selected.power === catalog[0].power ? "No change" : selected.power}</strong></span></div>
+          </div>
+          <div className="impact-grid">
+            <div><h3><CheckCircle2 size={15} /> Main gains</h3><p>More budget flexibility, excellent 1440p performance, and lower sustained heat for quieter gaming.</p></div>
+            <div><h3><AlertTriangle size={15} /> Main tradeoffs</h3><p>Less 4K headroom and a smaller ray-tracing margin in the most demanding titles.</p></div>
+            <div><h3><ShieldCheck size={15} /> Whole-build impact</h3><p>No cross-category replacements required. Case clearance, platform, and power connections remain compatible.</p></div>
+          </div>
+        </section>
+
+        <section className="compare-ai-recommendation">
+          <span><Sparkles size={18} /></span>
+          <div><small>AI RECOMMENDATION</small><h2>The {catalog[1].name} is the smartest match for your actual target.</h2><p>It preserves the high-refresh 1440p experience while returning meaningful budget and thermal headroom to the whole build.</p></div>
+        </section>
+      </div>
+
+      <footer className="compare-decision-bar">
+        <div className="decision-product"><small>SELECTED REPLACEMENT</small><strong>{selectedSlot === 0 ? "Keep current part" : selected.name}</strong></div>
+        <div><small>NEW BUILD TOTAL</small><strong>${selectedBuildTotal.toLocaleString()}</strong></div>
+        <div><small>BUDGET DELTA</small><strong className={budgetDelta >= 0 ? "positive-text" : "warning-text"}>{budgetDelta >= 0 ? `$${budgetDelta} remaining` : `$${Math.abs(budgetDelta)} over`}</strong></div>
+        <div><small>COMPATIBILITY</small><strong className="positive-text"><ShieldCheck size={14} /> {selected.compatibility}</strong></div>
+        <div className="decision-actions"><button className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={selectedSlot === 0} onClick={() => onReplace({ ...part, name: selected.name, price: selected.price, retailer: selected.retailer })}>Replace Current Part <ArrowRight size={15} /></button></div>
+      </footer>
+    </section>
   );
 }
 
@@ -68,6 +241,10 @@ function BuildWorkspace() {
   const budget = 2500;
   const delta = budget - total;
   const selectedPart = parts.find((part) => part.id === selectedId) ?? parts[1];
+  const openCompare = (part: Part) => {
+    setDetailPart(null);
+    setComparePart(part);
+  };
   const toggleImageFailure = (id: string) => setFailedImages((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   const sendMessage = () => {
     if (!chatText.trim()) return;
@@ -83,7 +260,7 @@ function BuildWorkspace() {
         <nav className="header-actions" aria-label="Account"><button>Saved Builds</button><button className="avatar-button" aria-label="Account menu">CG</button></nav>
       </header>
 
-      <main className="workspace-frame">
+      <main className={`workspace-frame ${comparePart ? "compare-active" : ""}`}>
         <aside className={`requirements-rail ${mobilePanel === "needs" ? "mobile-active" : ""}`}>
           <div className="rail-scroll">
             <div className="rail-heading"><div><span className="section-kicker">YOUR BUILD BRIEF</span><h2>What matters most</h2></div><button className="icon-button" aria-label="Edit requirements"><SlidersHorizontal size={17} /></button></div>
@@ -106,12 +283,24 @@ function BuildWorkspace() {
                 <div className="chat-message assistant"><div className="mini-avatar"><Sparkles size={13} /></div><p>Done. The case and cooling are intentionally oversized for lower fan speeds.</p></div>
                 {messages.map((message, index) => <div className="chat-message user" key={`${message}-${index}`}><p>{message}</p></div>)}
               </div>
-              <div className="quick-prompts"><button onClick={() => setComparePart(parts[1])}>Can I save $200?</button><button onClick={() => setWarningOpen(true)}>Check upgrade headroom</button></div>
+              <div className="quick-prompts"><button onClick={() => openCompare(parts[1])}>Can I save $200?</button><button onClick={() => setWarningOpen(true)}>Check upgrade headroom</button></div>
             </section>
           </div>
           <div className="chat-composer"><input value={chatText} onChange={(event) => setChatText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && sendMessage()} placeholder="Ask about this build…" aria-label="Ask the AI build guide" /><button onClick={sendMessage} aria-label="Send message"><Send size={16} /></button></div>
         </aside>
 
+        {comparePart ? (
+          <CompareWorkspace
+            part={comparePart}
+            buildTotal={total}
+            budget={budget}
+            onClose={() => setComparePart(null)}
+            onReplace={(nextPart) => {
+              setComparePart(null);
+              setReplacementPart(nextPart);
+            }}
+          />
+        ) : (<>
         <section className={`build-workspace ${mobilePanel === "build" ? "mobile-active" : ""}`}>
           <div className="workspace-scroll">
             <div className="workspace-intro">
@@ -140,7 +329,7 @@ function BuildWorkspace() {
                     <div className="price-block"><strong>${part.price.toLocaleString()}</strong><span>at {part.retailer}</span></div>
                     <span className={`compat-status ${part.id === "psu" ? "warning" : ""}`}>{part.id === "psu" ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}{part.compatibility}</span>
                     <div className="card-buttons">
-                      <button onClick={(event) => { event.stopPropagation(); setComparePart(part); }}><GitCompareArrows size={15} /> Compare</button>
+                      <button onClick={(event) => { event.stopPropagation(); openCompare(part); }}><GitCompareArrows size={15} /> Compare</button>
                       <button onClick={(event) => { event.stopPropagation(); setReplacementPart(part); }}><Layers3 size={15} /> Replace</button>
                       <button className="detail-button" onClick={(event) => { event.stopPropagation(); setDetailPart(part); }} aria-label={`View details for ${part.name}`}><ChevronRight size={17} /></button>
                     </div>
@@ -153,7 +342,7 @@ function BuildWorkspace() {
           {comparePart && <div className="center-overlay compare-overlay" role="dialog" aria-modal="true" aria-label="Component comparison">
             <div className="overlay-header"><div><span className="section-kicker">SIDE-BY-SIDE DECISION</span><h2>Save $200 without losing the experience</h2></div><button className="icon-button" onClick={() => setComparePart(null)} aria-label="Close comparison"><X size={18} /></button></div>
             <div className="comparison-hero">
-              <div className="compare-product current"><span className="choice-tag">CURRENT PICK</span><ProductVisual part={comparePart} failed={false} onFail={() => {}} /><h3>{comparePart.name}</h3><strong>${comparePart.price}</strong></div>
+              <div className="compare-product current"><span className="choice-tag">CURRENT PICK</span><ProductVisual part={selectedPart} failed={false} onFail={() => {}} /><h3>{selectedPart.name}</h3><strong>${selectedPart.price}</strong></div>
               <div className="versus">VS</div>
               <div className="compare-product recommended"><span className="choice-tag"><BadgeCheck size={13} /> BEST VALUE</span><ProductVisual part={comparePart} failed={false} onFail={() => {}} /><h3>{replacement.name}</h3><strong>${replacement.price}</strong></div>
             </div>
@@ -171,7 +360,7 @@ function BuildWorkspace() {
           {detailPart && <div className="center-overlay detail-overlay" role="dialog" aria-modal="true" aria-label="Component details">
             <div className="overlay-header"><div><span className="section-kicker">{detailPart.category}</span><h2>{detailPart.name}</h2></div><button className="icon-button" onClick={() => setDetailPart(null)} aria-label="Close details"><X size={18} /></button></div>
             <div className="detail-layout"><ProductVisual part={detailPart} failed={failedImages.includes(detailPart.id)} onFail={() => toggleImageFailure(detailPart.id)} /><div><span className="detail-price">${detailPart.price} <small>at {detailPart.retailer}</small></span><p>{detailPart.reason}</p><h4>What you need to know</h4><ul>{detailPart.specs.map((spec) => <li key={spec}><Check size={14} /> {spec}</li>)}<li><ShieldCheck size={14} /> {detailPart.compatibility}</li></ul></div></div>
-            <div className="detail-footer"><button className="outline-button" onClick={() => toggleImageFailure(detailPart.id)}><ImageOff size={15} /> Toggle image failure</button><button className="primary-button" onClick={() => { setDetailPart(null); setComparePart(detailPart); }}>Compare alternatives <ArrowRight size={15} /></button></div>
+            <div className="detail-footer"><button className="outline-button" onClick={() => toggleImageFailure(detailPart.id)}><ImageOff size={15} /> Toggle image failure</button><button className="primary-button" onClick={() => openCompare(detailPart)}>Compare alternatives <ArrowRight size={15} /></button></div>
           </div>}
         </section>
 
@@ -187,9 +376,10 @@ function BuildWorkspace() {
           <div className="summary-insight"><Sparkles size={15} /><p><strong>Well balanced.</strong> The GPU drives your target resolution while the CPU keeps high-frame-rate games responsive.</p></div>
           <div className="summary-footer"><button className="primary-button shopping-button" onClick={() => setShoppingOpen(true)}><ShoppingBag size={17} /> Preview shopping list <ArrowRight size={16} /></button><button className="save-button"><ClipboardList size={15} /> Save or export build</button><p><ShieldCheck size={12} /> Compatibility checked across 14 rules</p></div>
         </aside>
+        </>)}
       </main>
 
-      <nav className="mobile-tabs" aria-label="Workspace sections"><button className={mobilePanel === "needs" ? "active" : ""} onClick={() => setMobilePanel("needs")}><PanelLeft size={18} />Needs</button><button className={mobilePanel === "build" ? "active" : ""} onClick={() => setMobilePanel("build")}><Cpu size={18} />Build</button><button className={mobilePanel === "summary" ? "active" : ""} onClick={() => setMobilePanel("summary")}><ClipboardList size={18} />Summary</button></nav>
+      <nav className={`mobile-tabs ${comparePart ? "compare-open" : ""}`} aria-label="Workspace sections"><button className={mobilePanel === "needs" ? "active" : ""} onClick={() => setMobilePanel("needs")}><PanelLeft size={18} />Needs</button><button className={mobilePanel === "build" ? "active" : ""} onClick={() => setMobilePanel("build")}><Cpu size={18} />Build</button><button className={mobilePanel === "summary" ? "active" : ""} onClick={() => setMobilePanel("summary")}><ClipboardList size={18} />Summary</button></nav>
 
       {replacementPart && <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Confirm replacement"><div className="confirm-modal">
         <div className="confirm-icon"><GitCompareArrows size={22} /></div><span className="section-kicker">PREVIEW CHANGE</span><h2>Replace {replacementPart.category}?</h2><p>This prototype will preview the lower-cost alternative. Your current selection is preserved until you confirm.</p>
