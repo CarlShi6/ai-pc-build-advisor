@@ -543,6 +543,9 @@
   .mobile-tabs { display: none; }
 
   .wide-compare-workspace {
+    --comparison-label-width: 150px;
+    --comparison-grid-columns: var(--comparison-label-width) repeat(3, minmax(0, 1fr));
+    --comparison-page-gutter: clamp(24px, 3vw, 48px);
     grid-column: 2 / 4;
     min-width: 0;
     min-height: 0;
@@ -557,7 +560,7 @@
   .wide-compare-scroll {
     min-height: 0;
     overflow-y: auto;
-    padding: 28px clamp(24px, 3vw, 48px) 42px;
+    padding: 28px var(--comparison-page-gutter) 42px;
     scrollbar-width: thin;
     scrollbar-color: var(--line) transparent;
   }
@@ -585,11 +588,39 @@
   }
 
   .compare-slot-grid {
+    width: 100%;
+  }
+
+  .comparison-grid {
+    display: grid;
+    grid-template-columns: var(--comparison-grid-columns);
+  }
+
+  .compare-grid-frame {
+    position: relative;
     max-width: 1240px;
     margin: auto;
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 12px;
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: color-mix(in oklab, var(--panel-soft) 88%, transparent);
+  }
+
+  .comparison-label-spacer {
+    min-width: 0;
+    padding: 18px 14px;
+    display: flex;
+    align-items: flex-start;
+    color: var(--muted-foreground);
+    background: color-mix(in oklab, var(--panel-soft) 94%, transparent);
+  }
+
+  .comparison-label-spacer span,
+  .comparison-section-label span,
+  .decision-bar-label span {
+    font-size: 8px;
+    font-weight: 750;
+    letter-spacing: .1em;
+    text-transform: uppercase;
   }
 
   .compare-slot {
@@ -599,26 +630,31 @@
     display: flex;
     flex-direction: column;
     align-items: flex-start;
-    border: 1px solid var(--line);
-    border-radius: 16px 16px 0 0;
+    border: 0;
+    border-left: 1px solid var(--line);
+    border-radius: 0;
     background: color-mix(in oklab, var(--panel) 92%, transparent);
     transition: border-color .18s ease, background .18s ease;
+    overflow: visible;
   }
 
   .compare-slot.decision-selected {
-    border-color: color-mix(in oklab, var(--primary) 58%, var(--line));
     background: linear-gradient(160deg, color-mix(in oklab, var(--primary) 8%, var(--panel)), var(--panel));
-    box-shadow: inset 0 3px 0 var(--primary);
+    box-shadow: inset 0 3px 0 var(--primary), inset 1px 0 0 color-mix(in oklab, var(--primary) 48%, transparent), inset -1px 0 0 color-mix(in oklab, var(--primary) 48%, transparent);
   }
 
-  .catalog-search {
+  .catalog-combobox {
+    position: relative;
+    z-index: 5;
     width: 100%;
     display: grid;
     gap: 6px;
     margin-bottom: 12px;
   }
 
-  .catalog-search > span {
+  .catalog-combobox:focus-within { z-index: 80; }
+
+  .catalog-combobox > label {
     display: flex;
     align-items: center;
     gap: 5px;
@@ -629,11 +665,13 @@
     text-transform: uppercase;
   }
 
-  .catalog-search input {
+  .combobox-control { position: relative; min-width: 0; }
+
+  .catalog-combobox input {
     width: 100%;
     height: 36px;
     min-width: 0;
-    padding: 0 10px;
+    padding: 0 30px 0 10px;
     border: 1px solid var(--line);
     border-radius: 9px;
     outline: none;
@@ -642,10 +680,92 @@
     font-size: 10px;
   }
 
-  .catalog-search input:focus {
+  .catalog-combobox input:focus {
     border-color: color-mix(in oklab, var(--primary) 65%, var(--line));
     box-shadow: 0 0 0 3px color-mix(in oklab, var(--primary) 8%, transparent);
   }
+
+  .combobox-chevron {
+    position: absolute;
+    right: 9px;
+    top: 50%;
+    color: var(--muted-foreground);
+    transform: translateY(-50%) rotate(90deg);
+    transition: transform .15s ease;
+    pointer-events: none;
+  }
+
+  .combobox-chevron.open { transform: translateY(-50%) rotate(-90deg); }
+
+  .combobox-menu {
+    position: absolute;
+    z-index: 90;
+    top: calc(100% + 5px);
+    left: 0;
+    right: 0;
+    max-height: 268px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: 5px;
+    border: 1px solid color-mix(in oklab, var(--primary) 32%, var(--line));
+    border-radius: 11px;
+    background: oklch(0.175 0.008 255);
+    box-shadow: 0 24px 55px -24px black;
+    scrollbar-width: thin;
+    scrollbar-color: var(--line) transparent;
+  }
+
+  .combobox-option {
+    width: 100%;
+    min-width: 0;
+    display: grid;
+    grid-template-columns: 22px minmax(0, 1fr) auto;
+    align-items: center;
+    gap: 7px;
+    padding: 9px 8px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--foreground);
+    text-align: left;
+  }
+
+  .combobox-option:hover,
+  .combobox-option.keyboard-active {
+    border-color: color-mix(in oklab, var(--primary) 26%, var(--line));
+    background: color-mix(in oklab, var(--primary) 8%, var(--panel-soft));
+  }
+
+  .combobox-option.selected {
+    background: color-mix(in oklab, var(--primary) 11%, var(--panel-soft));
+  }
+
+  .combobox-option:disabled {
+    cursor: not-allowed;
+    opacity: .42;
+  }
+
+  .option-check { width: 22px; height: 22px; display: grid; place-items: center; color: var(--primary); }
+  .option-copy { min-width: 0; display: grid; gap: 2px; }
+  .option-copy strong { overflow-wrap: anywhere; font-size: 9px; line-height: 1.25; }
+  .option-copy small { color: var(--muted-foreground); font-size: 7px; line-height: 1.25; }
+  .option-copy em { color: var(--primary); font-size: 7px; font-style: normal; }
+  .combobox-option:disabled .option-copy em { color: var(--warning); }
+  .option-price { padding-left: 6px; font-family: var(--font-mono); font-size: 9px; white-space: nowrap; }
+
+  .combobox-empty {
+    min-height: 120px;
+    padding: 18px;
+    display: grid;
+    place-content: center;
+    justify-items: center;
+    gap: 5px;
+    color: var(--muted-foreground);
+    text-align: center;
+  }
+
+  .combobox-empty strong { color: var(--foreground); font-size: 10px; }
+  .combobox-empty span { font-size: 8px; }
 
   .compare-slot .part-visual {
     width: 100%;
@@ -680,6 +800,7 @@
     font-size: clamp(12px, 1.15vw, 16px);
     line-height: 1.3;
     letter-spacing: -.02em;
+    overflow-wrap: anywhere;
   }
 
   .compare-price {
@@ -733,17 +854,13 @@
   }
 
   .aligned-comparison {
-    max-width: 1240px;
-    margin: 0 auto;
-    border: 1px solid var(--line);
-    border-top: 0;
-    border-radius: 0 0 16px 16px;
+    width: 100%;
+    border-top: 1px solid var(--line);
+    border-radius: 0 0 15px 15px;
     overflow: hidden;
   }
 
   .comparison-row {
-    display: grid;
-    grid-template-columns: 150px repeat(3, minmax(0, 1fr));
     border-top: 1px solid var(--line);
     background: color-mix(in oklab, var(--panel-soft) 88%, transparent);
   }
@@ -759,6 +876,7 @@
     border-left: 1px solid var(--line);
     font-size: 10px;
     line-height: 1.35;
+    overflow-wrap: anywhere;
   }
 
   .comparison-row .comparison-metric {
@@ -787,8 +905,33 @@
 
   .structured-differences,
   .compare-ai-recommendation {
+    width: 100%;
     max-width: 1240px;
     margin: 24px auto 0;
+    border: 1px solid var(--line);
+    border-radius: 13px;
+    overflow: hidden;
+  }
+
+  .comparison-section-label,
+  .decision-bar-label {
+    min-width: 0;
+    padding: 15px 14px;
+    color: var(--muted-foreground);
+    background: color-mix(in oklab, var(--panel-soft) 94%, transparent);
+  }
+
+  .structured-differences-content,
+  .compare-ai-recommendation-content,
+  .decision-bar-content {
+    grid-column: 2 / -1;
+    min-width: 0;
+    border-left: 1px solid var(--line);
+  }
+
+  .structured-differences-content {
+    padding: 15px;
+    background: color-mix(in oklab, var(--panel-soft) 88%, transparent);
   }
 
   .structure-heading {
@@ -855,16 +998,18 @@
   .impact-grid p { margin: 0; color: var(--muted-foreground); font-size: 9px; line-height: 1.5; }
 
   .compare-ai-recommendation {
+    background: color-mix(in oklab, var(--primary) 7%, var(--panel));
+    border-color: color-mix(in oklab, var(--primary) 35%, var(--line));
+  }
+
+  .compare-ai-recommendation-content {
     display: grid;
     grid-template-columns: 40px 1fr;
     gap: 12px;
     padding: 16px;
-    border: 1px solid color-mix(in oklab, var(--primary) 35%, var(--line));
-    border-radius: 13px;
-    background: color-mix(in oklab, var(--primary) 7%, var(--panel));
   }
 
-  .compare-ai-recommendation > span {
+  .compare-ai-recommendation-content > span {
     width: 40px;
     height: 40px;
     display: grid;
@@ -879,20 +1024,27 @@
   .compare-ai-recommendation p { margin: 0; color: var(--muted-foreground); font-size: 9px; line-height: 1.5; }
 
   .compare-decision-bar {
+    width: min(1240px, calc(100% - (2 * var(--comparison-page-gutter))));
     min-height: 78px;
     z-index: 8;
-    display: grid;
-    grid-template-columns: minmax(190px, 1.4fr) .7fr .7fr .9fr auto;
-    align-items: center;
-    gap: 18px;
-    padding: 12px clamp(24px, 3vw, 48px);
+    margin: 0 auto;
     border-top: 1px solid color-mix(in oklab, var(--primary) 25%, var(--line));
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
     background: color-mix(in oklab, oklch(0.12 0.006 255) 95%, transparent);
     box-shadow: 0 -18px 44px -34px black;
     backdrop-filter: blur(18px);
   }
 
-  .compare-decision-bar > div:not(.decision-actions) { min-width: 0; display: grid; gap: 3px; }
+  .decision-bar-label { display: flex; align-items: center; }
+  .decision-bar-content {
+    display: grid;
+    grid-template-columns: minmax(170px, 1.2fr) .65fr .7fr .9fr auto;
+    align-items: center;
+    gap: 14px;
+    padding: 12px 14px;
+  }
+  .decision-bar-content > div:not(.decision-actions) { min-width: 0; display: grid; gap: 3px; }
   .compare-decision-bar small { color: var(--muted-foreground); font-size: 7px; letter-spacing: .1em; }
   .compare-decision-bar strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
   .compare-decision-bar .decision-product strong { font-size: 11px; }
@@ -913,9 +1065,9 @@
     .comparison-hero { grid-template-columns: 1fr 28px 1fr; }
     .compare-product { grid-template-columns: 110px 1fr; }
     .compare-product .part-visual { width: 110px; height: 110px; }
-    .comparison-row { grid-template-columns: 118px repeat(3, minmax(0, 1fr)); }
-    .compare-decision-bar { grid-template-columns: minmax(170px, 1.2fr) .6fr .7fr auto; gap: 11px; }
-    .compare-decision-bar > div:nth-child(4) { display: none; }
+    .wide-compare-workspace { --comparison-label-width: 118px; }
+    .decision-bar-content { grid-template-columns: minmax(150px, 1.1fr) .6fr .7fr auto; gap: 10px; }
+    .decision-bar-content > div:nth-child(4) { display: none; }
   }
 
   @media (max-width: 900px) {
@@ -942,11 +1094,12 @@
     .compat-status { display: none; }
     .card-buttons { margin: 0; padding: 0; }
     .center-overlay { inset: 8px; }
-    .wide-compare-workspace { width: 100%; height: 100%; border: 0; }
+    .wide-compare-workspace { --comparison-label-width: 112px; --comparison-page-gutter: 16px; width: 100%; height: 100%; border: 0; }
     .mobile-tabs.compare-open { display: none; }
-    .compare-decision-bar { grid-template-columns: 1fr 1fr auto; padding: 10px 16px; }
-    .compare-decision-bar > div:nth-child(3),
-    .compare-decision-bar > div:nth-child(4) { display: none; }
+    .decision-bar-content { grid-template-columns: 1fr auto; gap: 9px; padding: 10px; }
+    .decision-bar-content > div:nth-child(2),
+    .decision-bar-content > div:nth-child(3),
+    .decision-bar-content > div:nth-child(4) { display: none; }
   }
 
   @media (max-width: 620px) {
@@ -987,24 +1140,21 @@
     .confirm-actions, .shopping-actions { flex-direction: column-reverse; }
     .confirm-actions button, .shopping-actions button { width: 100%; }
     .wide-compare-scroll { padding: 20px 14px 28px; overflow: auto; }
+    .wide-compare-workspace { --comparison-label-width: 110px; --comparison-page-gutter: 14px; }
     .wide-compare-header { position: sticky; left: 0; width: calc(100vw - 28px); }
     .wide-compare-header h1 { font-size: 25px; }
-    .compare-slot-grid,
-    .aligned-comparison { min-width: 760px; }
+    .compare-grid-frame { min-width: 820px; }
     .compare-slot .part-visual { height: 132px; }
     .structured-differences,
-    .compare-ai-recommendation { min-width: 760px; }
+    .compare-ai-recommendation { min-width: 820px; }
     .difference-grid { grid-template-columns: repeat(4, 1fr); }
     .impact-grid { grid-template-columns: repeat(3, 1fr); }
     .compare-decision-bar {
-      min-height: 112px;
-      grid-template-columns: 1fr auto;
-      gap: 8px 12px;
-      padding: 10px 14px;
+      min-height: 92px;
     }
-    .compare-decision-bar .decision-product { grid-column: 1 / -1; }
-    .compare-decision-bar > div:nth-child(2) { display: grid; }
-    .decision-actions { grid-column: 2; grid-row: 2; }
+    .decision-bar-label { padding: 10px 8px; }
+    .decision-bar-content { grid-template-columns: minmax(0, 1fr) auto; }
+    .decision-actions { grid-column: 2; }
     .decision-actions .outline-button { display: none; }
     .decision-actions .primary-button { min-height: 40px; white-space: nowrap; }
   }

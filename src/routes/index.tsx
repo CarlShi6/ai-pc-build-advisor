@@ -6,7 +6,7 @@ import {
   PackageCheck, PanelLeft, Power, Send, ShieldCheck, ShoppingBag,
   SlidersHorizontal, Sparkles, Target, X, Zap, Search,
 } from "lucide-react";
-import { useMemo, useState, type ComponentType } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -54,6 +54,8 @@ type ComparisonProduct = {
   length: string;
   resolution: string;
   performanceDelta: string;
+  disabled?: boolean;
+  availability?: string;
 };
 
 function comparisonCatalog(part: Part): ComparisonProduct[] {
@@ -64,6 +66,11 @@ function comparisonCatalog(part: Part): ComparisonProduct[] {
       { id: "7900xt", name: "AMD Radeon RX 7900 XT 20GB", price: 699, retailer: "Amazon", label: "BEST VALUE", compatibility: "Fully compatible", gaming: "Excellent · 93/100", productivity: "Strong · 80/100", value: "97/100", vram: "20GB GDDR6", power: "315W", psu: "750W", length: "276mm", resolution: "1440p ultra / 4K", performanceDelta: "−5% raster" },
       { id: "5070ti", name: "NVIDIA GeForce RTX 5070 Ti 16GB", price: 749, retailer: "Newegg", label: "USER CHOICE", compatibility: "Fully compatible", gaming: "Excellent · 94/100", productivity: "Excellent · 91/100", value: "95/100", vram: "16GB GDDR7", power: "300W", psu: "750W", length: "300mm", resolution: "1440p ultra / 4K", performanceDelta: "−3% at 1440p" },
       { id: "4070s", name: "NVIDIA GeForce RTX 4070 SUPER 12GB", price: 599, retailer: "Best Buy", label: "LOWER COST", compatibility: "Fully compatible", gaming: "Strong · 84/100", productivity: "Strong · 82/100", value: "96/100", vram: "12GB GDDR6X", power: "220W", psu: "650W", length: "267mm", resolution: "1440p high", performanceDelta: "−18% at 1440p" },
+      { id: "4070", name: "NVIDIA GeForce RTX 4070 12GB", price: 529, retailer: "Amazon", label: "EFFICIENT PICK", compatibility: "Fully compatible", gaming: "Strong · 79/100", productivity: "Strong · 78/100", value: "91/100", vram: "12GB GDDR6X", power: "200W", psu: "650W", length: "244mm", resolution: "1440p high", performanceDelta: "−23% at 1440p" },
+      { id: "7800xt", name: "AMD Radeon RX 7800 XT 16GB", price: 499, retailer: "Newegg", label: "VALUE PICK", compatibility: "Fully compatible", gaming: "Strong · 82/100", productivity: "Good · 73/100", value: "98/100", vram: "16GB GDDR6", power: "263W", psu: "700W", length: "267mm", resolution: "1440p high", performanceDelta: "−19% raster" },
+      { id: "7900gre", name: "AMD Radeon RX 7900 GRE 16GB", price: 549, retailer: "Best Buy", label: "BALANCED PICK", compatibility: "Fully compatible", gaming: "Strong · 85/100", productivity: "Good · 76/100", value: "96/100", vram: "16GB GDDR6", power: "260W", psu: "700W", length: "280mm", resolution: "1440p ultra", performanceDelta: "−15% raster" },
+      { id: "5060ti", name: "NVIDIA GeForce RTX 5060 Ti 16GB", price: 449, retailer: "Amazon", label: "ENTRY PICK", compatibility: "Fully compatible", gaming: "Good · 73/100", productivity: "Good · 76/100", value: "90/100", vram: "16GB GDDR7", power: "180W", psu: "600W", length: "242mm", resolution: "1440p", performanceDelta: "−29% at 1440p" },
+      { id: "4090", name: "NVIDIA GeForce RTX 4090 24GB", price: 1799, retailer: "Unavailable", availability: "Currently unavailable", disabled: true, label: "FLAGSHIP", compatibility: "Requires PSU review", gaming: "Exceptional · 100/100", productivity: "Exceptional · 100/100", value: "61/100", vram: "24GB GDDR6X", power: "450W", psu: "1000W", length: "336mm", resolution: "4K ultra", performanceDelta: "+27% at 4K" },
     ];
   }
 
@@ -90,6 +97,192 @@ function ProductVisual({ part, failed, onFail }: { part: Part; failed: boolean; 
   );
 }
 
+function SearchablePartCombobox({
+  category,
+  products,
+  selected,
+  slotIndex,
+  onSelect,
+}: {
+  category: string;
+  products: ComparisonProduct[];
+  selected: ComparisonProduct;
+  slotIndex: number;
+  onSelect: (product: ComparisonProduct) => void;
+}) {
+  const rootRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listboxId = useId();
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState(selected.name);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  const filteredProducts = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+    if (!normalizedQuery) return products;
+    return products.filter((product) => {
+      const manufacturer = product.name.split(" ")[0];
+      const model = product.name.split(" ").slice(1).join(" ");
+      const searchText = [
+        product.name,
+        manufacturer,
+        model,
+        category,
+        product.vram,
+        product.power,
+        product.psu,
+        product.resolution,
+        product.retailer,
+        product.availability,
+      ].filter(Boolean).join(" ").toLowerCase();
+      return searchText.includes(normalizedQuery);
+    });
+  }, [category, products, query]);
+
+  useEffect(() => {
+    if (!open) setQuery(selected.name);
+  }, [open, selected.name]);
+
+  useEffect(() => {
+    const firstEnabled = filteredProducts.findIndex((product) => !product.disabled);
+    setActiveIndex(firstEnabled >= 0 ? firstEnabled : 0);
+  }, [query, open, filteredProducts]);
+
+  useEffect(() => {
+    if (!open) return;
+    const activeProduct = filteredProducts[activeIndex];
+    if (!activeProduct) return;
+    document.getElementById(`${listboxId}-${activeProduct.id}`)?.scrollIntoView({ block: "nearest" });
+  }, [activeIndex, filteredProducts, listboxId, open]);
+
+  useEffect(() => {
+    const closeOnOutsideClick = (event: MouseEvent) => {
+      if (rootRef.current?.contains(event.target as Node)) return;
+      setOpen(false);
+      setQuery(selected.name);
+    };
+    document.addEventListener("mousedown", closeOnOutsideClick);
+    return () => document.removeEventListener("mousedown", closeOnOutsideClick);
+  }, [selected.name]);
+
+  const openFullList = () => {
+    if (!open) {
+      setQuery("");
+      setOpen(true);
+      const selectedIndex = products.findIndex((product) => product.id === selected.id);
+      setActiveIndex(selectedIndex >= 0 ? selectedIndex : 0);
+    }
+  };
+
+  const commitSelection = (product: ComparisonProduct) => {
+    if (product.disabled) return;
+    onSelect(product);
+    setQuery(product.name);
+    setOpen(false);
+    inputRef.current?.focus();
+  };
+
+  const moveActive = (direction: 1 | -1) => {
+    if (!filteredProducts.length) return;
+    let nextIndex = activeIndex;
+    for (let step = 0; step < filteredProducts.length; step += 1) {
+      nextIndex = (nextIndex + direction + filteredProducts.length) % filteredProducts.length;
+      if (!filteredProducts[nextIndex]?.disabled) {
+        setActiveIndex(nextIndex);
+        return;
+      }
+    }
+  };
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "ArrowDown") {
+      event.preventDefault();
+      if (!open) openFullList();
+      else moveActive(1);
+      return;
+    }
+    if (event.key === "ArrowUp") {
+      event.preventDefault();
+      if (!open) openFullList();
+      else moveActive(-1);
+      return;
+    }
+    if (event.key === "Enter" && open) {
+      event.preventDefault();
+      const activeProduct = filteredProducts[activeIndex];
+      if (activeProduct) commitSelection(activeProduct);
+      return;
+    }
+    if (event.key === "Escape") {
+      event.preventDefault();
+      setOpen(false);
+      setQuery(selected.name);
+      return;
+    }
+    if (event.key === "Tab") {
+      setOpen(false);
+      setQuery(selected.name);
+    }
+  };
+
+  return (
+    <div className="catalog-combobox" ref={rootRef}>
+      <label htmlFor={`${listboxId}-input`}><Search size={13} /> Search {category}</label>
+      <div className="combobox-control">
+        <input
+          ref={inputRef}
+          id={`${listboxId}-input`}
+          role="combobox"
+          aria-autocomplete="list"
+          aria-expanded={open}
+          aria-controls={listboxId}
+          aria-activedescendant={open && filteredProducts[activeIndex] ? `${listboxId}-${filteredProducts[activeIndex].id}` : undefined}
+          value={query}
+          onFocus={openFullList}
+          onClick={openFullList}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onKeyDown={handleKeyDown}
+          autoComplete="off"
+          aria-label={`Search ${category} catalog for comparison slot ${slotIndex + 1}`}
+        />
+        <ChevronRight className={open ? "combobox-chevron open" : "combobox-chevron"} size={15} aria-hidden="true" />
+      </div>
+      {open && (
+        <div className="combobox-menu" id={listboxId} role="listbox" aria-label={`Compatible ${category} parts`}>
+          {filteredProducts.length ? filteredProducts.map((product, index) => {
+            const isSelected = product.id === selected.id;
+            const isActive = index === activeIndex;
+            return (
+              <button
+                type="button"
+                id={`${listboxId}-${product.id}`}
+                role="option"
+                aria-selected={isSelected}
+                aria-disabled={product.disabled || undefined}
+                disabled={product.disabled}
+                className={`combobox-option ${isSelected ? "selected" : ""} ${isActive ? "keyboard-active" : ""}`}
+                onMouseMove={() => setActiveIndex(index)}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => commitSelection(product)}
+                key={product.id}
+              >
+                <span className="option-check">{isSelected && <Check size={14} />}</span>
+                <span className="option-copy"><strong>{product.name}</strong><small>{product.vram} · {product.power} · {product.resolution}</small><em>{product.availability ?? `${product.retailer} · Available`}</em></span>
+                <span className="option-price">${product.price.toLocaleString()}</span>
+              </button>
+            );
+          }) : (
+            <div className="combobox-empty"><Search size={18} /><strong>No matching {category} parts</strong><span>Try a model, manufacturer, or specification.</span></div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function CompareWorkspace({
   part,
   buildTotal,
@@ -105,14 +298,10 @@ function CompareWorkspace({
 }) {
   const catalog = useMemo(() => comparisonCatalog(part), [part]);
   const [slots, setSlots] = useState([catalog[0], catalog[1], catalog[3] ?? catalog[2]]);
-  const [queries, setQueries] = useState(slots.map((slot) => slot.name));
   const [selectedSlot, setSelectedSlot] = useState(1);
 
-  const setSlotProduct = (slotIndex: number, name: string) => {
-    setQueries((current) => current.map((query, index) => index === slotIndex ? name : query));
-    const match = catalog.find((candidate) => candidate.name.toLowerCase() === name.toLowerCase());
-    if (!match) return;
-    setSlots((current) => current.map((slot, index) => index === slotIndex ? match : slot));
+  const setSlotProduct = (slotIndex: number, product: ComparisonProduct) => {
+    setSlots((current) => current.map((slot, index) => index === slotIndex ? product : slot));
   };
 
   const selected = slots[selectedSlot];
@@ -145,24 +334,22 @@ function CompareWorkspace({
           <button className="icon-button" onClick={onClose} aria-label="Close comparison"><X size={18} /></button>
         </header>
 
-        <div className="compare-slot-grid">
+        <div className="compare-grid-frame">
+        <div className="compare-slot-grid comparison-grid">
+          <div className="comparison-label-spacer" aria-hidden="true">
+            <span>Compared parts</span>
+          </div>
           {slots.map((slot, slotIndex) => {
             const displayPart = { ...part, name: slot.name, price: slot.price, retailer: slot.retailer };
             return (
               <article className={`compare-slot ${selectedSlot === slotIndex ? "decision-selected" : ""}`} key={`${slot.id}-${slotIndex}`}>
-                <label className="catalog-search">
-                  <span><Search size={13} /> Search {part.category}</span>
-                  <input
-                    list={`catalog-${part.id}-${slotIndex}`}
-                    value={queries[slotIndex]}
-                    onChange={(event) => setSlotProduct(slotIndex, event.target.value)}
-                    onFocus={(event) => event.currentTarget.select()}
-                    aria-label={`Search ${part.category} catalog for comparison slot ${slotIndex + 1}`}
-                  />
-                  <datalist id={`catalog-${part.id}-${slotIndex}`}>
-                    {catalog.map((candidate) => <option value={candidate.name} key={candidate.id} />)}
-                  </datalist>
-                </label>
+                <SearchablePartCombobox
+                  category={part.category}
+                  products={catalog}
+                  selected={slot}
+                  slotIndex={slotIndex}
+                  onSelect={(product) => setSlotProduct(slotIndex, product)}
+                />
                 <ProductVisual part={displayPart} failed={false} onFail={() => {}} />
                 <span className={`compare-label label-${slot.label.toLowerCase().replaceAll(" ", "-")}`}>{slot.label}</span>
                 <h2>{slot.name}</h2>
@@ -182,7 +369,7 @@ function CompareWorkspace({
 
         <div className="aligned-comparison" role="table" aria-label="Aligned product comparison">
           {rows.map(([label, ...values], rowIndex) => (
-            <div className={`comparison-row ${rowIndex >= 9 ? "whole-build-row" : ""}`} role="row" key={label}>
+            <div className={`comparison-row comparison-grid ${rowIndex >= 9 ? "whole-build-row" : ""}`} role="row" key={label}>
               <div className="comparison-metric" role="rowheader">{label}</div>
               {values.map((value, valueIndex) => (
                 <div className={selectedSlot === valueIndex ? "selected-value" : ""} role="cell" key={`${label}-${valueIndex}`}>
@@ -193,34 +380,44 @@ function CompareWorkspace({
             </div>
           ))}
         </div>
+        </div>
 
-        <section className="structured-differences">
-          <div className="structure-heading"><span className="section-kicker">STRUCTURED DIFFERENCES</span><h2>What changes in the whole build</h2></div>
-          <div className="difference-grid">
-            <div><CircleDollarSign size={17} /><span><small>PRICE DELTA</small><strong>{selected.price - part.price > 0 ? "+" : "−"}${Math.abs(selected.price - part.price)}</strong></span></div>
-            <div><Gauge size={17} /><span><small>PERFORMANCE DELTA</small><strong>{selected.performanceDelta}</strong></span></div>
-            <div><Target size={17} /><span><small>VALUE DELTA</small><strong>{selected.id === catalog[0].id ? "Baseline" : "+8 points"}</strong></span></div>
-            <div><Zap size={17} /><span><small>POWER DELTA</small><strong>{selected.power === catalog[0].power ? "No change" : selected.power}</strong></span></div>
-          </div>
-          <div className="impact-grid">
-            <div><h3><CheckCircle2 size={15} /> Main gains</h3><p>More budget flexibility, excellent 1440p performance, and lower sustained heat for quieter gaming.</p></div>
-            <div><h3><AlertTriangle size={15} /> Main tradeoffs</h3><p>Less 4K headroom and a smaller ray-tracing margin in the most demanding titles.</p></div>
-            <div><h3><ShieldCheck size={15} /> Whole-build impact</h3><p>No cross-category replacements required. Case clearance, platform, and power connections remain compatible.</p></div>
+        <section className="structured-differences comparison-grid">
+          <div className="comparison-section-label"><span>Structured differences</span></div>
+          <div className="structured-differences-content">
+            <div className="structure-heading"><span className="section-kicker">STRUCTURED DIFFERENCES</span><h2>What changes in the whole build</h2></div>
+            <div className="difference-grid">
+              <div><CircleDollarSign size={17} /><span><small>PRICE DELTA</small><strong>{selected.price - part.price > 0 ? "+" : "−"}${Math.abs(selected.price - part.price)}</strong></span></div>
+              <div><Gauge size={17} /><span><small>PERFORMANCE DELTA</small><strong>{selected.performanceDelta}</strong></span></div>
+              <div><Target size={17} /><span><small>VALUE DELTA</small><strong>{selected.id === catalog[0].id ? "Baseline" : "+8 points"}</strong></span></div>
+              <div><Zap size={17} /><span><small>POWER DELTA</small><strong>{selected.power === catalog[0].power ? "No change" : selected.power}</strong></span></div>
+            </div>
+            <div className="impact-grid">
+              <div><h3><CheckCircle2 size={15} /> Main gains</h3><p>More budget flexibility, excellent 1440p performance, and lower sustained heat for quieter gaming.</p></div>
+              <div><h3><AlertTriangle size={15} /> Main tradeoffs</h3><p>Less 4K headroom and a smaller ray-tracing margin in the most demanding titles.</p></div>
+              <div><h3><ShieldCheck size={15} /> Whole-build impact</h3><p>No cross-category replacements required. Case clearance, platform, and power connections remain compatible.</p></div>
+            </div>
           </div>
         </section>
 
-        <section className="compare-ai-recommendation">
-          <span><Sparkles size={18} /></span>
-          <div><small>AI RECOMMENDATION</small><h2>The {catalog[1].name} is the smartest match for your actual target.</h2><p>It preserves the high-refresh 1440p experience while returning meaningful budget and thermal headroom to the whole build.</p></div>
+        <section className="compare-ai-recommendation comparison-grid">
+          <div className="comparison-section-label"><span>AI recommendation</span></div>
+          <div className="compare-ai-recommendation-content">
+            <span><Sparkles size={18} /></span>
+            <div><small>AI RECOMMENDATION</small><h2>The {catalog[1].name} is the smartest match for your actual target.</h2><p>It preserves the high-refresh 1440p experience while returning meaningful budget and thermal headroom to the whole build.</p></div>
+          </div>
         </section>
       </div>
 
-      <footer className="compare-decision-bar">
-        <div className="decision-product"><small>SELECTED REPLACEMENT</small><strong>{selectedSlot === 0 ? "Keep current part" : selected.name}</strong></div>
-        <div><small>NEW BUILD TOTAL</small><strong>${selectedBuildTotal.toLocaleString()}</strong></div>
-        <div><small>BUDGET DELTA</small><strong className={budgetDelta >= 0 ? "positive-text" : "warning-text"}>{budgetDelta >= 0 ? `$${budgetDelta} remaining` : `$${Math.abs(budgetDelta)} over`}</strong></div>
-        <div><small>COMPATIBILITY</small><strong className="positive-text"><ShieldCheck size={14} /> {selected.compatibility}</strong></div>
-        <div className="decision-actions"><button className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={selectedSlot === 0} onClick={() => onReplace({ ...part, name: selected.name, price: selected.price, retailer: selected.retailer })}>Replace Current Part <ArrowRight size={15} /></button></div>
+      <footer className="compare-decision-bar comparison-grid">
+        <div className="decision-bar-label"><span>Decision</span></div>
+        <div className="decision-bar-content">
+          <div className="decision-product"><small>SELECTED REPLACEMENT</small><strong>{selectedSlot === 0 ? "Keep current part" : selected.name}</strong></div>
+          <div><small>NEW BUILD TOTAL</small><strong>${selectedBuildTotal.toLocaleString()}</strong></div>
+          <div><small>BUDGET DELTA</small><strong className={budgetDelta >= 0 ? "positive-text" : "warning-text"}>{budgetDelta >= 0 ? `$${budgetDelta} remaining` : `$${Math.abs(budgetDelta)} over`}</strong></div>
+          <div><small>COMPATIBILITY</small><strong className="positive-text"><ShieldCheck size={14} /> {selected.compatibility}</strong></div>
+          <div className="decision-actions"><button className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={selectedSlot === 0} onClick={() => onReplace({ ...part, name: selected.name, price: selected.price, retailer: selected.retailer })}>Replace Current Part <ArrowRight size={15} /></button></div>
+        </div>
       </footer>
     </section>
   );
