@@ -561,10 +561,10 @@
   .wide-compare-header {
     max-width: 1240px;
     margin: 0 auto 22px;
-    display: flex;
+    display: grid;
+    grid-template-columns: minmax(280px, 1fr) auto 36px;
     align-items: flex-start;
-    justify-content: space-between;
-    gap: 20px;
+    gap: 24px;
   }
 
   .wide-compare-header h1 {
@@ -577,8 +577,14 @@
   .wide-compare-header p {
     margin: 0;
     color: var(--muted-foreground);
-    font-size: 11px;
+    font-size: 12px;
+    line-height: 1.5;
   }
+
+  .compare-header-context { display: grid; grid-template-columns: repeat(3, minmax(110px, 1fr)); gap: 0; border-left: 1px solid var(--line-subtle); }
+  .compare-header-context > span { min-width: 0; display: grid; gap: 4px; padding: 3px 14px 4px; border-right: 1px solid var(--line-subtle); }
+  .compare-header-context small { color: var(--muted-foreground); font-size: 8px; font-weight: 700; letter-spacing: .1em; }
+  .compare-header-context strong { max-width: 20ch; overflow: hidden; color: var(--foreground); font-size: 11px; line-height: 1.35; text-overflow: ellipsis; white-space: nowrap; }
 
   .compare-slot-grid {
     width: 100%;
@@ -594,8 +600,8 @@
     max-width: 1240px;
     margin: auto;
     border: 1px solid var(--line);
-    border-radius: 16px;
-    background: var(--panel-soft);
+    border-radius: 10px;
+    background: var(--surface-1);
   }
 
   .comparison-label-spacer {
@@ -619,35 +625,21 @@
   .compare-slot {
     position: relative;
     min-width: 0;
-    padding: 14px;
+    padding: 12px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     border: 0;
     border-left: 1px solid var(--line);
     border-radius: 0;
-    background: var(--panel);
+    background: var(--surface-1);
     transition: border-color .18s ease, background .18s ease;
     overflow: visible;
   }
 
   .compare-slot.decision-selected {
-    background: color-mix(in oklab, var(--panel) 96%, var(--palette-mid));
-    box-shadow: inset 0 2px 0 color-mix(in oklab, var(--primary) 72%, var(--line));
-  }
-
-  .compare-slot.ai-recommendation {
-    box-shadow: inset 0 1px 0 color-mix(in oklab, var(--primary) 38%, var(--line));
-  }
-
-  .compare-slot.ai-recommendation.decision-selected {
-    background: var(--panel);
-    box-shadow: inset 0 2px 0 color-mix(in oklab, var(--primary) 55%, var(--line));
-  }
-
-  .compare-slot.user-choice.decision-selected {
-    background: color-mix(in oklab, var(--panel) 95%, var(--primary));
-    box-shadow: inset 0 2px 0 var(--primary), inset 1px 0 0 color-mix(in oklab, var(--primary) 22%, transparent), inset -1px 0 0 color-mix(in oklab, var(--primary) 22%, transparent);
+    background: var(--surface-2);
+    box-shadow: inset 0 2px 0 var(--line-selected), inset 1px 0 0 var(--line-strong), inset -1px 0 0 var(--line-strong);
   }
 
   .catalog-combobox {
@@ -796,9 +788,9 @@
   }
 
   .label-ai-pick {
-    color: var(--primary);
-    border-color: color-mix(in oklab, var(--primary) 24%, var(--line));
-    background: color-mix(in oklab, var(--primary) 3%, transparent);
+    color: var(--semantic-strong);
+    border-color: color-mix(in oklab, var(--semantic-strong) 24%, var(--line));
+    background: transparent;
   }
 
   .label-best-value {
@@ -811,12 +803,6 @@
     color: var(--foreground);
     border-color: color-mix(in oklab, var(--palette-soft) 18%, var(--line));
     background: color-mix(in oklab, var(--palette-soft) 6%, transparent);
-  }
-
-  .compare-slot.user-choice.decision-selected .label-user-choice {
-    color: var(--primary);
-    border-color: color-mix(in oklab, var(--primary) 36%, var(--line));
-    background: color-mix(in oklab, var(--primary) 5%, transparent);
   }
 
   .compare-slot h2 {
@@ -849,7 +835,7 @@
     display: flex;
     align-items: center;
     gap: 5px;
-    margin: 8px 0 13px;
+    margin: 8px 0 10px;
     color: var(--primary);
     font-size: 9px;
   }
@@ -860,7 +846,7 @@
     display: inline-flex;
     align-items: center;
     gap: 4px;
-    margin: -3px 0 11px;
+    margin: -2px 0 10px;
     color: var(--muted-foreground);
     font-size: 8px;
     font-weight: 650;
@@ -897,16 +883,16 @@
   }
 
   .slot-action.active {
-    border-color: color-mix(in oklab, var(--primary) 30%, var(--line));
-    background: color-mix(in oklab, var(--palette-soft) 7%, var(--panel-soft));
+    border-color: var(--line-selected);
+    background: var(--surface-3);
     color: var(--foreground);
   }
 
-  .compare-slot.user-choice .slot-action.active {
-    border-color: color-mix(in oklab, var(--primary) 48%, var(--line));
-    background: color-mix(in oklab, var(--primary) 6%, var(--panel));
-    color: var(--slate-bright);
-  }
+  .slot-impact-summary { width: 100%; display: grid; grid-template-columns: 1fr 1fr; gap: 0; margin: 2px 0 12px; border-top: 1px solid var(--line-subtle); border-bottom: 1px solid var(--line-subtle); }
+  .slot-impact-summary > div { min-width: 0; display: grid; gap: 3px; padding: 8px 4px; }
+  .slot-impact-summary > div:nth-child(even) { padding-left: 10px; border-left: 1px solid var(--line-subtle); }
+  .slot-impact-summary dt { color: var(--muted-foreground); font-size: 8px; letter-spacing: .07em; text-transform: uppercase; }
+  .slot-impact-summary dd { min-width: 0; margin: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 10px; line-height: 1.35; }
 
   .aligned-comparison {
     width: 100%;
@@ -945,17 +931,9 @@
   }
 
   .comparison-row > .selected-value {
-    background: color-mix(in oklab, var(--palette-mid) 4%, transparent);
+    background: var(--surface-2);
     color: var(--foreground);
-  }
-
-  .comparison-row > .selected-value.selected-ai {
-    background: color-mix(in oklab, var(--palette-mid) 2%, transparent);
-  }
-
-  .comparison-row > .selected-value.selected-user {
-    background: color-mix(in oklab, var(--palette-mid) 4%, transparent);
-    box-shadow: inset 1px 0 0 color-mix(in oklab, var(--palette-mid) 38%, transparent), inset -1px 0 0 color-mix(in oklab, var(--palette-mid) 38%, transparent);
+    box-shadow: inset 1px 0 0 var(--line-strong), inset -1px 0 0 var(--line-strong);
   }
 
   .comparison-row > div:not(.comparison-metric) svg {
@@ -972,9 +950,9 @@
   .compare-ai-recommendation {
     width: 100%;
     max-width: 1240px;
-    margin: 24px auto 0;
+    margin: 16px auto 0;
     border: 1px solid var(--line);
-    border-radius: 13px;
+    border-radius: 10px;
     overflow: hidden;
   }
 
@@ -995,7 +973,7 @@
   }
 
   .structured-differences-content {
-    padding: 15px;
+    padding: 12px;
     background: var(--panel-soft);
   }
 
@@ -1024,11 +1002,10 @@
     display: flex;
     align-items: center;
     gap: 9px;
-    min-height: 62px;
-    padding: 11px 12px;
-    border: 1px solid var(--line);
-    border-radius: 11px;
-    background: var(--panel);
+    min-height: 54px;
+    padding: 9px 10px;
+    border-right: 1px solid var(--line-subtle);
+    background: transparent;
     color: var(--slate-bright);
   }
 
@@ -1044,10 +1021,9 @@
   }
 
   .impact-grid > div {
-    padding: 13px;
-    border: 1px solid var(--line);
-    border-radius: 11px;
-    background: var(--panel-soft);
+    padding: 11px;
+    border-top: 1px solid var(--line-subtle);
+    background: transparent;
   }
 
   .impact-grid h3 {
@@ -1061,11 +1037,11 @@
   .impact-grid h3 svg { color: var(--slate-bright); }
   .impact-grid > div:nth-child(2) h3 svg { color: var(--warning); }
   .impact-grid > div:nth-child(3) h3 svg { color: var(--primary); }
-  .impact-grid p { margin: 0; color: var(--muted-foreground); font-size: 9px; line-height: 1.5; }
+  .impact-grid p { margin: 0; color: var(--muted-foreground); font-size: 10px; line-height: 1.5; }
 
   .compare-ai-recommendation {
-    background: color-mix(in oklab, var(--palette-soft) 4%, var(--panel));
-    border-color: color-mix(in oklab, var(--primary) 20%, var(--line));
+    background: var(--surface-1);
+    border-color: var(--line);
   }
 
   .compare-ai-recommendation-content {
@@ -1081,17 +1057,17 @@
     display: grid;
     place-items: center;
     border-radius: 11px;
-    background: color-mix(in oklab, var(--primary) 6%, var(--panel-soft));
-    color: var(--primary);
+    background: var(--surface-2);
+    color: var(--semantic-strong);
   }
 
-  .compare-ai-recommendation small { color: var(--primary); font-size: 8px; letter-spacing: .11em; }
-  .compare-ai-recommendation h2 { margin: 4px 0 4px; font-size: 13px; }
-  .compare-ai-recommendation p { margin: 0; color: var(--muted-foreground); font-size: 9px; line-height: 1.5; }
+  .compare-ai-recommendation small { color: var(--semantic-strong); font-size: 8px; letter-spacing: .11em; }
+  .compare-ai-recommendation h2 { margin: 4px 0 3px; font-size: 13px; }
+  .compare-ai-recommendation p { margin: 0; color: var(--muted-foreground); font-size: 10px; line-height: 1.5; }
 
   .compare-decision-bar {
     width: min(1240px, calc(100% - (2 * var(--comparison-page-gutter))));
-    min-height: 78px;
+    min-height: 104px;
     z-index: 8;
     margin: 0 auto;
     border-top: 1px solid var(--line);
@@ -1105,12 +1081,14 @@
   .decision-bar-label { display: flex; align-items: center; }
   .decision-bar-content {
     display: grid;
-    grid-template-columns: minmax(170px, 1.2fr) .65fr .7fr .9fr auto;
+    grid-template-columns: minmax(170px, 1fr) minmax(0, 2.6fr) auto;
     align-items: center;
     gap: 14px;
     padding: 12px 14px;
   }
-  .decision-bar-content > div:not(.decision-actions) { min-width: 0; display: grid; gap: 3px; }
+  .decision-product { min-width: 0; display: grid; gap: 3px; }
+  .decision-metrics { min-width: 0; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px 14px; }
+  .decision-metrics > div { min-width: 0; display: grid; gap: 3px; }
   .compare-decision-bar small { color: var(--muted-foreground); font-size: 7px; letter-spacing: .1em; }
   .compare-decision-bar strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
   .compare-decision-bar .decision-product strong { font-size: 11px; }
@@ -1120,6 +1098,15 @@
   .warning-text { color: var(--warning); }
   .decision-actions { display: flex; gap: 7px; justify-content: flex-end; }
   .decision-actions .primary-button:disabled { cursor: not-allowed; opacity: .45; filter: grayscale(.6); }
+
+  .confirmation-impact-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); margin: 14px 0; border-top: 1px solid var(--line); border-bottom: 1px solid var(--line); }
+  .confirmation-impact-grid > div { min-width: 0; display: grid; gap: 4px; padding: 11px 10px; border-right: 1px solid var(--line-subtle); }
+  .confirmation-impact-grid > div:nth-child(3n) { border-right: 0; }
+  .confirmation-impact-grid dt { color: var(--muted-foreground); font-size: 9px; }
+  .confirmation-impact-grid dd { margin: 0; overflow-wrap: anywhere; font-family: var(--font-mono); font-size: 11px; line-height: 1.35; }
+  .confirmation-note { display: flex; align-items: flex-start; gap: 8px; margin-bottom: 16px; color: var(--muted-foreground); font-size: 11px; line-height: 1.45; }
+  .confirmation-note svg { flex: 0 0 auto; color: var(--semantic-excellent); }
+  .confirmation-note strong { color: var(--foreground); }
 
   @media (max-width: 1180px) {
     .workspace-frame { grid-template-columns: 248px minmax(500px, 1fr) 286px; }
@@ -1131,8 +1118,13 @@
     .compare-product { grid-template-columns: 110px 1fr; }
     .compare-product .part-visual { width: 110px; height: 110px; }
     .wide-compare-workspace { --comparison-label-width: 118px; }
-    .decision-bar-content { grid-template-columns: minmax(150px, 1.1fr) .6fr .7fr auto; gap: 10px; }
-    .decision-bar-content > div:nth-child(4) { display: none; }
+    .wide-compare-header { grid-template-columns: minmax(240px, 1fr) auto 36px; gap: 16px; }
+    .compare-header-context { grid-template-columns: repeat(3, minmax(92px, 1fr)); }
+    .compare-header-context > span { padding-inline: 10px; }
+    .decision-bar-content { grid-template-columns: minmax(150px, .9fr) minmax(0, 2fr) auto; gap: 10px; }
+    .decision-metrics { gap: 8px 10px; }
+    .decision-actions { flex-direction: column-reverse; }
+    .decision-actions button { min-height: 32px; }
   }
 
   @media (max-width: 900px) {
@@ -1162,10 +1154,11 @@
     .center-overlay { inset: 8px; }
     .wide-compare-workspace { --comparison-label-width: 112px; --comparison-page-gutter: 16px; width: 100%; height: 100%; border: 0; }
     .mobile-tabs.compare-open { display: none; }
-    .decision-bar-content { grid-template-columns: 1fr auto; gap: 9px; padding: 10px; }
-    .decision-bar-content > div:nth-child(2),
-    .decision-bar-content > div:nth-child(3),
-    .decision-bar-content > div:nth-child(4) { display: none; }
+    .wide-compare-header { grid-template-columns: minmax(0, 1fr) 36px; }
+    .compare-header-context { grid-column: 1/-1; grid-row: 2; }
+    .decision-bar-content { grid-template-columns: minmax(0, 1fr) auto; gap: 10px; padding: 10px; }
+    .decision-metrics { grid-column: 1/-1; grid-row: 2; }
+    .decision-actions { grid-column: 2; grid-row: 1; flex-direction: row; }
   }
 
   @media (max-width: 620px) {
@@ -1205,6 +1198,7 @@
     .wide-compare-workspace { --comparison-label-width: 110px; --comparison-page-gutter: 14px; }
     .wide-compare-header { position: sticky; left: 0; width: calc(100vw - 28px); }
     .wide-compare-header h1 { font-size: 25px; }
+    .compare-header-context { display: none; }
     .compare-grid-frame { min-width: 820px; }
     .compare-slot .part-visual { height: 132px; }
     .structured-differences,
@@ -1212,13 +1206,19 @@
     .difference-grid { grid-template-columns: repeat(4, 1fr); }
     .impact-grid { grid-template-columns: repeat(3, 1fr); }
     .compare-decision-bar {
-      min-height: 92px;
+      width: 100%;
+      min-height: 174px;
+      display: block;
     }
-    .decision-bar-label { padding: 10px 8px; }
+    .decision-bar-label { display: none; }
     .decision-bar-content { grid-template-columns: minmax(0, 1fr) auto; }
-    .decision-actions { grid-column: 2; }
-    .decision-actions .outline-button { display: none; }
-    .decision-actions .primary-button { min-height: 40px; white-space: nowrap; }
+    .decision-product strong { white-space: normal; line-height: 1.3; }
+    .decision-metrics { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+    .decision-actions { grid-column: 1/-1; grid-row: 3; display: grid; grid-template-columns: 1fr 1.35fr; }
+    .decision-actions .primary-button { min-height: 38px; white-space: nowrap; }
+    .confirmation-impact-grid { grid-template-columns: 1fr 1fr; }
+    .confirmation-impact-grid > div:nth-child(3n) { border-right: 1px solid var(--line-subtle); }
+    .confirmation-impact-grid > div:nth-child(even) { border-right: 0; }
   }
 }
 
