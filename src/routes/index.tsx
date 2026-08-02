@@ -4,7 +4,8 @@ import {
   CheckCircle2, ChevronRight, CircleDollarSign, ClipboardList, Cpu, Fan, Gauge,
   GitCompareArrows, HardDrive, ImageOff, Layers3, MemoryStick, MonitorCog,
   PackageCheck, PanelLeft, Power, Send, ShieldCheck, ShoppingBag,
-  SlidersHorizontal, Sparkles, Target, X, Zap, Search,
+  SlidersHorizontal, Sparkles, Target, X, Zap, Search, Copy, Download,
+  ExternalLink, Store, Thermometer,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
 
@@ -148,6 +149,49 @@ function workloadFit(part: Part) {
     case: "High-airflow, low-noise fit",
   };
   return fits[part.id] ?? "Balanced for this build";
+}
+
+type ShoppingPart = Part & { purchaseUrl?: string };
+type ShoppingPlanStatus = "ready" | "loading" | "error";
+
+function purchaseUrlFor(part: Part) {
+  return (part as ShoppingPart).purchaseUrl;
+}
+
+function formatPartPrice(price: number | null | undefined) {
+  return typeof price === "number" && Number.isFinite(price)
+    ? `$${price.toLocaleString()}`
+    : "Price unavailable";
+}
+
+function stockState(part: Part) {
+  if (/out of stock|unavailable/i.test(part.stock)) return "risk";
+  if (/low/i.test(part.stock)) return "caution";
+  return "excellent";
+}
+
+function detailPowerThermal(part: Part) {
+  const relevantSpecs = part.specs.filter((spec) => /w\b|tdp|radiator|fan|pwm|airflow|mesh/i.test(spec));
+  return relevantSpecs.length ? relevantSpecs.join(" · ") : "No additional power or thermal data is provided by the current catalog.";
+}
+
+function relatedCompatibility(part: Part) {
+  const relationships: Record<string, string> = {
+    cpu: `${part.compatibility}. Paired with ${parts[2].name} and ${parts[3].name}.`,
+    gpu: `${part.compatibility}. Checked against ${parts[7].name} and ${parts[6].name}.`,
+    motherboard: `${part.compatibility}. Hosts the selected processor, memory, and storage.`,
+    ram: `${part.compatibility}. Checked against the selected motherboard and processor platform.`,
+    ssd: `${part.compatibility}. Uses an available slot on the selected motherboard.`,
+    cooler: `${part.compatibility}. Checked against the selected processor and case mounting position.`,
+    psu: `${part.compatibility}. Supplies the selected graphics card and processor.`,
+    case: `${part.compatibility}. Checked against graphics-card and cooling dimensions.`,
+  };
+  return relationships[part.id] ?? part.compatibility;
+}
+
+function upgradeLimit(part: Part) {
+  if (part.id === "psu") return "A future flagship GPU may require more PSU headroom.";
+  return "No structured upgrade-limit data is provided by the current catalog.";
 }
 
 function ProductVisual({ part, failed, onFail }: { part: Part; failed: boolean; onFail: () => void }) {
@@ -522,14 +566,25 @@ function BuildWorkspace() {
   const [replacementPart, setReplacementPart] = useState<Part | null>(null);
   const [comparisonReplacement, setComparisonReplacement] = useState<{ current: Part; next: Part } | null>(null);
   const [shoppingOpen, setShoppingOpen] = useState(false);
+  const [shoppingStatus] = useState<ShoppingPlanStatus>("ready");
+  const [shoppingFeedback, setShoppingFeedback] = useState("");
   const [warningOpen, setWarningOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"needs" | "build" | "summary">("build");
   const [failedImages, setFailedImages] = useState<string[]>([]);
   const [chatText, setChatText] = useState("");
   const [messages, setMessages] = useState<string[]>([]);
+  const detailCloseRef = useRef<HTMLButtonElement>(null);
+  const shoppingCloseRef = useRef<HTMLButtonElement>(null);
   const total = useMemo(() => parts.reduce((sum, part) => sum + part.price, 0), []);
   const budget = 2500;
   const delta = budget - total;
+  const retailerGroups = useMemo(() => {
+    const groups = new Map<string, Part[]>();
+    parts.forEach((part) => groups.set(part.retailer || "Retailer unavailable", [...(groups.get(part.retailer || "Retailer unavailable") ?? []), part]));
+    return [...groups.entries()];
+  }, []);
+  const compatibilityReviewCount = parts.filter((part) => /review|warning|issue|required/i.test(part.compatibility)).length;
+  const unresolvedPurchaseCount = parts.filter((part) => !purchaseUrlFor(part) || !Number.isFinite(part.price) || /out of stock|unavailable/i.test(part.stock)).length;
   const selectedPart = parts.find((part) => part.id === selectedId) ?? parts[1];
   const pendingCurrent = comparisonReplacement?.current ?? replacementPart;
   const pendingNext = comparisonReplacement?.next ?? (replacementPart ? {
@@ -552,6 +607,64 @@ function BuildWorkspace() {
     if (!chatText.trim()) return;
     setMessages((current) => [...current, chatText.trim()]);
     setChatText("");
+  };
+
+  useEffect(() => {
+    const openDialog = detailPart || shoppingOpen;
+    if (!openDialog) return;
+    const onKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== "Escape") return;
+      if (shoppingOpen) setShoppingOpen(false);
+      else setDetailPart(null);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    window.requestAnimationFrame(() => (shoppingOpen ? shoppingCloseRef.current : detailCloseRef.current)?.focus());
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [detailPart, shoppingOpen]);
+
+  const shoppingPlanText = () => {
+    const budgetLine = delta >= 0 ? `${formatPartPrice(delta)} remaining` : `${formatPartPrice(Math.abs(delta))} over budget`;
+    return [
+      "1440p Performance Build purchase plan",
+      `Build total: ${formatPartPrice(total)}`,
+      `Budget: ${budgetLine}`,
+      `Compatibility: ${compatibilityReviewCount ? `${compatibilityReviewCount} item requires review` : "No issues"}`,
+      "",
+      ...parts.map((part) => `${part.category}: ${part.name} | ${formatPartPrice(part.price)} | ${part.retailer || "Retailer unavailable"} | ${part.stock} | ${purchaseUrlFor(part) ?? "Purchase reference unavailable"}`),
+    ].join("\n");
+  };
+
+  const copyShoppingPlan = async () => {
+    const text = shoppingPlanText();
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    setShoppingFeedback("Purchase plan copied");
+  };
+
+  const exportShoppingPlan = () => {
+    const escapeCsv = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
+    const rows = [
+      ["Category", "Product", "Price", "Retailer", "Availability", "Compatibility", "Purchase reference", "Official page"],
+      ...parts.map((part) => [part.category, part.name, part.price, part.retailer, part.stock, part.compatibility, purchaseUrlFor(part) ?? "Unavailable", part.officialUrl ?? "Unavailable"]),
+    ];
+    const blob = new Blob([rows.map((row) => row.map(escapeCsv).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "1440p-performance-build-purchase-plan.csv";
+    link.click();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setShoppingFeedback("Purchase plan exported");
   };
 
   return (
@@ -654,10 +767,26 @@ function BuildWorkspace() {
             <div className="recommendation-callout"><span><Sparkles size={18} /></span><div><small>AI RECOMMENDATION</small><strong>Choose the 4070 Ti SUPER if 1440p is your real priority.</strong></div><button onClick={() => { setComparePart(null); setReplacementPart(parts[1]); }}>Choose this option <ArrowRight size={15} /></button></div>
           </div>}
 
-          {detailPart && <div className="center-overlay detail-overlay" role="dialog" aria-modal="true" aria-label="Component details">
-            <div className="overlay-header"><div><span className="section-kicker">{detailPart.category}</span><h2>{detailPart.name}</h2></div><button className="icon-button" onClick={() => setDetailPart(null)} aria-label="Close details"><X size={18} /></button></div>
-            <div className="detail-layout"><ProductVisual part={detailPart} failed={failedImages.includes(detailPart.id)} onFail={() => toggleImageFailure(detailPart.id)} /><div><span className="detail-price">${detailPart.price} <small>at {detailPart.retailer}</small></span>{detailPart.officialUrl && <a className="official-link detail-official-link" href={detailPart.officialUrl} target="_blank" rel="noreferrer" aria-label={`Open official page for ${detailPart.name} in a new tab`}>Official page <span aria-hidden="true">↗</span></a>}<p>{detailPart.reason}</p><h4>What you need to know</h4><ul>{detailPart.specs.map((spec) => <li key={spec}><Check size={14} /> {spec}</li>)}<li><ShieldCheck size={14} /> {detailPart.compatibility}</li></ul></div></div>
-            <div className="detail-footer"><button className="outline-button" onClick={() => toggleImageFailure(detailPart.id)}><ImageOff size={15} /> Toggle image failure</button><button className="primary-button" onClick={() => openCompare(detailPart)}>Compare alternatives <ArrowRight size={15} /></button></div>
+          {detailPart && <div className="center-overlay detail-overlay" role="dialog" aria-modal="true" aria-labelledby="product-detail-title">
+            <div className="overlay-header detail-header"><div><span className="section-kicker">{detailPart.category} RESEARCH</span><h2 id="product-detail-title">{detailPart.name}</h2></div><button ref={detailCloseRef} className="icon-button" onClick={() => setDetailPart(null)} aria-label="Close product detail"><X size={18} /></button></div>
+            <div className="detail-masthead">
+              <ProductVisual part={detailPart} failed={failedImages.includes(detailPart.id)} onFail={() => toggleImageFailure(detailPart.id)} />
+              <div className="detail-purchase-context">
+                <span className="detail-price">{formatPartPrice(detailPart.price)}</span>
+                <p><Store size={14} /> {detailPart.retailer || "Retailer unavailable"} <span aria-hidden="true">·</span> <span className={`semantic-${stockState(detailPart)}`}>{detailPart.stock}</span></p>
+                <p className={detailPart.id === "psu" ? "semantic-caution" : "semantic-excellent"}>{detailPart.id === "psu" ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}{detailPart.compatibility}</p>
+                {detailPart.officialUrl && <a className="official-link detail-official-link" href={detailPart.officialUrl} target="_blank" rel="noreferrer" aria-label={`Open official page for ${detailPart.name} in a new tab`}>Official page <ExternalLink size={13} /></a>}
+              </div>
+            </div>
+            <div className="detail-sections">
+              <section className="detail-rationale"><span className="detail-section-label">WHY IT WAS SELECTED</span><p>{detailPart.reason}</p></section>
+              <section><span className="detail-section-label">WORKLOAD FIT</span><strong>{workloadFit(detailPart)}</strong><p>This selection supports the current 1440p gaming and creator brief.</p></section>
+              <section><span className="detail-section-label">IMPORTANT SPECIFICATIONS</span><dl className="detail-specs">{detailPart.specs.map((spec, index) => <div key={spec}><dt>Specification {index + 1}</dt><dd>{spec}</dd></div>)}</dl></section>
+              <section><span className="detail-section-label">COMPATIBILITY RELATIONSHIPS</span><p>{relatedCompatibility(detailPart)}</p></section>
+              <section><span className="detail-section-label">POWER AND THERMALS</span><p><Thermometer size={14} />{detailPowerThermal(detailPart)}</p></section>
+              <section><span className="detail-section-label">UPGRADE LIMITS</span><p>{upgradeLimit(detailPart)}</p></section>
+            </div>
+            <div className="detail-footer"><button className="outline-button" onClick={() => { const part = detailPart; setDetailPart(null); setReplacementPart(part); }}><Layers3 size={15} /> Replace</button><button className="primary-button" onClick={() => openCompare(detailPart)}><GitCompareArrows size={15} /> Compare alternatives</button></div>
           </div>}
         </section>
 
@@ -694,11 +823,46 @@ function BuildWorkspace() {
         <div className="confirm-actions"><button className="outline-button" onClick={closeReplacement}>Keep current part</button><button className="primary-button" onClick={closeReplacement}><Check size={15} /> Confirm replacement</button></div>
       </div></div>}
 
-      {shoppingOpen && <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Shopping list preview"><div className="shopping-modal">
-        <div className="overlay-header"><div><span className="section-kicker">PURCHASE PLAN</span><h2>Shopping list preview</h2></div><button className="icon-button" onClick={() => setShoppingOpen(false)} aria-label="Close shopping list"><X size={18} /></button></div>
-        <div className="shopping-summary"><PackageCheck size={21} /><div><strong>8 parts from 3 retailers</strong><span>All prices are reference estimates</span></div><strong>${total.toLocaleString()}</strong></div>
-        <div className="shopping-list">{parts.map((part) => <div key={part.id}><span className="shop-icon"><part.Icon size={16} /></span><p><strong>{part.name}</strong><small>{part.retailer} · {part.stock}</small></p><strong>${part.price}</strong></div>)}</div>
-        <div className="shopping-actions"><button className="outline-button" onClick={() => setShoppingOpen(false)}>Back to build</button><button className="primary-button"><ShoppingBag size={15} /> Open purchase references</button></div>
+      {shoppingOpen && <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="shopping-plan-title"><div className="shopping-modal">
+        <div className="overlay-header shopping-header"><div><span className="section-kicker">PURCHASE EXECUTION</span><h2 id="shopping-plan-title">Shopping plan</h2><p>Retailer references and unresolved purchase details for this build.</p></div><button ref={shoppingCloseRef} className="icon-button" onClick={() => setShoppingOpen(false)} aria-label="Close shopping plan"><X size={18} /></button></div>
+        <div className="shopping-summary" aria-label="Shopping plan summary">
+          <div className="shopping-total"><span>Build total</span><strong>{formatPartPrice(total)}</strong><small>{parts.length} selected components</small></div>
+          <dl>
+            <div><dt>Budget</dt><dd className={delta >= 0 ? "semantic-excellent" : "semantic-risk"}>{delta >= 0 ? `${formatPartPrice(delta)} remaining` : `${formatPartPrice(Math.abs(delta))} over`}</dd></div>
+            <div><dt>Compatibility</dt><dd className={compatibilityReviewCount ? "semantic-caution" : "semantic-excellent"}>{compatibilityReviewCount ? `${compatibilityReviewCount} review required` : "Ready"}</dd></div>
+            <div><dt>Unresolved purchase items</dt><dd className={unresolvedPurchaseCount ? "semantic-caution" : "semantic-excellent"}>{unresolvedPurchaseCount}</dd></div>
+            <div><dt>Build completeness</dt><dd className={parts.length === 8 ? "semantic-excellent" : "semantic-risk"}>{parts.length === 8 ? "Complete" : `${8 - parts.length} parts missing`}</dd></div>
+          </dl>
+        </div>
+        <div className="shopping-plan-body">
+          {shoppingStatus === "loading" && <div className="shopping-state" role="status"><PackageCheck size={22} /><strong>Loading purchase references</strong><p>Checking the current build plan.</p></div>}
+          {shoppingStatus === "error" && <div className="shopping-state semantic-risk" role="alert"><AlertTriangle size={22} /><strong>Purchase references could not be loaded</strong><p>The selected build is unchanged. Try opening the plan again.</p></div>}
+          {shoppingStatus === "ready" && parts.length === 0 && <div className="shopping-state"><ShoppingBag size={22} /><strong>This build has no selected parts</strong><p>Complete the build before creating a shopping plan.</p></div>}
+          {shoppingStatus === "ready" && parts.length > 0 && <div className="retailer-groups">{retailerGroups.map(([retailer, retailerParts]) => {
+            const groupHasReferences = retailerParts.some((part) => Boolean(purchaseUrlFor(part)));
+            return <section className="retailer-group" key={retailer}>
+              <header><div><Store size={15} /><strong>{retailer}</strong><span>{retailerParts.length} {retailerParts.length === 1 ? "item" : "items"}</span></div><small className={groupHasReferences ? "semantic-excellent" : "semantic-caution"}>{groupHasReferences ? "Purchase references available" : "Purchase references needed"}</small></header>
+              <div className="purchase-ledger">{retailerParts.map((part) => {
+                const purchaseUrl = purchaseUrlFor(part);
+                const priceAvailable = Number.isFinite(part.price);
+                const needsReview = /review|warning|issue|required/i.test(part.compatibility);
+                return <article className="purchase-row" key={part.id}>
+                  <span className="shop-icon"><part.Icon size={16} /></span>
+                  <div className="purchase-product"><span>{part.category}</span><strong>{part.name}</strong><small className={`semantic-${stockState(part)}`}>{part.stock}</small></div>
+                  <div className="purchase-price"><strong className={priceAvailable ? "" : "semantic-caution"}>{formatPartPrice(part.price)}</strong><span>{part.retailer || "Retailer unavailable"}</span></div>
+                  <div className={`purchase-review ${needsReview ? "semantic-caution" : "semantic-excellent"}`}>{needsReview ? <AlertTriangle size={13} /> : <ShieldCheck size={13} />}<span>{needsReview ? "Review required" : "Compatibility checked"}</span></div>
+                  <div className="purchase-actions">
+                    {purchaseUrl ? <a className="purchase-reference" href={purchaseUrl} target="_blank" rel="noreferrer">Purchase reference <ExternalLink size={12} /></a> : <button className="purchase-reference unavailable" disabled>Purchase link unavailable</button>}
+                    {part.officialUrl && <a className="official-link" href={part.officialUrl} target="_blank" rel="noreferrer">Official page <ExternalLink size={11} /></a>}
+                    <button onClick={() => { setShoppingOpen(false); openCompare(part); }}>Compare</button>
+                    <button onClick={() => { setShoppingOpen(false); setReplacementPart(part); }}>Replace</button>
+                  </div>
+                </article>;
+              })}</div>
+            </section>;
+          })}</div>}
+        </div>
+        <div className="shopping-actions"><span role="status" aria-live="polite">{shoppingFeedback}</span><button className="outline-button" onClick={copyShoppingPlan}><Copy size={14} /> Copy plan</button><button className="outline-button" onClick={exportShoppingPlan}><Download size={14} /> Export CSV</button><button className="primary-button" onClick={() => setShoppingOpen(false)}>Done</button></div>
       </div></div>}
     </div>
   );
