@@ -362,15 +362,18 @@ function CompareWorkspace({
 }) {
   const catalog = useMemo(() => comparisonCatalog(part), [part]);
   const [slots, setSlots] = useState([catalog[0], catalog[1], catalog[3] ?? catalog[2]]);
-  const [selectedSlot, setSelectedSlot] = useState(1);
+  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
 
   const setSlotProduct = (slotIndex: number, product: ComparisonProduct) => {
     setSlots((current) => current.map((slot, index) => index === slotIndex ? product : slot));
   };
 
-  const selected = slots[selectedSlot];
-  const selectedBuildTotal = buildTotal - part.price + selected.price;
+  const selected = selectedSlot === null ? null : slots[selectedSlot];
+  const selectedBuildTotal = selected ? buildTotal - part.price + selected.price : buildTotal;
   const budgetDelta = budget - selectedBuildTotal;
+  const selectedValue = selected?.value ?? "Not selected";
+  const selectedPower = selected?.power ?? "Not selected";
+  const selectedPerformance = selected?.performanceDelta ?? "Not selected";
   const rows = [
     ["Price", ...slots.map((slot) => `$${slot.price.toLocaleString()}`)],
     ["Gaming fit", ...slots.map((slot) => slot.gaming)],
@@ -391,9 +394,14 @@ function CompareWorkspace({
       <div className="wide-compare-scroll">
         <header className="wide-compare-header">
           <div>
-            <span className="section-kicker">{part.category.toUpperCase()} COMPARISON</span>
-            <h1>Compare three. Choose with confidence.</h1>
-            <p>Every slot is locked to {part.category}. Whole-build effects are calculated below.</p>
+            <span className="section-kicker">COMPARE WORKSPACE</span>
+            <h1>Compare {part.category} options</h1>
+            <p>Three same-category choices with whole-build consequences aligned before you commit.</p>
+          </div>
+          <div className="compare-header-context" aria-label="Comparison context">
+            <span><small>CURRENT PART</small><strong>{part.name}</strong></span>
+            <span><small>BUILD TARGET</small><strong>1440p high refresh</strong></span>
+            <span><small>OPTIONS</small><strong>3 compatible parts</strong></span>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Close comparison"><X size={18} /></button>
         </header>
@@ -405,10 +413,11 @@ function CompareWorkspace({
           </div>
           {slots.map((slot, slotIndex) => {
             const displayPart = { ...part, name: slot.name, price: slot.price, retailer: slot.retailer };
-            const recommendationClass = slot.label === "AI PICK" ? "ai-recommendation" : "";
-            const userChoiceClass = slot.label === "USER CHOICE" ? "user-choice" : "";
+            const slotRole = ["CURRENT PICK", "AI OPTION", "USER OPTION"][slotIndex];
+            const slotBuildTotal = buildTotal - part.price + slot.price;
+            const slotBudgetDelta = budget - slotBuildTotal;
             return (
-              <article className={`compare-slot ${recommendationClass} ${userChoiceClass} ${selectedSlot === slotIndex ? "decision-selected" : ""}`} key={`${slot.id}-${slotIndex}`}>
+              <article className={`compare-slot ${selectedSlot === slotIndex ? "decision-selected" : ""}`} key={`${slot.id}-${slotIndex}`}>
                 <SearchablePartCombobox
                   category={part.category}
                   products={catalog}
@@ -417,7 +426,7 @@ function CompareWorkspace({
                   onSelect={(product) => setSlotProduct(slotIndex, product)}
                 />
                 <ProductVisual part={displayPart} failed={false} onFail={() => {}} />
-                <span className={`compare-label label-${slot.label.toLowerCase().replaceAll(" ", "-")}`}>{slot.label}</span>
+                <span className={`compare-label ${slotIndex === 1 ? "label-ai-pick" : slotIndex === 2 ? "label-user-choice" : ""}`}>{slotRole}</span>
                 <h2>{slot.name}</h2>
                 <div className="compare-price"><strong>${slot.price}</strong><span>at {slot.retailer}</span></div>
                 <span className={`slot-compatibility ${/note|review|requires/i.test(slot.compatibility) ? "warning" : ""}`}>
@@ -429,9 +438,16 @@ function CompareWorkspace({
                     Official page <span aria-hidden="true">↗</span>
                   </a>
                 )}
+                <dl className="slot-impact-summary">
+                  <div><dt>Build total</dt><dd>${slotBuildTotal.toLocaleString()}</dd></div>
+                  <div><dt>Budget</dt><dd className={slotBudgetDelta >= 0 ? "semantic-excellent" : "semantic-risk"}>{slotBudgetDelta >= 0 ? `$${slotBudgetDelta} left` : `$${Math.abs(slotBudgetDelta)} over`}</dd></div>
+                  <div><dt>Performance</dt><dd>{slot.performanceDelta}</dd></div>
+                  <div><dt>Value</dt><dd className={semanticScoreClass(slot.value)}>{slot.value}</dd></div>
+                  <div><dt>Power</dt><dd>{slot.power}</dd></div>
+                </dl>
                 <button className={selectedSlot === slotIndex ? "slot-action active" : "slot-action"} onClick={() => setSelectedSlot(slotIndex)}>
                   {selectedSlot === slotIndex ? <Check size={14} /> : <GitCompareArrows size={14} />}
-                  {slotIndex === 0 ? "Keep current" : selectedSlot === slotIndex ? "Selected replacement" : "Replace with this"}
+                  {selectedSlot === slotIndex ? (slotIndex === 0 ? "Current build selected" : "Replacement selected") : (slotIndex === 0 ? "Keep current build" : "Choose this option")}
                 </button>
               </article>
             );
@@ -443,7 +459,7 @@ function CompareWorkspace({
             <div className={`comparison-row comparison-grid ${rowIndex >= 9 ? "whole-build-row" : ""}`} role="row" key={label}>
               <div className="comparison-metric" role="rowheader">{label}</div>
               {values.map((value, valueIndex) => (
-                <div className={`${selectedSlot === valueIndex ? `selected-value ${slots[valueIndex].label === "AI PICK" ? "selected-ai" : slots[valueIndex].label === "USER CHOICE" ? "selected-user" : ""}` : ""} ${comparisonValueClass(label, value)}`.trim()} role="cell" key={`${label}-${valueIndex}`}>
+                <div className={`${selectedSlot === valueIndex ? "selected-value" : ""} ${comparisonValueClass(label, value)}`.trim()} role="cell" key={`${label}-${valueIndex}`}>
                   {label === "Compatibility impact" && <ShieldCheck size={14} />}
                   {value}
                 </div>
@@ -458,15 +474,15 @@ function CompareWorkspace({
           <div className="structured-differences-content">
             <div className="structure-heading"><span className="section-kicker">STRUCTURED DIFFERENCES</span><h2>What changes in the whole build</h2></div>
             <div className="difference-grid">
-              <div><CircleDollarSign size={17} /><span><small>PRICE DELTA</small><strong>{selected.price - part.price > 0 ? "+" : "−"}${Math.abs(selected.price - part.price)}</strong></span></div>
-              <div><Gauge size={17} /><span><small>PERFORMANCE DELTA</small><strong>{selected.performanceDelta}</strong></span></div>
-              <div><Target size={17} /><span><small>VALUE DELTA</small><strong>{selected.id === catalog[0].id ? "Baseline" : "+8 points"}</strong></span></div>
-              <div><Zap size={17} /><span><small>POWER DELTA</small><strong>{selected.power === catalog[0].power ? "No change" : selected.power}</strong></span></div>
+              <div><CircleDollarSign size={17} /><span><small>PRICE DELTA</small><strong>{selected ? `${selected.price - part.price > 0 ? "+" : "−"}$${Math.abs(selected.price - part.price)}` : "Select an option"}</strong></span></div>
+              <div><Gauge size={17} /><span><small>PERFORMANCE DELTA</small><strong>{selectedPerformance}</strong></span></div>
+              <div><Target size={17} /><span><small>VALUE</small><strong>{selectedValue}</strong></span></div>
+              <div><Zap size={17} /><span><small>POWER IMPACT</small><strong>{selectedPower}</strong></span></div>
             </div>
             <div className="impact-grid">
-              <div><h3><CheckCircle2 size={15} /> Main gains</h3><p>More budget flexibility, excellent 1440p performance, and lower sustained heat for quieter gaming.</p></div>
-              <div><h3><AlertTriangle size={15} /> Main tradeoffs</h3><p>Less 4K headroom and a smaller ray-tracing margin in the most demanding titles.</p></div>
-              <div><h3><ShieldCheck size={15} /> Whole-build impact</h3><p>No cross-category replacements required. Case clearance, platform, and power connections remain compatible.</p></div>
+              <div><h3><CheckCircle2 size={15} /> Main gains</h3><p>{selected ? "More budget flexibility with strong target-resolution performance." : "Select a column to reveal the practical gains."}</p></div>
+              <div><h3><AlertTriangle size={15} /> Main tradeoffs</h3><p>{selected ? "Review peak performance and upgrade headroom before replacing." : "No tradeoff is assumed until you choose an option."}</p></div>
+              <div><h3><ShieldCheck size={15} /> Whole-build impact</h3><p>{selected ? `${selected.compatibility}. New total: $${selectedBuildTotal.toLocaleString()}.` : "Build consequences will appear after an explicit selection."}</p></div>
             </div>
           </div>
         </section>
@@ -475,7 +491,7 @@ function CompareWorkspace({
           <div className="comparison-section-label"><span>AI recommendation</span></div>
           <div className="compare-ai-recommendation-content">
             <span><Sparkles size={18} /></span>
-            <div><small>AI RECOMMENDATION</small><h2>The {catalog[1].name} is the smartest match for your actual target.</h2><p>It preserves the high-refresh 1440p experience while returning meaningful budget and thermal headroom to the whole build.</p></div>
+            <div><small>AI RECOMMENDATION</small><h2>{catalog[1].name}</h2><p>Best balance for high-refresh 1440p, budget recovery, and lower sustained power.</p></div>
           </div>
         </section>
       </div>
@@ -483,11 +499,16 @@ function CompareWorkspace({
       <footer className="compare-decision-bar comparison-grid">
         <div className="decision-bar-label"><span>Decision</span></div>
         <div className="decision-bar-content">
-          <div className="decision-product"><small>SELECTED REPLACEMENT</small><strong>{selectedSlot === 0 ? "Keep current part" : selected.name}</strong></div>
-          <div><small>NEW BUILD TOTAL</small><strong>${selectedBuildTotal.toLocaleString()}</strong></div>
-          <div><small>BUDGET DELTA</small><strong className={budgetDelta >= 0 ? "budget-positive-text" : "warning-text"}>{budgetDelta >= 0 ? `$${budgetDelta} remaining` : `$${Math.abs(budgetDelta)} over`}</strong></div>
-          <div><small>COMPATIBILITY</small><strong className="positive-text"><ShieldCheck size={14} /> {selected.compatibility}</strong></div>
-          <div className="decision-actions"><button className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={selectedSlot === 0} onClick={() => onReplace({ ...part, name: selected.name, price: selected.price, retailer: selected.retailer })}>Replace Current Part <ArrowRight size={15} /></button></div>
+          <div className="decision-product"><small>SELECTED DECISION</small><strong>{selected ? (selectedSlot === 0 ? "Keep current part" : selected.name) : "Choose a comparison column"}</strong></div>
+          <div className="decision-metrics">
+            <div><small>NEW BUILD TOTAL</small><strong>${selectedBuildTotal.toLocaleString()}</strong></div>
+            <div><small>BUDGET</small><strong className={budgetDelta >= 0 ? "budget-positive-text" : "warning-text"}>{budgetDelta >= 0 ? `$${budgetDelta} left` : `$${Math.abs(budgetDelta)} over`}</strong></div>
+            <div><small>COMPATIBILITY</small><strong className={selected ? comparisonValueClass("Compatibility impact", selected.compatibility) : ""}>{selected?.compatibility ?? "Not selected"}</strong></div>
+            <div><small>PERFORMANCE</small><strong>{selectedPerformance}</strong></div>
+            <div><small>VALUE</small><strong className={selected ? semanticScoreClass(selected.value) : ""}>{selectedValue}</strong></div>
+            <div><small>POWER</small><strong>{selectedPower}</strong></div>
+          </div>
+          <div className="decision-actions"><button className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={!selected || selectedSlot === 0} onClick={() => selected && onReplace({ ...part, name: selected.name, price: selected.price, retailer: selected.retailer })}>Review Replacement <ArrowRight size={15} /></button></div>
         </div>
       </footer>
     </section>
@@ -499,6 +520,7 @@ function BuildWorkspace() {
   const [detailPart, setDetailPart] = useState<Part | null>(null);
   const [comparePart, setComparePart] = useState<Part | null>(null);
   const [replacementPart, setReplacementPart] = useState<Part | null>(null);
+  const [comparisonReplacement, setComparisonReplacement] = useState<{ current: Part; next: Part } | null>(null);
   const [shoppingOpen, setShoppingOpen] = useState(false);
   const [warningOpen, setWarningOpen] = useState(false);
   const [mobilePanel, setMobilePanel] = useState<"needs" | "build" | "summary">("build");
@@ -509,6 +531,18 @@ function BuildWorkspace() {
   const budget = 2500;
   const delta = budget - total;
   const selectedPart = parts.find((part) => part.id === selectedId) ?? parts[1];
+  const pendingCurrent = comparisonReplacement?.current ?? replacementPart;
+  const pendingNext = comparisonReplacement?.next ?? (replacementPart ? {
+    ...replacementPart,
+    name: replacementPart.id === "gpu" ? replacement.name : `Recommended ${replacementPart.category} alternative`,
+    price: replacementPart.id === "gpu" ? replacement.price : Math.max(79, replacementPart.price - 40),
+  } : null);
+  const pendingBuildTotal = pendingCurrent && pendingNext ? total - pendingCurrent.price + pendingNext.price : total;
+  const pendingBudgetDelta = budget - pendingBuildTotal;
+  const closeReplacement = () => {
+    setReplacementPart(null);
+    setComparisonReplacement(null);
+  };
   const openCompare = (part: Part) => {
     setDetailPart(null);
     setComparePart(part);
@@ -564,8 +598,9 @@ function BuildWorkspace() {
             budget={budget}
             onClose={() => setComparePart(null)}
             onReplace={(nextPart) => {
+              const currentPart = comparePart;
               setComparePart(null);
-              setReplacementPart(nextPart);
+              if (currentPart) setComparisonReplacement({ current: currentPart, next: nextPart });
             }}
           />
         ) : (<>
@@ -644,10 +679,19 @@ function BuildWorkspace() {
 
       <nav className={`mobile-tabs ${comparePart ? "compare-open" : ""}`} aria-label="Workspace sections"><button className={mobilePanel === "needs" ? "active" : ""} onClick={() => setMobilePanel("needs")}><PanelLeft size={18} />Needs</button><button className={mobilePanel === "build" ? "active" : ""} onClick={() => setMobilePanel("build")}><Cpu size={18} />Build</button><button className={mobilePanel === "summary" ? "active" : ""} onClick={() => setMobilePanel("summary")}><ClipboardList size={18} />Summary</button></nav>
 
-      {replacementPart && <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Confirm replacement"><div className="confirm-modal">
-        <div className="confirm-icon"><GitCompareArrows size={22} /></div><span className="section-kicker">PREVIEW CHANGE</span><h2>Replace {replacementPart.category}?</h2><p>This prototype will preview the lower-cost alternative. Your current selection is preserved until you confirm.</p>
-        <div className="replacement-summary"><div><span>Current</span><strong>{replacementPart.name}</strong><small>${replacementPart.price}</small></div><ArrowRight size={18} /><div><span>Alternative</span><strong>{replacementPart.id === "gpu" ? replacement.name : `Recommended ${replacementPart.category} alternative`}</strong><small>${Math.max(79, replacementPart.price - 40)}</small></div></div>
-        <div className="confirm-actions"><button className="outline-button" onClick={() => setReplacementPart(null)}>Keep current part</button><button className="primary-button" onClick={() => setReplacementPart(null)}><Check size={15} /> Confirm replacement</button></div>
+      {pendingCurrent && pendingNext && <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Confirm replacement"><div className="confirm-modal consequence-confirmation">
+        <div className="confirm-icon"><GitCompareArrows size={22} /></div><span className="section-kicker">REPLACEMENT CONSEQUENCES</span><h2>Replace {pendingCurrent.category}?</h2><p>Review the part and whole-build changes before confirming this decision.</p>
+        <div className="replacement-summary"><div><span>Current part</span><strong>{pendingCurrent.name}</strong><small>${pendingCurrent.price}</small></div><ArrowRight size={18} /><div><span>Selected replacement</span><strong>{pendingNext.name}</strong><small>${pendingNext.price}</small></div></div>
+        <dl className="confirmation-impact-grid">
+          <div><dt>Part price</dt><dd className={pendingNext.price <= pendingCurrent.price ? "semantic-excellent" : "semantic-caution"}>{pendingNext.price <= pendingCurrent.price ? "Save" : "Add"} ${Math.abs(pendingNext.price - pendingCurrent.price)}</dd></div>
+          <div><dt>New build total</dt><dd>${pendingBuildTotal.toLocaleString()}</dd></div>
+          <div><dt>Budget</dt><dd className={pendingBudgetDelta >= 0 ? "semantic-excellent" : "semantic-risk"}>{pendingBudgetDelta >= 0 ? `$${pendingBudgetDelta} remaining` : `$${Math.abs(pendingBudgetDelta)} over`}</dd></div>
+          <div><dt>Compatibility</dt><dd className={comparisonValueClass("Compatibility impact", pendingNext.compatibility)}>{pendingNext.compatibility}</dd></div>
+          <div><dt>Performance</dt><dd>{comparisonReplacement ? comparisonCatalog(pendingCurrent).find((item) => item.name === pendingNext.name)?.performanceDelta ?? "Recalculated" : "Target maintained"}</dd></div>
+          <div><dt>Power</dt><dd>{comparisonReplacement ? comparisonCatalog(pendingCurrent).find((item) => item.name === pendingNext.name)?.power ?? "Recalculated" : "Compatibility checked"}</dd></div>
+        </dl>
+        <div className="confirmation-note"><ShieldCheck size={15} /><span><strong>Compatibility check complete.</strong> No cross-category replacement is required.</span></div>
+        <div className="confirm-actions"><button className="outline-button" onClick={closeReplacement}>Keep current part</button><button className="primary-button" onClick={closeReplacement}><Check size={15} /> Confirm replacement</button></div>
       </div></div>}
 
       {shoppingOpen && <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Shopping list preview"><div className="shopping-modal">
