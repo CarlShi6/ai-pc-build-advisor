@@ -1319,3 +1319,42 @@
 .comparison-row > div.semantic-risk {
   background: transparent;
 }
+
+.data-trust-label {
+  display: inline-flex;
+  align-items: center;
+  width: fit-content;
+  color: rgba(232, 232, 234, 0.62);
+  font-size: 10px;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.data-trust-detail {
+  display: flex !important;
+  align-items: baseline;
+  gap: 8px;
+  color: rgba(232, 232, 234, 0.56) !important;
+  font-size: 12px;
+}
+
+.replacement-feedback {
+  position: fixed;
+  z-index: 120;
+  right: 20px;
+  bottom: 20px;
+  max-width: min(440px, calc(100vw - 32px));
+  padding: 11px 14px;
+  border: 1px solid rgba(232, 232, 234, 0.2);
+  border-radius: 8px;
+  background: #171719;
+  color: #e8e8ea;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.replacement-feedback.failed { border-color: rgba(255, 138, 138, 0.55); }
+.replacement-feedback.succeeded { border-color: rgba(110, 214, 160, 0.45); }

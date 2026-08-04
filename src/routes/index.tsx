@@ -8,6 +8,14 @@ import {
   ExternalLink, Store, Thermometer,
 } from "lucide-react";
 import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
+import { seedParts, recommendedBuildPartIds, categoryLabels } from "@/data/seedParts";
+import { getPartDecisionMetadata } from "@/lib/decision-metadata";
+import {
+  createSeedBuild, estimateBuildPower, getValidatedOfficialUrl, getValidatedPurchaseUrl,
+  replaceBuildPartLocally, trustedAvailability, trustedPartPrice, trustForPart,
+} from "@/lib/product-trust";
+import type { Build, PartDecisionMetadata } from "@/types/build";
+import type { Part as CanonicalPart, PartCategory } from "@/types/parts";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -27,10 +35,12 @@ type Part = {
 };
 
 function mockOfficialUrl(manufacturer: string, id: string) {
-  return `https://example.com/${manufacturer.toLowerCase().replaceAll(" ", "-")}/products/${id}`;
+  void manufacturer;
+  void id;
+  return undefined;
 }
 
-const parts: Part[] = ([
+const legacyPrototypeParts: Part[] = ([
   { id: "cpu", category: "Processor", eyebrow: "CPU", name: "AMD Ryzen 7 7800X3D", price: 369, retailer: "Newegg", stock: "In stock", stockTone: "good", specs: ["8 cores / 16 threads", "Up to 5.0 GHz", "96MB L3 cache", "120W TDP"], reason: "Best-in-class gaming performance without overspending on cores you won’t use.", Icon: Cpu, visual: "cpu", compatibility: "Fits AM5 platform" },
   { id: "gpu", category: "Graphics", eyebrow: "GPU", name: "NVIDIA GeForce RTX 4080 SUPER 16GB", price: 999, retailer: "Best Buy", stock: "In stock", stockTone: "good", specs: ["16GB GDDR6X", "10240 CUDA cores", "320W board power", "DLSS 3.5"], reason: "The strongest fit for 1440p high refresh and smooth 4K without 4090 pricing.", Icon: MonitorCog, visual: "gpu", compatibility: "Clearance verified" },
   { id: "motherboard", category: "Motherboard", eyebrow: "BOARD", name: "MSI MAG B650 Tomahawk WiFi", price: 219, retailer: "Amazon", stock: "In stock", stockTone: "good", specs: ["AM5 socket", "DDR5", "Wi‑Fi 6E", "3× M.2 slots"], reason: "Reliable power delivery and the connectivity you need, without enthusiast extras.", Icon: Cpu, visual: "board", compatibility: "BIOS ready" },
@@ -44,7 +54,7 @@ const parts: Part[] = ([
   return { ...part, manufacturer, officialUrl: mockOfficialUrl(manufacturer, part.id) };
 });
 
-const replacement = { name: "NVIDIA GeForce RTX 4070 Ti SUPER 16GB", price: 799 };
+const legacyPrototypeReplacement = { name: "NVIDIA GeForce RTX 4070 Ti SUPER 16GB", price: 799 };
 
 type ComparisonProduct = {
   id: string;
@@ -68,7 +78,7 @@ type ComparisonProduct = {
   availability?: string;
 };
 
-function comparisonCatalog(part: Part): ComparisonProduct[] {
+function legacyPrototypeComparisonCatalog(part: Part): ComparisonProduct[] {
   if (part.id === "gpu") {
     const gpuProducts: ComparisonProduct[] = [
       { id: "4080s", name: part.name, price: 999, retailer: "Best Buy", label: "CURRENT PICK", compatibility: "Fully compatible", gaming: "Excellent · 98/100", productivity: "Excellent · 94/100", value: "86/100", vram: "16GB GDDR6X", power: "320W", psu: "750W", length: "304mm", resolution: "1440p ultra / 4K", performanceDelta: "Baseline" },
@@ -100,6 +110,115 @@ function comparisonCatalog(part: Part): ComparisonProduct[] {
     manufacturer,
     officialUrl: part.officialUrl ?? mockOfficialUrl(manufacturer, product.id),
   }));
+}
+
+type CanonicalViewPart = Part & {
+  canonical: CanonicalPart;
+  purchaseUrl?: string;
+  trustLabel: string;
+  trustDetail: string;
+};
+
+type CanonicalComparisonProduct = ComparisonProduct & {
+  canonical: CanonicalPart;
+  metadata: PartDecisionMetadata;
+  priceTrustLabel: string;
+};
+
+const categoryIcons: Record<PartCategory, ComponentType<{ size?: number; strokeWidth?: number }>> = {
+  cpu: Cpu, gpu: MonitorCog, motherboard: Cpu, ram: MemoryStick, ssd: HardDrive,
+  psu: Power, case: Box, cooler: Fan, os: HardDrive, fan: Fan, accessory: Layers3,
+};
+
+const categoryVisuals: Record<PartCategory, string> = {
+  cpu: "cpu", gpu: "gpu", motherboard: "board", ram: "ram", ssd: "ssd",
+  psu: "psu", case: "case", cooler: "cooler", os: "ssd", fan: "cooler", accessory: "board",
+};
+
+function formatCanonicalSpec(key: string, value: string | number | boolean) {
+  const units: Record<string, string> = {
+    tdpW: "W TDP", powerDrawW: "W draw", wattageW: "W", lengthMm: "mm",
+    capacityGb: "GB", capacityTb: "TB", speedMt: " MT/s", boostGHz: " GHz boost",
+    vramGb: "GB VRAM", readMb: " MB/s read", radiatorMm: "mm radiator",
+  };
+  if (key in units) return `${value}${units[key]}`;
+  return `${key.replace(/([A-Z])/g, " $1").toLowerCase()}: ${String(value)}`;
+}
+
+function adaptCanonicalPart(part: CanonicalPart, build: Build): CanonicalViewPart {
+  const checks = build.compatibilityChecks.filter((check) => check.affectedPartIds.includes(part.id));
+  const priorityCheck = checks.find((check) => check.severity === "fail")
+    ?? checks.find((check) => check.severity === "warning");
+  const availability = trustedAvailability(part).value ?? "unknown";
+  const trust = trustForPart(part);
+  return {
+    canonical: part,
+    id: part.id,
+    category: categoryLabels[part.category],
+    eyebrow: categoryLabels[part.category],
+    name: part.displayName,
+    price: trustedPartPrice(part).value ?? Number.NaN,
+    retailer: part.retailer ?? "Retailer unavailable",
+    stock: availability === "in_stock" ? "In stock" : availability === "low_stock" ? "Low stock" : availability === "out_of_stock" ? "Out of stock" : "Stock unknown",
+    stockTone: availability === "in_stock" ? "good" : "low",
+    specs: Object.entries(part.specs).slice(0, 4).map(([key, value]) => formatCanonicalSpec(key, value)),
+    reason: part.recommendationReason ?? "Selection rationale unavailable in the current catalog.",
+    Icon: categoryIcons[part.category],
+    visual: categoryVisuals[part.category],
+    compatibility: priorityCheck?.message ?? (checks.length ? `${checks.filter((check) => check.severity === "pass").length} applicable checks passed` : "Compatibility data incomplete"),
+    manufacturer: part.brand,
+    officialUrl: getValidatedOfficialUrl(part) ?? undefined,
+    purchaseUrl: getValidatedPurchaseUrl(part) ?? undefined,
+    trustLabel: trust.source === "seed" ? "Seed data" : trust.source,
+    trustDetail: trust.disclosure ?? "Source details unavailable.",
+  };
+}
+
+function getNumericSpec(part: CanonicalPart, key: string) {
+  const value = part.specs[key];
+  return typeof value === "number" ? value : null;
+}
+
+function getTextSpec(part: CanonicalPart, key: string) {
+  const value = part.specs[key];
+  return typeof value === "string" ? value : null;
+}
+
+function canonicalComparisonCatalog(part: CanonicalViewPart, build: Build): CanonicalComparisonProduct[] {
+  const candidates = seedParts.filter((candidate) => candidate.category === part.canonical.category);
+  const ordered = [part.canonical, ...candidates.filter((candidate) => candidate.id !== part.id)];
+  const decisions = getPartDecisionMetadata(build, ordered, part.canonical);
+  const baseline = decisions.find((decision) => decision.partId === part.id)?.performanceScore ?? null;
+  return ordered.map((candidate, index) => {
+    const metadata = decisions.find((decision) => decision.partId === candidate.id)!;
+    const score = metadata.performanceScore;
+    const performanceDelta = candidate.id === part.id ? "Baseline" : score !== null && baseline !== null ? `${score - baseline > 0 ? "+" : ""}${score - baseline} points` : "Unknown";
+    const availability = trustedAvailability(candidate).value ?? "unknown";
+    return {
+      canonical: candidate,
+      metadata,
+      id: candidate.id,
+      name: candidate.displayName,
+      price: trustedPartPrice(candidate).value ?? Number.NaN,
+      retailer: candidate.retailer ?? "Retailer unavailable",
+      manufacturer: candidate.brand,
+      officialUrl: getValidatedOfficialUrl(candidate) ?? undefined,
+      label: candidate.id === part.id ? "CURRENT PICK" : metadata.bestValue ? "AI OPTION" : index === 2 ? "USER OPTION" : "CATALOG OPTION",
+      compatibility: metadata.compatibilityImpact.summary,
+      gaming: getNumericSpec(candidate, "gaming1440pScore") !== null ? `${getNumericSpec(candidate, "gaming1440pScore")}/100 · Seed spec` : score !== null ? `${score}/100 · Derived` : "Unknown",
+      productivity: getNumericSpec(candidate, "productivityScore") !== null ? `${getNumericSpec(candidate, "productivityScore")}/100 · Seed spec` : "Unknown",
+      value: `${metadata.valueScore}/100 · Derived`,
+      vram: getNumericSpec(candidate, "vramGb") !== null ? `${getNumericSpec(candidate, "vramGb")}GB` : candidate.specSummary ?? "Unknown",
+      power: getNumericSpec(candidate, "powerDrawW") !== null ? `${getNumericSpec(candidate, "powerDrawW")}W · Seed spec` : getNumericSpec(candidate, "tdpW") !== null ? `${getNumericSpec(candidate, "tdpW")}W · Seed spec` : "Unknown",
+      psu: getNumericSpec(candidate, "recommendedPsuW") !== null ? `${getNumericSpec(candidate, "recommendedPsuW")}W` : "Unknown",
+      length: getNumericSpec(candidate, "lengthMm") !== null ? `${getNumericSpec(candidate, "lengthMm")}mm` : "Unknown",
+      resolution: getTextSpec(candidate, "performanceTier") ?? "Target not supplied",
+      performanceDelta,
+      disabled: availability === "out_of_stock",
+      availability: `${availability.replaceAll("_", " ")} · Seed data`,
+      priceTrustLabel: "Seed price · not live",
+    };
+  });
 }
 
 function BrandMark() {
@@ -148,7 +267,7 @@ function workloadFit(part: Part) {
     psu: "Healthy load, limited flagship headroom",
     case: "High-airflow, low-noise fit",
   };
-  return fits[part.id] ?? "Balanced for this build";
+  return fits[(part as CanonicalViewPart).canonical?.category ?? part.id] ?? "Balanced for this build";
 }
 
 type ShoppingPart = Part & { purchaseUrl?: string };
@@ -164,6 +283,13 @@ function formatPartPrice(price: number | null | undefined) {
     : "Price unavailable";
 }
 
+function formatSignedCurrency(value: number, explicitPlus = false) {
+  if (!Number.isFinite(value)) return "Unknown";
+  if (value === 0) return "$0";
+  const formatted = `$${Math.abs(value).toLocaleString()}`;
+  return value < 0 ? `-${formatted}` : explicitPlus ? `+${formatted}` : formatted;
+}
+
 function stockState(part: Part) {
   if (/out of stock|unavailable/i.test(part.stock)) return "risk";
   if (/low/i.test(part.stock)) return "caution";
@@ -176,21 +302,11 @@ function detailPowerThermal(part: Part) {
 }
 
 function relatedCompatibility(part: Part) {
-  const relationships: Record<string, string> = {
-    cpu: `${part.compatibility}. Paired with ${parts[2].name} and ${parts[3].name}.`,
-    gpu: `${part.compatibility}. Checked against ${parts[7].name} and ${parts[6].name}.`,
-    motherboard: `${part.compatibility}. Hosts the selected processor, memory, and storage.`,
-    ram: `${part.compatibility}. Checked against the selected motherboard and processor platform.`,
-    ssd: `${part.compatibility}. Uses an available slot on the selected motherboard.`,
-    cooler: `${part.compatibility}. Checked against the selected processor and case mounting position.`,
-    psu: `${part.compatibility}. Supplies the selected graphics card and processor.`,
-    case: `${part.compatibility}. Checked against graphics-card and cooling dimensions.`,
-  };
-  return relationships[part.id] ?? part.compatibility;
+  return part.compatibility;
 }
 
 function upgradeLimit(part: Part) {
-  if (part.id === "psu") return "A future flagship GPU may require more PSU headroom.";
+  if ((part as CanonicalViewPart).canonical?.category === "psu") return "A future flagship GPU may require more PSU headroom.";
   return "No structured upgrade-limit data is provided by the current catalog.";
 }
 
@@ -379,7 +495,7 @@ function SearchablePartCombobox({
               >
                 <span className="option-check">{isSelected && <Check size={14} />}</span>
                 <span className="option-copy"><strong>{product.name}</strong><small>{product.vram} · {product.power} · {product.resolution}</small><em>{product.availability ?? `${product.retailer} · Available`}</em></span>
-                <span className="option-price">${product.price.toLocaleString()}</span>
+                <span className="option-price">{formatPartPrice(product.price)}</span>
               </button>
             );
           }) : (
@@ -393,43 +509,50 @@ function SearchablePartCombobox({
 
 function CompareWorkspace({
   part,
+  build,
   buildTotal,
   budget,
   onClose,
   onReplace,
 }: {
-  part: Part;
+  part: CanonicalViewPart;
+  build: Build;
   buildTotal: number;
   budget: number;
   onClose: () => void;
-  onReplace: (part: Part) => void;
+  onReplace: (part: CanonicalViewPart) => void;
 }) {
-  const catalog = useMemo(() => comparisonCatalog(part), [part]);
-  const [slots, setSlots] = useState([catalog[0], catalog[1], catalog[3] ?? catalog[2]]);
+  const catalog = useMemo(() => canonicalComparisonCatalog(part, build), [part, build]);
+  const [slots, setSlots] = useState([catalog[0], catalog[1], catalog[2]]);
   const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
 
-  const setSlotProduct = (slotIndex: number, product: ComparisonProduct) => {
-    setSlots((current) => current.map((slot, index) => index === slotIndex ? product : slot));
+  const setSlotProduct = (slotIndex: number, product: CanonicalComparisonProduct) => {
+    setSlots((current) => {
+      const duplicateIndex = current.findIndex((slot, index) => index !== slotIndex && slot.id === product.id);
+      if (duplicateIndex < 0) return current.map((slot, index) => index === slotIndex ? product : slot);
+      const previous = current[slotIndex];
+      return current.map((slot, index) => index === slotIndex ? product : index === duplicateIndex ? previous : slot);
+    });
   };
 
   const selected = selectedSlot === null ? null : slots[selectedSlot];
-  const selectedBuildTotal = selected ? buildTotal - part.price + selected.price : buildTotal;
+  const selectedBuildTotal = selected && Number.isFinite(selected.price) ? buildTotal - part.price + selected.price : buildTotal;
   const budgetDelta = budget - selectedBuildTotal;
   const selectedValue = selected?.value ?? "Not selected";
   const selectedPower = selected?.power ?? "Not selected";
   const selectedPerformance = selected?.performanceDelta ?? "Not selected";
   const rows = [
-    ["Price", ...slots.map((slot) => `$${slot.price.toLocaleString()}`)],
+    ["Price", ...slots.map((slot) => formatPartPrice(slot.price))],
     ["Gaming fit", ...slots.map((slot) => slot.gaming)],
     ["Productivity fit", ...slots.map((slot) => slot.productivity)],
     ["Value", ...slots.map((slot) => slot.value)],
-    [part.id === "gpu" ? "VRAM" : "Primary specification", ...slots.map((slot) => slot.vram)],
-    [part.id === "gpu" ? "Board power" : "Power / thermal", ...slots.map((slot) => slot.power)],
+    [part.canonical.category === "gpu" ? "VRAM" : "Primary specification", ...slots.map((slot) => slot.vram)],
+    [part.canonical.category === "gpu" ? "Board power" : "Power / thermal", ...slots.map((slot) => slot.power)],
     ["Recommended PSU", ...slots.map((slot) => slot.psu)],
-    [part.id === "gpu" ? "Physical length" : "Physical fit", ...slots.map((slot) => slot.length)],
+    [part.canonical.category === "gpu" ? "Physical length" : "Physical fit", ...slots.map((slot) => slot.length)],
     ["Target resolution", ...slots.map((slot) => slot.resolution)],
-    ["New build total", ...slots.map((slot) => `$${(buildTotal - part.price + slot.price).toLocaleString()}`)],
-    ["Budget remaining", ...slots.map((slot) => `$${(budget - (buildTotal - part.price + slot.price)).toLocaleString()}`)],
+    ["New build total", ...slots.map((slot) => Number.isFinite(slot.price) ? formatPartPrice(buildTotal - part.price + slot.price) : "Unavailable")],
+    ["Budget remaining", ...slots.map((slot) => Number.isFinite(slot.price) ? formatSignedCurrency(budget - (buildTotal - part.price + slot.price)) : "Unknown")],
     ["Compatibility impact", ...slots.map((slot) => slot.compatibility)],
   ];
 
@@ -445,7 +568,7 @@ function CompareWorkspace({
           <div className="compare-header-context" aria-label="Comparison context">
             <span><small>CURRENT PART</small><strong>{part.name}</strong></span>
             <span><small>BUILD TARGET</small><strong>1440p high refresh</strong></span>
-            <span><small>OPTIONS</small><strong>3 compatible parts</strong></span>
+            <span><small>OPTIONS</small><strong>3 same-category parts</strong></span>
           </div>
           <button className="icon-button" onClick={onClose} aria-label="Close comparison"><X size={18} /></button>
         </header>
@@ -458,7 +581,7 @@ function CompareWorkspace({
           {slots.map((slot, slotIndex) => {
             const displayPart = { ...part, name: slot.name, price: slot.price, retailer: slot.retailer };
             const slotRole = ["CURRENT PICK", "AI OPTION", "USER OPTION"][slotIndex];
-            const slotBuildTotal = buildTotal - part.price + slot.price;
+            const slotBuildTotal = Number.isFinite(slot.price) ? buildTotal - part.price + slot.price : Number.NaN;
             const slotBudgetDelta = budget - slotBuildTotal;
             return (
               <article className={`compare-slot ${selectedSlot === slotIndex ? "decision-selected" : ""}`} key={`${slot.id}-${slotIndex}`}>
@@ -467,12 +590,12 @@ function CompareWorkspace({
                   products={catalog}
                   selected={slot}
                   slotIndex={slotIndex}
-                  onSelect={(product) => setSlotProduct(slotIndex, product)}
+                  onSelect={(product) => setSlotProduct(slotIndex, product as CanonicalComparisonProduct)}
                 />
                 <ProductVisual part={displayPart} failed={false} onFail={() => {}} />
                 <span className={`compare-label ${slotIndex === 1 ? "label-ai-pick" : slotIndex === 2 ? "label-user-choice" : ""}`}>{slotRole}</span>
                 <h2>{slot.name}</h2>
-                <div className="compare-price"><strong>${slot.price}</strong><span>at {slot.retailer}</span></div>
+                <div className="compare-price"><strong>{formatPartPrice(slot.price)}</strong><span>{slot.retailer === "Retailer unavailable" ? slot.retailer : `Seed listing at ${slot.retailer}`}</span><small className="data-trust-label">Seed price · not live</small></div>
                 <span className={`slot-compatibility ${/note|review|requires/i.test(slot.compatibility) ? "warning" : ""}`}>
                   {/note|review|requires/i.test(slot.compatibility) ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}
                   {slot.compatibility}
@@ -483,8 +606,8 @@ function CompareWorkspace({
                   </a>
                 )}
                 <dl className="slot-impact-summary">
-                  <div><dt>Build total</dt><dd>${slotBuildTotal.toLocaleString()}</dd></div>
-                  <div><dt>Budget</dt><dd className={slotBudgetDelta >= 0 ? "semantic-excellent" : "semantic-risk"}>{slotBudgetDelta >= 0 ? `$${slotBudgetDelta} left` : `$${Math.abs(slotBudgetDelta)} over`}</dd></div>
+                  <div><dt>Build total</dt><dd>{formatPartPrice(slotBuildTotal)}</dd></div>
+                  <div><dt>Budget</dt><dd className={slotBudgetDelta >= 0 ? "semantic-excellent" : "semantic-risk"}>{Number.isFinite(slotBudgetDelta) ? (slotBudgetDelta >= 0 ? `${formatPartPrice(slotBudgetDelta)} left` : `${formatPartPrice(Math.abs(slotBudgetDelta))} over`) : "Unknown"}</dd></div>
                   <div><dt>Performance</dt><dd>{slot.performanceDelta}</dd></div>
                   <div><dt>Value</dt><dd className={semanticScoreClass(slot.value)}>{slot.value}</dd></div>
                   <div><dt>Power</dt><dd>{slot.power}</dd></div>
@@ -524,8 +647,8 @@ function CompareWorkspace({
               <div><Zap size={17} /><span><small>POWER IMPACT</small><strong>{selectedPower}</strong></span></div>
             </div>
             <div className="impact-grid">
-              <div><h3><CheckCircle2 size={15} /> Main gains</h3><p>{selected ? "More budget flexibility with strong target-resolution performance." : "Select a column to reveal the practical gains."}</p></div>
-              <div><h3><AlertTriangle size={15} /> Main tradeoffs</h3><p>{selected ? "Review peak performance and upgrade headroom before replacing." : "No tradeoff is assumed until you choose an option."}</p></div>
+              <div><h3><CheckCircle2 size={15} /> Main gains</h3><p>{selected ? (selected as CanonicalComparisonProduct).metadata.recommendationReason : "Select a column to reveal the practical gains."}</p></div>
+              <div><h3><AlertTriangle size={15} /> Main tradeoffs</h3><p>{selected ? (selected as CanonicalComparisonProduct).metadata.tradeOffSummary : "No tradeoff is assumed until you choose an option."}</p></div>
               <div><h3><ShieldCheck size={15} /> Whole-build impact</h3><p>{selected ? `${selected.compatibility}. New total: $${selectedBuildTotal.toLocaleString()}.` : "Build consequences will appear after an explicit selection."}</p></div>
             </div>
           </div>
@@ -535,7 +658,7 @@ function CompareWorkspace({
           <div className="comparison-section-label"><span>AI recommendation</span></div>
           <div className="compare-ai-recommendation-content">
             <span><Sparkles size={18} /></span>
-            <div><small>AI RECOMMENDATION</small><h2>{catalog[1].name}</h2><p>Best balance for high-refresh 1440p, budget recovery, and lower sustained power.</p></div>
+            <div><small>AI RECOMMENDATION</small><h2>{catalog[1]?.name ?? "No alternative available"}</h2><p>{catalog[1]?.metadata.recommendationReason ?? "The current seed catalog has no second option for this category."}</p></div>
           </div>
         </section>
       </div>
@@ -552,7 +675,7 @@ function CompareWorkspace({
             <div><small>VALUE</small><strong className={selected ? semanticScoreClass(selected.value) : ""}>{selectedValue}</strong></div>
             <div><small>POWER</small><strong>{selectedPower}</strong></div>
           </div>
-          <div className="decision-actions"><button className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={!selected || selectedSlot === 0} onClick={() => selected && onReplace({ ...part, name: selected.name, price: selected.price, retailer: selected.retailer })}>Review Replacement <ArrowRight size={15} /></button></div>
+          <div className="decision-actions"><button className="outline-button" onClick={onClose}>Cancel</button><button className="primary-button" disabled={!selected || selectedSlot === 0 || !Number.isFinite(selected.price)} onClick={() => selected && onReplace(adaptCanonicalPart((selected as CanonicalComparisonProduct).canonical, build))}>Review Replacement <ArrowRight size={15} /></button></div>
         </div>
       </footer>
     </section>
@@ -560,11 +683,16 @@ function CompareWorkspace({
 }
 
 function BuildWorkspace() {
-  const [selectedId, setSelectedId] = useState("gpu");
-  const [detailPart, setDetailPart] = useState<Part | null>(null);
-  const [comparePart, setComparePart] = useState<Part | null>(null);
-  const [replacementPart, setReplacementPart] = useState<Part | null>(null);
-  const [comparisonReplacement, setComparisonReplacement] = useState<{ current: Part; next: Part } | null>(null);
+  const [build, setBuild] = useState<Build>(() => createSeedBuild(Object.values(recommendedBuildPartIds).filter(Boolean).map((id) => seedParts.find((part) => part.id === id)!).filter(Boolean)));
+  const parts = useMemo(() => build.parts.map((part) => adaptCanonicalPart(part, build)), [build]);
+  const initialGpuId = build.parts.find((part) => part.category === "gpu")?.id ?? build.parts[0]?.id ?? "";
+  const [selectedId, setSelectedId] = useState(initialGpuId);
+  const [detailPart, setDetailPart] = useState<CanonicalViewPart | null>(null);
+  const [comparePart, setComparePart] = useState<CanonicalViewPart | null>(null);
+  const [replacementPart, setReplacementPart] = useState<CanonicalViewPart | null>(null);
+  const [comparisonReplacement, setComparisonReplacement] = useState<{ current: CanonicalViewPart; next: CanonicalViewPart } | null>(null);
+  const [replacementStatus, setReplacementStatus] = useState<"idle" | "pending" | "succeeded" | "failed">("idle");
+  const [replacementFeedback, setReplacementFeedback] = useState("");
   const [shoppingOpen, setShoppingOpen] = useState(false);
   const [shoppingStatus] = useState<ShoppingPlanStatus>("ready");
   const [shoppingFeedback, setShoppingFeedback] = useState("");
@@ -575,32 +703,57 @@ function BuildWorkspace() {
   const [messages, setMessages] = useState<string[]>([]);
   const detailCloseRef = useRef<HTMLButtonElement>(null);
   const shoppingCloseRef = useRef<HTMLButtonElement>(null);
-  const total = useMemo(() => parts.reduce((sum, part) => sum + part.price, 0), []);
-  const budget = 2500;
+  const total = build.totalPrice;
+  const budget = build.budget;
   const delta = budget - total;
   const retailerGroups = useMemo(() => {
-    const groups = new Map<string, Part[]>();
+    const groups = new Map<string, CanonicalViewPart[]>();
     parts.forEach((part) => groups.set(part.retailer || "Retailer unavailable", [...(groups.get(part.retailer || "Retailer unavailable") ?? []), part]));
     return [...groups.entries()];
-  }, []);
-  const compatibilityReviewCount = parts.filter((part) => /review|warning|issue|required/i.test(part.compatibility)).length;
-  const unresolvedPurchaseCount = parts.filter((part) => !purchaseUrlFor(part) || !Number.isFinite(part.price) || /out of stock|unavailable/i.test(part.stock)).length;
+  }, [parts]);
+  const compatibilityReviewCount = build.compatibilityChecks.filter((check) => check.severity !== "pass").length;
+  const unresolvedPurchaseCount = parts.filter((part) => !part.purchaseUrl || !Number.isFinite(part.price) || part.stock === "Out of stock" || part.stock === "Stock unknown").length;
+  const powerEstimate = estimateBuildPower(build);
+  const psuWattage = build.parts.find((part) => part.category === "psu")?.specs.wattageW;
+  const psuHeadroom = powerEstimate.value !== null && typeof psuWattage === "number" ? psuWattage - powerEstimate.value : null;
+  const gpu = build.parts.find((part) => part.category === "gpu");
+  const performanceScore = typeof gpu?.specs.gaming1440pScore === "number" ? gpu.specs.gaming1440pScore : gpu?.performanceScore ?? null;
+  const valueScore = typeof gpu?.valueScore === "number" ? gpu.valueScore : null;
   const selectedPart = parts.find((part) => part.id === selectedId) ?? parts[1];
   const pendingCurrent = comparisonReplacement?.current ?? replacementPart;
-  const pendingNext = comparisonReplacement?.next ?? (replacementPart ? {
-    ...replacementPart,
-    name: replacementPart.id === "gpu" ? replacement.name : `Recommended ${replacementPart.category} alternative`,
-    price: replacementPart.id === "gpu" ? replacement.price : Math.max(79, replacementPart.price - 40),
-  } : null);
-  const pendingBuildTotal = pendingCurrent && pendingNext ? total - pendingCurrent.price + pendingNext.price : total;
+  const pendingNext = comparisonReplacement?.next ?? (replacementPart
+    ? canonicalComparisonCatalog(replacementPart, build).find((candidate) => candidate.id !== replacementPart.id && !candidate.disabled)
+    : null);
+  const pendingPreviewBuild = pendingCurrent && pendingNext
+    ? (() => { try { return replaceBuildPartLocally(build, pendingCurrent.id, pendingNext.canonical); } catch { return build; } })()
+    : build;
+  const pendingNextPart = pendingNext ? adaptCanonicalPart(pendingNext.canonical, pendingPreviewBuild) : null;
+  const pendingBuildTotal = pendingCurrent && pendingNextPart ? total - pendingCurrent.price + pendingNextPart.price : total;
   const pendingBudgetDelta = budget - pendingBuildTotal;
   const closeReplacement = () => {
     setReplacementPart(null);
     setComparisonReplacement(null);
   };
-  const openCompare = (part: Part) => {
+  const openCompare = (part: CanonicalViewPart) => {
     setDetailPart(null);
     setComparePart(part);
+  };
+  const confirmReplacement = () => {
+    if (!pendingCurrent || !pendingNextPart) return;
+    setReplacementStatus("pending");
+    setReplacementFeedback("Recalculating build consequences…");
+    try {
+      const previousCompatibility = build.compatibilityStatus;
+      const nextBuild = replaceBuildPartLocally(build, pendingCurrent.id, pendingNextPart.canonical);
+      setBuild(nextBuild);
+      setSelectedId(pendingNextPart.id);
+      setReplacementStatus("succeeded");
+      setReplacementFeedback(`${pendingNextPart.name} applied. Compatibility ${previousCompatibility === nextBuild.compatibilityStatus ? "is unchanged" : `changed from ${previousCompatibility} to ${nextBuild.compatibilityStatus}`}. Persistence is unavailable in this guest preview.`);
+      closeReplacement();
+    } catch (error) {
+      setReplacementStatus("failed");
+      setReplacementFeedback(error instanceof Error ? error.message : "Replacement could not be applied. The build is unchanged.");
+    }
   };
   const toggleImageFailure = (id: string) => setFailedImages((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
   const sendMessage = () => {
@@ -630,7 +783,7 @@ function BuildWorkspace() {
       `Budget: ${budgetLine}`,
       `Compatibility: ${compatibilityReviewCount ? `${compatibilityReviewCount} item requires review` : "No issues"}`,
       "",
-      ...parts.map((part) => `${part.category}: ${part.name} | ${formatPartPrice(part.price)} | ${part.retailer || "Retailer unavailable"} | ${part.stock} | ${purchaseUrlFor(part) ?? "Purchase reference unavailable"}`),
+      ...parts.map((part) => `${part.category}: ${part.name} | ${formatPartPrice(part.price)} (seed, not live) | ${part.retailer || "Retailer unavailable"} (seed listing) | ${part.stock} (seed) | ${purchaseUrlFor(part) ?? "Purchase reference unavailable"}`),
     ].join("\n");
   };
 
@@ -654,8 +807,8 @@ function BuildWorkspace() {
   const exportShoppingPlan = () => {
     const escapeCsv = (value: string | number) => `"${String(value).replaceAll('"', '""')}"`;
     const rows = [
-      ["Category", "Product", "Price", "Retailer", "Availability", "Compatibility", "Purchase reference", "Official page"],
-      ...parts.map((part) => [part.category, part.name, part.price, part.retailer, part.stock, part.compatibility, purchaseUrlFor(part) ?? "Unavailable", part.officialUrl ?? "Unavailable"]),
+      ["Category", "Product", "Price", "Price source", "Retailer", "Retailer source", "Availability", "Stock source", "Compatibility", "Compatibility source", "Purchase reference", "Official page"],
+      ...parts.map((part) => [part.category, part.name, Number.isFinite(part.price) ? part.price : "Unavailable", "Seed catalog, not live", part.retailer, "Seed catalog", part.stock, "Seed catalog", part.compatibility, "Calculated", purchaseUrlFor(part) ?? "Unavailable", part.officialUrl ?? "Unavailable"]),
     ];
     const blob = new Blob([rows.map((row) => row.map(escapeCsv).join(",")).join("\r\n")], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
@@ -707,6 +860,7 @@ function BuildWorkspace() {
         {comparePart ? (
           <CompareWorkspace
             part={comparePart}
+            build={build}
             buildTotal={total}
             budget={budget}
             onClose={() => setComparePart(null)}
@@ -729,14 +883,14 @@ function BuildWorkspace() {
                 <article key={part.id} className={`component-card ${selectedId === part.id ? "selected" : ""}`} onClick={() => setSelectedId(part.id)} tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(part.id); } }}>
                   <ProductVisual part={part} failed={failedImages.includes(part.id)} onFail={() => toggleImageFailure(part.id)} />
                   <div className="part-main">
-                    <div className="part-meta"><span>{part.category}</span><span className={`stock ${part.stockTone}`}>{part.stock}</span></div>
+                    <div className="part-meta"><span>{part.category}</span><span className={`stock ${part.stockTone}`}>{part.stock}</span><span className="data-trust-label" title={part.trustDetail}>{part.trustLabel}</span></div>
                     <h3>{part.name}</h3>
                     <p className="workload-fit">{workloadFit(part)}</p>
                     <div className="spec-list">{part.specs.slice(0, 3).map((spec) => <span key={spec}>{spec}</span>)}</div>
                     <p className="selection-reason">{part.reason}</p>
                   </div>
                   <div className="part-actions">
-                    <div className="price-block"><strong>${part.price.toLocaleString()}</strong><span>at {part.retailer}</span></div>
+                    <div className="price-block"><strong>{formatPartPrice(part.price)}</strong><span>{part.retailer === "Retailer unavailable" ? part.retailer : `Seed listing at ${part.retailer}`}</span></div>
                     <span className={`compat-status ${part.id === "psu" ? "warning" : ""}`}>{part.id === "psu" ? <AlertTriangle size={13} /> : <CheckCircle2 size={13} />}{part.compatibility}</span>
                     <div className="card-buttons">
                       <button onClick={(event) => { event.stopPropagation(); openCompare(part); }}><GitCompareArrows size={15} /> Compare</button>
@@ -754,7 +908,7 @@ function BuildWorkspace() {
             <div className="comparison-hero">
               <div className="compare-product current"><span className="choice-tag">CURRENT PICK</span><ProductVisual part={selectedPart} failed={false} onFail={() => {}} /><h3>{selectedPart.name}</h3><strong>${selectedPart.price}</strong></div>
               <div className="versus">VS</div>
-              <div className="compare-product recommended"><span className="choice-tag"><BadgeCheck size={13} /> BEST VALUE</span><ProductVisual part={comparePart} failed={false} onFail={() => {}} /><h3>{replacement.name}</h3><strong>${replacement.price}</strong></div>
+              <div className="compare-product recommended"><span className="choice-tag"><BadgeCheck size={13} /> BEST VALUE</span><ProductVisual part={comparePart} failed={false} onFail={() => {}} /><h3>{legacyPrototypeReplacement.name}</h3><strong>${legacyPrototypeReplacement.price}</strong></div>
             </div>
             <div className="delta-grid">
               <div className="positive"><CircleDollarSign size={17} /><span><small>PRICE</small><strong>Save $200</strong></span></div>
@@ -774,7 +928,8 @@ function BuildWorkspace() {
               <div className="detail-purchase-context">
                 <span className="detail-price">{formatPartPrice(detailPart.price)}</span>
                 <p><Store size={14} /> {detailPart.retailer || "Retailer unavailable"} <span aria-hidden="true">·</span> <span className={`semantic-${stockState(detailPart)}`}>{detailPart.stock}</span></p>
-                <p className={detailPart.id === "psu" ? "semantic-caution" : "semantic-excellent"}>{detailPart.id === "psu" ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}{detailPart.compatibility}</p>
+                <p className="data-trust-detail"><span className="data-trust-label">{detailPart.trustLabel}</span>{detailPart.trustDetail}</p>
+                <p className={detailPart.canonical.category === "psu" && build.compatibilityStatus !== "pass" ? "semantic-caution" : "semantic-excellent"}>{detailPart.canonical.category === "psu" && build.compatibilityStatus !== "pass" ? <AlertTriangle size={14} /> : <ShieldCheck size={14} />}{detailPart.compatibility}</p>
                 {detailPart.officialUrl && <a className="official-link detail-official-link" href={detailPart.officialUrl} target="_blank" rel="noreferrer" aria-label={`Open official page for ${detailPart.name} in a new tab`}>Official page <ExternalLink size={13} /></a>}
               </div>
             </div>
@@ -791,36 +946,37 @@ function BuildWorkspace() {
         </section>
 
         <aside className={`summary-rail ${mobilePanel === "summary" ? "mobile-active" : ""}`}>
-          <div className="summary-top"><div className="summary-heading"><span className="section-kicker">DECISION RECEIPT</span></div><div className="total-price"><span>Estimated build total</span><strong>${total.toLocaleString()}</strong><small>8 selected components</small></div><div className="budget-status"><div><span>Target budget</span><strong>${budget.toLocaleString()}</strong></div><div><span>{delta >= 0 ? "Remaining" : "Over budget"}</span><strong className={delta >= 0 ? "semantic-excellent" : "semantic-risk"}>${Math.abs(delta)}</strong></div><p className={delta >= 0 ? "semantic-excellent" : "semantic-risk"}>{delta >= 0 ? "9% below your target" : "Budget adjustment required"}</p></div></div>
+          <div className="summary-top"><div className="summary-heading"><span className="section-kicker">DECISION RECEIPT</span></div><div className="total-price"><span>Estimated build total</span><strong>{formatPartPrice(total)}</strong><small>{parts.length} selected components · Seed prices</small></div><div className="budget-status"><div><span>Target budget</span><strong>{formatPartPrice(budget)}</strong></div><div><span>{delta >= 0 ? "Remaining" : "Over budget"}</span><strong className={delta >= 0 ? "semantic-excellent" : "semantic-risk"}>{formatPartPrice(Math.abs(delta))}</strong></div><p className={delta >= 0 ? "semantic-excellent" : "semantic-risk"}>{delta >= 0 ? `${Math.round((delta / budget) * 100)}% below your target` : "Budget adjustment required"}</p></div></div>
           <div className="receipt-metrics">
-            <button className="receipt-row receipt-warning" onClick={() => setWarningOpen(!warningOpen)}><span>Compatibility</span><strong className="semantic-caution">1 note to review</strong><ChevronRight size={15} /></button>
-            {warningOpen && <div className="warning-detail"><strong>Power headroom is tight</strong><p>The 850W PSU is safe for this build, but leaves limited room for a future flagship GPU.</p><button onClick={() => setReplacementPart(parts[6])}>Review PSU options</button></div>}
-            <div className="receipt-row"><span>Target performance<small>1440p high refresh</small></span><strong className="semantic-excellent">94</strong></div>
-            <div className="receipt-row"><span>Value<small>Strong price-to-performance</small></span><strong className="semantic-strong">89</strong></div>
-            <div className="receipt-row"><span>Estimated power<small>72% of PSU capacity</small></span><strong className="semantic-strong">612W</strong></div>
-            <div className="receipt-row"><span>PSU headroom<small>Safe now, tighter for a flagship upgrade</small></span><strong className="semantic-caution">238W</strong></div>
+            <button className="receipt-row receipt-warning" onClick={() => setWarningOpen(!warningOpen)}><span>Compatibility<small>{build.compatibilityChecks.length} rules evaluated · calculated</small></span><strong className={build.compatibilityStatus === "pass" ? "semantic-excellent" : build.compatibilityStatus === "warning" ? "semantic-caution" : "semantic-risk"}>{compatibilityReviewCount ? `${compatibilityReviewCount} ${compatibilityReviewCount === 1 ? "note" : "notes"} to review` : "All checks passed"}</strong><ChevronRight size={15} /></button>
+            {warningOpen && <div className="warning-detail"><strong>{build.compatibilityWarnings[0]?.severity === "fail" ? "Compatibility issue" : "Compatibility review"}</strong><p>{build.compatibilityWarnings[0]?.message ?? "All evaluated compatibility rules currently pass."}</p>{parts.find((part) => part.canonical.category === "psu") && <button onClick={() => setReplacementPart(parts.find((part) => part.canonical.category === "psu")!)}>Review PSU options</button>}</div>}
+            <div className="receipt-row"><span>Target performance<small>GPU workload score · seed specification</small></span><strong className={performanceScore === null ? "" : semanticScoreClass(`${performanceScore}`)}>{performanceScore ?? "Unknown"}</strong></div>
+            <div className="receipt-row"><span>Value<small>Catalog score provenance required</small></span><strong className={valueScore === null ? "" : semanticScoreClass(`${valueScore}`)}>{valueScore ?? "Unknown"}</strong></div>
+            <div className="receipt-row"><span>Estimated power<small>{powerEstimate.trust.disclosure}</small></span><strong className="semantic-strong">{powerEstimate.value === null ? "Unknown" : `${powerEstimate.value}W`}</strong></div>
+            <div className="receipt-row"><span>PSU headroom<small>Derived from selected PSU and estimated draw</small></span><strong className={psuHeadroom !== null && psuHeadroom < 100 ? "semantic-caution" : "semantic-strong"}>{psuHeadroom === null ? "Unknown" : `${psuHeadroom}W`}</strong></div>
           </div>
           <p className="receipt-insight"><strong>Well balanced.</strong> The GPU carries the target resolution while the CPU protects high-frame-rate responsiveness.</p>
-          <div className="summary-footer"><button className="primary-button shopping-button" onClick={() => setShoppingOpen(true)}><ShoppingBag size={17} /> Preview shopping list <ArrowRight size={16} /></button><button className="save-button"><ClipboardList size={15} /> Save or export build</button><p><ShieldCheck size={12} /> Compatibility checked across 14 rules</p></div>
+          <div className="summary-footer"><button className="primary-button shopping-button" onClick={() => setShoppingOpen(true)}><ShoppingBag size={17} /> Preview shopping list <ArrowRight size={16} /></button><button className="save-button"><ClipboardList size={15} /> Save or export build</button><p><ShieldCheck size={12} /> {build.compatibilityChecks.length} rules evaluated · calculated result</p></div>
         </aside>
         </>)}
       </main>
 
       <nav className={`mobile-tabs ${comparePart ? "compare-open" : ""}`} aria-label="Workspace sections"><button className={mobilePanel === "needs" ? "active" : ""} onClick={() => setMobilePanel("needs")}><PanelLeft size={18} />Needs</button><button className={mobilePanel === "build" ? "active" : ""} onClick={() => setMobilePanel("build")}><Cpu size={18} />Build</button><button className={mobilePanel === "summary" ? "active" : ""} onClick={() => setMobilePanel("summary")}><ClipboardList size={18} />Summary</button></nav>
 
-      {pendingCurrent && pendingNext && <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Confirm replacement"><div className="confirm-modal consequence-confirmation">
+      {replacementFeedback && <div className={`replacement-feedback ${replacementStatus}`} role="status" aria-live="polite">{replacementFeedback}</div>}
+      {pendingCurrent && pendingNextPart && <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Confirm replacement"><div className="confirm-modal consequence-confirmation">
         <div className="confirm-icon"><GitCompareArrows size={22} /></div><span className="section-kicker">REPLACEMENT CONSEQUENCES</span><h2>Replace {pendingCurrent.category}?</h2><p>Review the part and whole-build changes before confirming this decision.</p>
-        <div className="replacement-summary"><div><span>Current part</span><strong>{pendingCurrent.name}</strong><small>${pendingCurrent.price}</small></div><ArrowRight size={18} /><div><span>Selected replacement</span><strong>{pendingNext.name}</strong><small>${pendingNext.price}</small></div></div>
+        <div className="replacement-summary"><div><span>Current part</span><strong>{pendingCurrent.name}</strong><small>{formatPartPrice(pendingCurrent.price)} · Seed data</small></div><ArrowRight size={18} /><div><span>Selected replacement</span><strong>{pendingNextPart.name}</strong><small>{formatPartPrice(pendingNextPart.price)} · Seed data</small></div></div>
         <dl className="confirmation-impact-grid">
-          <div><dt>Part price</dt><dd className={pendingNext.price <= pendingCurrent.price ? "semantic-excellent" : "semantic-caution"}>{pendingNext.price <= pendingCurrent.price ? "Save" : "Add"} ${Math.abs(pendingNext.price - pendingCurrent.price)}</dd></div>
+          <div><dt>Part price</dt><dd className={pendingNextPart.price <= pendingCurrent.price ? "semantic-excellent" : "semantic-caution"}>{formatSignedCurrency(pendingNextPart.price - pendingCurrent.price, true)}</dd></div>
           <div><dt>New build total</dt><dd>${pendingBuildTotal.toLocaleString()}</dd></div>
           <div><dt>Budget</dt><dd className={pendingBudgetDelta >= 0 ? "semantic-excellent" : "semantic-risk"}>{pendingBudgetDelta >= 0 ? `$${pendingBudgetDelta} remaining` : `$${Math.abs(pendingBudgetDelta)} over`}</dd></div>
-          <div><dt>Compatibility</dt><dd className={comparisonValueClass("Compatibility impact", pendingNext.compatibility)}>{pendingNext.compatibility}</dd></div>
-          <div><dt>Performance</dt><dd>{comparisonReplacement ? comparisonCatalog(pendingCurrent).find((item) => item.name === pendingNext.name)?.performanceDelta ?? "Recalculated" : "Target maintained"}</dd></div>
-          <div><dt>Power</dt><dd>{comparisonReplacement ? comparisonCatalog(pendingCurrent).find((item) => item.name === pendingNext.name)?.power ?? "Recalculated" : "Compatibility checked"}</dd></div>
+          <div><dt>Compatibility</dt><dd className={comparisonValueClass("Compatibility impact", pendingNextPart.compatibility)}>{pendingNextPart.compatibility}</dd></div>
+          <div><dt>Performance</dt><dd>{canonicalComparisonCatalog(pendingCurrent, build).find((item) => item.id === pendingNextPart.id)?.performanceDelta ?? "Unknown"}</dd></div>
+          <div><dt>Power</dt><dd>{canonicalComparisonCatalog(pendingCurrent, build).find((item) => item.id === pendingNextPart.id)?.power ?? "Unknown"}</dd></div>
         </dl>
-        <div className="confirmation-note"><ShieldCheck size={15} /><span><strong>Compatibility check complete.</strong> No cross-category replacement is required.</span></div>
-        <div className="confirm-actions"><button className="outline-button" onClick={closeReplacement}>Keep current part</button><button className="primary-button" onClick={closeReplacement}><Check size={15} /> Confirm replacement</button></div>
+        <div className="confirmation-note"><ShieldCheck size={15} /><span><strong>Compatibility preview calculated.</strong> Confirming reruns every rule against the updated build.</span></div>
+        <div className="confirm-actions"><button className="outline-button" onClick={closeReplacement}>Keep current part</button><button className="primary-button" disabled={replacementStatus === "pending"} onClick={confirmReplacement}><Check size={15} /> {replacementStatus === "pending" ? "Applying…" : "Confirm replacement"}</button></div>
       </div></div>}
 
       {shoppingOpen && <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="shopping-plan-title"><div className="shopping-modal">
@@ -841,7 +997,7 @@ function BuildWorkspace() {
           {shoppingStatus === "ready" && parts.length > 0 && <div className="retailer-groups">{retailerGroups.map(([retailer, retailerParts]) => {
             const groupHasReferences = retailerParts.some((part) => Boolean(purchaseUrlFor(part)));
             return <section className="retailer-group" key={retailer}>
-              <header><div><Store size={15} /><strong>{retailer}</strong><span>{retailerParts.length} {retailerParts.length === 1 ? "item" : "items"}</span></div><small className={groupHasReferences ? "semantic-excellent" : "semantic-caution"}>{groupHasReferences ? "Purchase references available" : "Purchase references needed"}</small></header>
+              <header><div><Store size={15} /><strong>{retailer}</strong><span>{retailerParts.length} {retailerParts.length === 1 ? "item" : "items"} · seed catalog</span></div><small className={groupHasReferences ? "semantic-excellent" : "semantic-caution"}>{groupHasReferences ? "Retailer search references available" : "Purchase references needed"}</small></header>
               <div className="purchase-ledger">{retailerParts.map((part) => {
                 const purchaseUrl = purchaseUrlFor(part);
                 const priceAvailable = Number.isFinite(part.price);
@@ -849,7 +1005,7 @@ function BuildWorkspace() {
                 return <article className="purchase-row" key={part.id}>
                   <span className="shop-icon"><part.Icon size={16} /></span>
                   <div className="purchase-product"><span>{part.category}</span><strong>{part.name}</strong><small className={`semantic-${stockState(part)}`}>{part.stock}</small></div>
-                  <div className="purchase-price"><strong className={priceAvailable ? "" : "semantic-caution"}>{formatPartPrice(part.price)}</strong><span>{part.retailer || "Retailer unavailable"}</span></div>
+                  <div className="purchase-price"><strong className={priceAvailable ? "" : "semantic-caution"}>{formatPartPrice(part.price)}</strong><span>{part.retailer || "Retailer unavailable"}</span><small className="data-trust-label">Seed price · not live</small></div>
                   <div className={`purchase-review ${needsReview ? "semantic-caution" : "semantic-excellent"}`}>{needsReview ? <AlertTriangle size={13} /> : <ShieldCheck size={13} />}<span>{needsReview ? "Review required" : "Compatibility checked"}</span></div>
                   <div className="purchase-actions">
                     {purchaseUrl ? <a className="purchase-reference" href={purchaseUrl} target="_blank" rel="noreferrer">Purchase reference <ExternalLink size={12} /></a> : <button className="purchase-reference unavailable" disabled>Purchase link unavailable</button>}
