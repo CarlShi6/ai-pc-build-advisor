@@ -6,12 +6,7 @@ import { ComparisonTable } from "@/components/comparison-table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  GPU_OPTIONS,
-  GPU_METRICS,
-  verdict,
-  type ComparableOption,
-} from "@/lib/parts-data";
+import { GPU_OPTIONS, GPU_METRICS, verdict, type ComparableOption } from "@/lib/parts-data";
 import {
   ArrowLeft,
   ArrowRight,
@@ -145,8 +140,7 @@ function ComparePage() {
               <div className="flex items-center gap-2">
                 <Check className="size-4 text-primary" />
                 <span>
-                  Selected GPU changed to{" "}
-                  <span className="font-semibold">{selected.name}</span>.{" "}
+                  Selected GPU changed to <span className="font-semibold">{selected.name}</span>.{" "}
                   <span
                     className={cn(
                       "font-mono font-semibold",
@@ -203,8 +197,8 @@ function ComparePage() {
             </div>
             <p className="text-sm leading-relaxed text-muted-foreground">
               The <span className="font-semibold text-foreground">RTX 4080 Super</span> is
-              recommended because it gives strong 4K editing and gaming performance without the
-              huge price jump of the RTX 4090. The{" "}
+              recommended because it gives strong 4K editing and gaming performance without the huge
+              price jump of the RTX 4090. The{" "}
               <span className="font-semibold text-foreground">RTX 4070 Ti Super</span> is a
               better-value choice if you want to save money.
             </p>
@@ -217,8 +211,8 @@ function ComparePage() {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex gap-2">
                 <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
-                Keep <span className="font-semibold text-foreground">RTX 4080 Super</span> as
-                the balanced option.
+                Keep <span className="font-semibold text-foreground">RTX 4080 Super</span> as the
+                balanced option.
               </li>
               <li className="flex gap-2">
                 <span className="mt-1.5 size-1.5 shrink-0 rounded-full bg-primary" />
@@ -338,27 +332,18 @@ function OptionCard({
         <p className="mt-1 text-xs text-muted-foreground">{option.reason}</p>
       </div>
 
-      <div className="font-mono text-3xl font-bold">
-        ${option.price.toLocaleString()}
-      </div>
+      <div className="font-mono text-3xl font-bold">${option.price.toLocaleString()}</div>
 
       <dl className="grid grid-cols-2 gap-x-3 gap-y-2 border-t border-border pt-4 text-xs">
         <Spec label="Performance" value={`${option.perfScore}/100`} />
         <Spec label="VRAM" value={`${option.vramGb} GB`} />
         <Spec label="Power" value={`${option.powerW} W`} />
         <Spec label="Est. FPS" value={`${option.fps4k ?? "—"}`} />
-        <Spec
-          label="Stock"
-          value={option.stock}
-          valueClass={cn("font-semibold", stockTone)}
-        />
+        <Spec label="Stock" value={option.stock} valueClass={cn("font-semibold", stockTone)} />
         <Spec
           label="Compatible"
           value={option.compatible ? "Yes" : "Check"}
-          valueClass={cn(
-            "font-semibold",
-            option.compatible ? "text-success" : "text-warning",
-          )}
+          valueClass={cn("font-semibold", option.compatible ? "text-success" : "text-warning")}
         />
       </dl>
 
@@ -386,15 +371,7 @@ function OptionCard({
   );
 }
 
-function Spec({
-  label,
-  value,
-  valueClass,
-}: {
-  label: string;
-  value: string;
-  valueClass?: string;
-}) {
+function Spec({ label, value, valueClass }: { label: string; value: string; valueClass?: string }) {
   return (
     <div className="flex items-center justify-between gap-2">
       <span className="text-muted-foreground">{label}</span>

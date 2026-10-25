@@ -1,7 +1,13 @@
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import { recalculateBuild } from "@/lib/build-advisor";
+import { withDraftEnvelope } from "@/lib/persistence/draft-envelope";
 import { createPostBuildFeedbackSummary } from "@/lib/post-build-feedback";
-import type { PostBuildFeedback, PostBuildFeedbackInput, SavedBuild, SavedBuildSummary } from "@/types/build";
+import type {
+  PostBuildFeedback,
+  PostBuildFeedbackInput,
+  SavedBuild,
+  SavedBuildSummary,
+} from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
 import type {
   AuthSession,
@@ -226,8 +232,8 @@ export class MockPersistenceStore implements PersistenceStore {
     const plan = this.getCurrentPlan(actor);
     const replacementLimit =
       plan === "build_pro"
-        ? BUILD_PRO_PLAN.replacementLimit ?? 25
-        : FREE_PLAN.replacementLimit ?? 3;
+        ? (BUILD_PRO_PLAN.replacementLimit ?? 25)
+        : (FREE_PLAN.replacementLimit ?? 3);
     const remainingReplacements = Math.max(0, replacementLimit - state.replacementsUsedForBuild);
 
     if (plan === "build_pro") {
@@ -518,7 +524,7 @@ export class MockPersistenceStore implements PersistenceStore {
     const state = this.getActorState(actor);
     const now = nowIso();
     const existing = input.id ? state.savedBuilds.find((item) => item.id === input.id) : undefined;
-    const safeBuild = recalculateBuild(input.build);
+    const safeBuild = withDraftEnvelope(input.build, recalculateBuild(input.build));
 
     return {
       id: existing?.id ?? createId("saved"),

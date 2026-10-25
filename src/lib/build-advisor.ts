@@ -123,55 +123,62 @@ export function getRecommendedBuildData(input?: RecommendedBuildInput): Build {
     ? "cpu-r9-7950x3d"
     : wants2K && wantsGaming && !creatorHeavy && !wantsStreaming && !wants4K
       ? "cpu-i7-14700k"
-    : prefersIntelCpu && !creatorHeavy && budgetTight
-      ? "cpu-i7-14700k"
-      : creatorHeavy || wantsStreaming || wants4K || budget >= 2500
-        ? "cpu-i9-14900k"
-        : "cpu-i7-14700k";
+      : prefersIntelCpu && !creatorHeavy && budgetTight
+        ? "cpu-i7-14700k"
+        : creatorHeavy || wantsStreaming || wants4K || budget >= 2500
+          ? "cpu-i9-14900k"
+          : "cpu-i7-14700k";
 
-  const gpuId = wantsAi || wantsRendering || (budgetFlexible && wants4K)
-    ? "gpu-rtx-4090"
-    : wants2K && !creatorHeavy
-      ? "gpu-rtx-4070-ti-super"
-      : budgetTight && wantsGaming && !wants4K
+  const gpuId =
+    wantsAi || wantsRendering || (budgetFlexible && wants4K)
+      ? "gpu-rtx-4090"
+      : wants2K && !creatorHeavy
         ? "gpu-rtx-4070-ti-super"
-        : "gpu-rtx-4080-super";
+        : budgetTight && wantsGaming && !wants4K
+          ? "gpu-rtx-4070-ti-super"
+          : "gpu-rtx-4080-super";
 
-  const motherboardId = cpuId === "cpu-r9-7950x3d"
-    ? "mobo-x670e-hero"
-    : budgetTight
-      ? "mobo-b760-aorus"
-      : "mobo-z790-hero";
+  const motherboardId =
+    cpuId === "cpu-r9-7950x3d"
+      ? "mobo-x670e-hero"
+      : budgetTight
+        ? "mobo-b760-aorus"
+        : "mobo-z790-hero";
 
-  const ramId = budgetTight && !creatorHeavy
-    ? "ram-gskill-32-ddr5-6000"
-    : budget < 2600
-      ? "ram-kingston-64-ddr5-6000"
-      : "ram-corsair-64-ddr5-6400";
+  const ramId =
+    budgetTight && !creatorHeavy
+      ? "ram-gskill-32-ddr5-6000"
+      : budget < 2600
+        ? "ram-kingston-64-ddr5-6000"
+        : "ram-corsair-64-ddr5-6400";
 
-  const ssdId = wantsAi || wantsRendering || budgetFlexible
-    ? "ssd-p44-pro-4tb"
-    : budgetTight
-      ? "ssd-sn850x-2tb"
-      : "ssd-990-pro-2tb";
+  const ssdId =
+    wantsAi || wantsRendering || budgetFlexible
+      ? "ssd-p44-pro-4tb"
+      : budgetTight
+        ? "ssd-sn850x-2tb"
+        : "ssd-990-pro-2tb";
 
-  const psuId = gpuId === "gpu-rtx-4090"
-    ? "psu-rm1000x"
-    : gpuId === "gpu-rtx-4070-ti-super" && cpuId === "cpu-i7-14700k" && budgetTight
-      ? "psu-focus-750"
-      : "psu-rm850x";
+  const psuId =
+    gpuId === "gpu-rtx-4090"
+      ? "psu-rm1000x"
+      : gpuId === "gpu-rtx-4070-ti-super" && cpuId === "cpu-i7-14700k" && budgetTight
+        ? "psu-focus-750"
+        : "psu-rm850x";
 
-  const caseId = budgetTight && !prefersBlack && !prefersRgb
-    ? "case-nzxt-h5-flow"
-    : creatorHeavy || wantsRendering
-      ? "case-fractal-north-xl"
-      : "case-o11-evo";
+  const caseId =
+    budgetTight && !prefersBlack && !prefersRgb
+      ? "case-nzxt-h5-flow"
+      : creatorHeavy || wantsRendering
+        ? "case-fractal-north-xl"
+        : "case-o11-evo";
 
-  const coolerId = cpuId === "cpu-i7-14700k" && budgetTight
-    ? "cooler-pa120"
-    : creatorHeavy || cpuId === "cpu-i9-14900k" || prefersRgb
-      ? "cooler-ls720"
-      : "cooler-nh-d15";
+  const coolerId =
+    cpuId === "cpu-i7-14700k" && budgetTight
+      ? "cooler-pa120"
+      : creatorHeavy || cpuId === "cpu-i9-14900k" || prefersRgb
+        ? "cooler-ls720"
+        : "cooler-nh-d15";
 
   const selection = {
     ...recommendedBuildPartIds,
@@ -202,9 +209,7 @@ export function getPartsByCategoryData(category: string): Part[] {
 }
 
 export function getComparePartsData(ids: string[]): Part[] {
-  return ids
-    .map((id) => findPartById(id))
-    .filter((part): part is Part => Boolean(part));
+  return ids.map((id) => findPartById(id)).filter((part): part is Part => Boolean(part));
 }
 
 export function recalculateBuild(build: Build): Build {
@@ -241,17 +246,17 @@ export function getCartPreviewItems(build: Build): CartPreviewItem[] {
   return build.parts.map((part) => ({
     partId: part.id,
     displayName: part.displayName,
-    retailer: part.owned ? "Already owned" : part.retailer ?? "Partner retailer",
+    retailer: part.owned ? "Already owned" : (part.retailer ?? "Partner retailer"),
     estimatedPrice: part.owned ? 0 : part.price,
     quantity: 1,
     purchaseUrl: part.owned ? undefined : part.purchaseUrl,
-    productUrl: part.owned ? undefined : part.purchaseUrl ?? part.productUrl,
+    productUrl: part.owned ? undefined : (part.purchaseUrl ?? part.productUrl),
     searchUrl: part.owned ? undefined : part.searchUrl,
-    stockStatus: part.owned ? "unknown" : part.stockStatus ?? part.availability,
+    stockStatus: part.owned ? "unknown" : (part.stockStatus ?? part.availability),
     lastUpdated: part.owned ? undefined : part.lastUpdated,
     specSummary: part.specSummary,
     affiliateLinks: part.owned ? [] : part.affiliateLinks,
-    availability: part.owned ? "unknown" : part.stockStatus ?? part.availability,
+    availability: part.owned ? "unknown" : (part.stockStatus ?? part.availability),
     note: part.owned
       ? "Already owned - no purchase needed."
       : getAvailabilityNote(part.stockStatus ?? part.availability),
@@ -294,9 +299,8 @@ export function getRecommendedReplacementForWarning(
         .filter((category): category is PartCategory => Boolean(category)),
     ),
   );
-  const preferredCategory = warning.id.includes("psu") || categories.includes("psu")
-    ? "psu"
-    : categories[0];
+  const preferredCategory =
+    warning.id.includes("psu") || categories.includes("psu") ? "psu" : categories[0];
 
   if (!preferredCategory) {
     return null;
@@ -332,17 +336,9 @@ export function getPartSummarySpecs(part: Part) {
         `${part.specs.performanceTier}`,
       ];
     case "motherboard":
-      return [
-        `${part.specs.socket} socket`,
-        `${part.specs.ramType}`,
-        `${part.specs.formFactor}`,
-      ];
+      return [`${part.specs.socket} socket`, `${part.specs.ramType}`, `${part.specs.formFactor}`];
     case "ram":
-      return [
-        `${part.specs.capacityGb}GB`,
-        `${part.specs.speedMt} MT/s`,
-        `${part.specs.ramType}`,
-      ];
+      return [`${part.specs.capacityGb}GB`, `${part.specs.speedMt} MT/s`, `${part.specs.ramType}`];
     case "ssd":
       return [
         `${part.specs.capacityTb}TB`,
@@ -350,11 +346,7 @@ export function getPartSummarySpecs(part: Part) {
         `${part.specs.readMb}/${part.specs.writeMb} MB/s`,
       ];
     case "psu":
-      return [
-        `${part.specs.wattageW}W`,
-        `${part.specs.efficiency}`,
-        `${part.specs.atxVersion}`,
-      ];
+      return [`${part.specs.wattageW}W`, `${part.specs.efficiency}`, `${part.specs.atxVersion}`];
     case "case":
       return [
         `${part.specs.style}`,

@@ -24,7 +24,9 @@ const USE_CASE_PATTERNS: Array<{ pattern: RegExp; value: string }> = [
 ];
 
 function parseBudget(message: string) {
-  const underMatch = message.match(/\b(?:under|below|less than|max(?:imum)?|budget)\s*\$?\s*(\d{3,5})\b/i);
+  const underMatch = message.match(
+    /\b(?:under|below|less than|max(?:imum)?|budget)\s*\$?\s*(\d{3,5})\b/i,
+  );
 
   if (underMatch) {
     return Number.parseInt(underMatch[1], 10);
@@ -47,9 +49,9 @@ function parseBudget(message: string) {
 
 function parseUseCases(message: string) {
   const normalized = message.toLowerCase();
-  const matches = USE_CASE_PATTERNS
-    .filter((entry) => entry.pattern.test(normalized))
-    .map((entry) => entry.value);
+  const matches = USE_CASE_PATTERNS.filter((entry) => entry.pattern.test(normalized)).map(
+    (entry) => entry.value,
+  );
 
   return Array.from(new Set(matches));
 }

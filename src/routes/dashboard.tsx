@@ -8,7 +8,10 @@ export const Route = createFileRoute("/dashboard")({
   head: () => ({
     meta: [
       { title: "Saved Builds - AI PC Build Advisor" },
-      { name: "description", content: "Saved mock PC build recommendations and comparison activity." },
+      {
+        name: "description",
+        content: "Saved mock PC build recommendations and comparison activity.",
+      },
     ],
   }),
   component: DashboardPage,
@@ -21,10 +24,34 @@ const STATS = [
 ];
 
 const RECENT = [
-  { id: "PC-22341", build: "Production Master Pro", useCase: "4K editing + gaming", total: "$2,783", status: "Ready" },
-  { id: "PC-22340", build: "Streamer Starter", useCase: "Streaming + 1440p", total: "$1,420", status: "Review" },
-  { id: "PC-22339", build: "Esports Lite", useCase: "High-FPS esports", total: "$980", status: "Ready" },
-  { id: "PC-22338", build: "Workstation X", useCase: "AI + rendering", total: "$4,210", status: "Compare" },
+  {
+    id: "PC-22341",
+    build: "Production Master Pro",
+    useCase: "4K editing + gaming",
+    total: "$2,783",
+    status: "Ready",
+  },
+  {
+    id: "PC-22340",
+    build: "Streamer Starter",
+    useCase: "Streaming + 1440p",
+    total: "$1,420",
+    status: "Review",
+  },
+  {
+    id: "PC-22339",
+    build: "Esports Lite",
+    useCase: "High-FPS esports",
+    total: "$980",
+    status: "Ready",
+  },
+  {
+    id: "PC-22338",
+    build: "Workstation X",
+    useCase: "AI + rendering",
+    total: "$4,210",
+    status: "Compare",
+  },
 ];
 
 function DashboardPage() {

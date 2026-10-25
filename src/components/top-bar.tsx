@@ -24,7 +24,8 @@ export function TopBar({
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const isSignedIn = authSession?.status === "authenticated";
   const accountLabel = isSignedIn ? "Signed in" : "Guest mode";
-  const planLabel = entitlement?.active && entitlement.plan === "build_pro" ? "Build Pro active" : "Free";
+  const planLabel =
+    entitlement?.active && entitlement.plan === "build_pro" ? "Build Pro active" : "Free";
 
   return (
     <header className="sticky top-0 z-50 flex h-16 items-center justify-between border-b border-border/80 bg-background/88 px-6 shadow-card backdrop-blur-xl">

@@ -12,7 +12,10 @@ export const Route = createFileRoute("/build")({
   head: () => ({
     meta: [
       { title: "Build Result — AI装机助手" },
-      { name: "description", content: "Recommended PC build with compatibility check and pricing." },
+      {
+        name: "description",
+        content: "Recommended PC build with compatibility check and pricing.",
+      },
     ],
   }),
   component: BuildPage,
@@ -74,7 +77,9 @@ function BuildPage() {
     setFocus(category);
     setCompareOpen(category);
     requestAnimationFrame(() =>
-      document.getElementById("compare-panel")?.scrollIntoView({ behavior: "smooth", block: "start" }),
+      document
+        .getElementById("compare-panel")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" }),
     );
   };
 
@@ -96,10 +101,7 @@ function BuildPage() {
           compact
         />
 
-        <FocusCard
-          part={focusPart}
-          onCompare={() => openCompare(focus)}
-        />
+        <FocusCard part={focusPart} onCompare={() => openCompare(focus)} />
 
         {compareOpen && (
           <ComparePanel
@@ -137,11 +139,7 @@ function BuildPage() {
         </section>
 
         <section className="flex flex-wrap gap-3">
-          <Button
-            variant="secondary"
-            className="rounded-xl"
-            onClick={() => openCompare("GPU")}
-          >
+          <Button variant="secondary" className="rounded-xl" onClick={() => openCompare("GPU")}>
             <GitCompare className="mr-2 size-4" /> Compare GPU options
           </Button>
           <Button variant="secondary" className="rounded-xl" onClick={() => openCompare("CPU")}>

@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { seedParts, recommendedBuildPartIds } from "@/data/seedParts";
-import { createSeedBuild, estimateBuildPower, getValidatedOfficialUrl, getValidatedPurchaseUrl, replaceBuildPartLocally, trustedAvailability, trustedPartPrice } from "@/lib/product-trust";
+import {
+  createSeedBuild,
+  estimateBuildPower,
+  getValidatedOfficialUrl,
+  getValidatedPurchaseUrl,
+  replaceBuildPartLocally,
+  trustedAvailability,
+  trustedPartPrice,
+} from "@/lib/product-trust";
 
-const buildParts = Object.values(recommendedBuildPartIds).filter(Boolean).map((id) => seedParts.find((part) => part.id === id)!).filter(Boolean);
+const buildParts = Object.values(recommendedBuildPartIds)
+  .filter(Boolean)
+  .map((id) => seedParts.find((part) => part.id === id)!)
+  .filter(Boolean);
 
 describe("product trust workspace helpers", () => {
   it("replaces a canonical same-category part and recalculates the build", () => {
@@ -24,7 +35,14 @@ describe("product trust workspace helpers", () => {
   });
 
   it("reports truthful fallbacks for invalid price, stock, and links", () => {
-    const incomplete = { ...seedParts[0], price: Number.NaN, availability: "unknown" as const, purchaseUrl: "javascript:alert(1)", affiliateLinks: [], productUrl: "https://example.com/fake" };
+    const incomplete = {
+      ...seedParts[0],
+      price: Number.NaN,
+      availability: "unknown" as const,
+      purchaseUrl: "javascript:alert(1)",
+      affiliateLinks: [],
+      productUrl: "https://example.com/fake",
+    };
     expect(trustedPartPrice(incomplete).value).toBeNull();
     expect(trustedAvailability(incomplete).value).toBe("unknown");
     expect(getValidatedPurchaseUrl(incomplete)).toBeNull();
@@ -33,6 +51,9 @@ describe("product trust workspace helpers", () => {
 
   it("derives power only when supported inputs exist", () => {
     expect(estimateBuildPower(createSeedBuild(buildParts)).value).toBeTypeOf("number");
-    expect(estimateBuildPower(createSeedBuild(buildParts.filter((part) => part.category !== "gpu"))).value).toBeNull();
+    expect(
+      estimateBuildPower(createSeedBuild(buildParts.filter((part) => part.category !== "gpu")))
+        .value,
+    ).toBeNull();
   });
 });

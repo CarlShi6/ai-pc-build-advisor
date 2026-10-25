@@ -134,8 +134,18 @@ function getSessionAttribution(): AnalyticsProperties {
   try {
     const key = "ai-pc-advisor:session";
     let sessionId = window.sessionStorage.getItem(key);
-    if (!sessionId) { sessionId = createEventId(); window.sessionStorage.setItem(key, sessionId); }
+    if (!sessionId) {
+      sessionId = createEventId();
+      window.sessionStorage.setItem(key, sessionId);
+    }
     const params = new URLSearchParams(window.location.search);
-    return { session_id: sessionId, utm_source: params.get("utm_source")?.slice(0, 80), utm_medium: params.get("utm_medium")?.slice(0, 80), utm_campaign: params.get("utm_campaign")?.slice(0, 80) };
-  } catch { return {}; }
+    return {
+      session_id: sessionId,
+      utm_source: params.get("utm_source")?.slice(0, 80),
+      utm_medium: params.get("utm_medium")?.slice(0, 80),
+      utm_campaign: params.get("utm_campaign")?.slice(0, 80),
+    };
+  } catch {
+    return {};
+  }
 }

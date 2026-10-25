@@ -21,7 +21,9 @@ export async function createStripeCheckoutSession({
   plan,
   buildId,
   userId,
-}: CreateCheckoutSessionRequest): Promise<CreateCheckoutSessionResponse & { checkoutSessionId?: string }> {
+}: CreateCheckoutSessionRequest): Promise<
+  CreateCheckoutSessionResponse & { checkoutSessionId?: string }
+> {
   const config = getServerConfig();
 
   if (plan !== "build_pro") {

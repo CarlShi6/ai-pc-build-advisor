@@ -146,7 +146,9 @@ function getRecommendationReason(decision: CandidateDecision, part: Part, select
     return "Beginner friendly because compatibility stays clean and the swap avoids major power or budget pressure.";
   }
 
-  return part.recommendationReason ?? "Reasonable option, but another selected part is a clearer fit.";
+  return (
+    part.recommendationReason ?? "Reasonable option, but another selected part is a clearer fit."
+  );
 }
 
 function getTradeOffSummary(decision: CandidateDecision) {
@@ -275,7 +277,11 @@ export function getPartDecisionMetadata(
       beginnerFriendly: withWinners.beginnerFriendly,
       compatibilityImpact: withWinners.compatibilityImpact,
       totalPriceAfterSwap: withWinners.totalPriceAfterSwap,
-      recommendationReason: getRecommendationReason(withWinners, parts.find((part) => part.id === withWinners.partId) ?? selectedPart, selectedPart),
+      recommendationReason: getRecommendationReason(
+        withWinners,
+        parts.find((part) => part.id === withWinners.partId) ?? selectedPart,
+        selectedPart,
+      ),
       tradeOffSummary: getTradeOffSummary(withWinners),
       valueScore: withWinners.valueScore,
       performanceScore: withWinners.performanceScore,

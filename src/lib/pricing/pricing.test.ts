@@ -226,8 +226,13 @@ describe("in-memory price repository", () => {
 });
 
 describe("price history range and internal API", () => {
-  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
-  afterEach(() => { vi.useRealTimers(); });
+  beforeEach(() => {
+    vi.useFakeTimers();
+    vi.setSystemTime(NOW);
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
   it("rejects arbitrary public ranges", () => {
     expect(() => normalizePriceHistoryRange("365d")).toThrow(PriceValidationError);
   });

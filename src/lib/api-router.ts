@@ -21,6 +21,9 @@ import { getRetailPriceProvider } from "@/lib/pricing/current-offer-service.serv
 import { BEST_BUY_DISCLOSURE } from "@/lib/pricing/best-buy-provider.server";
 import { seedParts } from "@/data/seedParts";
 import { normalizeRecommendedBuildInput, ValidationError } from "@/lib/validation";
+import { readBoundedImage, ImageInputError } from "@/lib/v3/image-input";
+import { analyzeReferenceImage, ImageAnalysisError } from "@/lib/v3/image-analysis.server";
+import type { ImageAnalyzer } from "@/lib/v3/image-contract";
 import type {
   AdvisorRequestPayload,
   AdvisorResponsePayload,
@@ -162,7 +165,7 @@ async function readBoundedJson<T>(request: Request, maxBytes: number): Promise<T
 
 export async function handleInternalApiRequest(
   request: Request,
-  dependencies: { retailPriceProvider?: RetailPriceProvider } = {},
+  dependencies: { retailPriceProvider?: RetailPriceProvider; imageAnalyzer?: ImageAnalyzer } = {},
 ): Promise<Response | null> {
   const url = new URL(request.url);
   const pathname = normalizeApiPath(url.pathname);
@@ -173,6 +176,13 @@ export async function handleInternalApiRequest(
   }
 
   try {
+    if (pathname === "/api/image-analyses") {
+      if (request.method !== "POST") return methodNotAllowed(["POST"]);
+      const image = await readBoundedImage(request);
+      const result = await (dependencies.imageAnalyzer ?? analyzeReferenceImage)(image);
+      return jsonResponse(result, { headers: { "cache-control": "no-store" } });
+    }
+
     if (pathname === "/api/analytics/events") {
       if (request.method !== "POST") {
         return methodNotAllowed(["POST"]);
@@ -745,6 +755,12 @@ export async function handleInternalApiRequest(
 
     return jsonResponse({ message: "API endpoint not found." }, { status: 404 });
   } catch (error) {
+    if (error instanceof ImageInputError || error instanceof ImageAnalysisError) {
+      return jsonResponse(
+        { error: { code: error.code, message: error.message } },
+        { status: error.status, headers: { "cache-control": "no-store" } },
+      );
+    }
     if (error instanceof ApiRouteError) {
       return jsonResponse({ message: error.message }, { status: error.status });
     }

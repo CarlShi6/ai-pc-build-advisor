@@ -8,13 +8,7 @@ import type {
 import type { AffiliateMerchant, PlanType } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 
-export type Json =
-  | string
-  | number
-  | boolean
-  | null
-  | { [key: string]: Json | undefined }
-  | Json[];
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[];
 
 export interface Database {
   public: {

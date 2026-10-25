@@ -1,7 +1,14 @@
-import type { ProductSearchProvider, ProductSearchQuery, ProductSearchResult } from "@/lib/product-search/types";
+import type {
+  ProductSearchProvider,
+  ProductSearchQuery,
+  ProductSearchResult,
+} from "@/lib/product-search/types";
 import type { PartCategory } from "@/types/parts";
 
-type MockRetailerProduct = Omit<ProductSearchResult, "source" | "confidence" | "priceStatus" | "lastUpdated"> & {
+type MockRetailerProduct = Omit<
+  ProductSearchResult,
+  "source" | "confidence" | "priceStatus" | "lastUpdated"
+> & {
   keywords: string[];
 };
 
@@ -289,7 +296,7 @@ function scoreProduct(product: MockRetailerProduct, query: string, category?: Pa
     return 0;
   }
 
-  return Math.min(0.95, 0.46 + matches / tokens.length * 0.36 + (category ? 0.08 : 0));
+  return Math.min(0.95, 0.46 + (matches / tokens.length) * 0.36 + (category ? 0.08 : 0));
 }
 
 export const mockRetailerProductSearchProvider: ProductSearchProvider = {
@@ -297,9 +304,16 @@ export const mockRetailerProductSearchProvider: ProductSearchProvider = {
   label: "Mock retailer preview",
   async search(query: ProductSearchQuery) {
     return mockProducts
-      .map((product) => ({ product, confidence: scoreProduct(product, query.query, query.category) }))
+      .map((product) => ({
+        product,
+        confidence: scoreProduct(product, query.query, query.category),
+      }))
       .filter(({ confidence }) => confidence > 0)
-      .sort((left, right) => right.confidence - left.confidence || (left.product.price ?? 0) - (right.product.price ?? 0))
+      .sort(
+        (left, right) =>
+          right.confidence - left.confidence ||
+          (left.product.price ?? 0) - (right.product.price ?? 0),
+      )
       .slice(0, 8)
       .map(({ product, confidence }) => ({
         ...product,

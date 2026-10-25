@@ -92,7 +92,8 @@ function riskScore(build: Build, part: Part) {
 
 function getCompatibilitySummary(build: Build, candidateBuild: Build) {
   const confidenceDelta = candidateBuild.confidenceScore.score - build.confidenceScore.score;
-  const warningDelta = candidateBuild.confidenceScore.warningCount - build.confidenceScore.warningCount;
+  const warningDelta =
+    candidateBuild.confidenceScore.warningCount - build.confidenceScore.warningCount;
   const failDelta = candidateBuild.confidenceScore.failCount - build.confidenceScore.failCount;
 
   if (failDelta < 0) {
@@ -190,7 +191,10 @@ function classifySubstitution({
   const overBudgetAfter = candidateBuild.totalPrice > build.budget;
   const similarPerformance = performanceDelta === null || performanceDelta >= -6;
 
-  if (improvesCompatibility && candidateBuild.confidenceScore.failCount <= build.confidenceScore.failCount) {
+  if (
+    improvesCompatibility &&
+    candidateBuild.confidenceScore.failCount <= build.confidenceScore.failCount
+  ) {
     return "compatibilitySafeSubstitute";
   }
 
@@ -247,7 +251,11 @@ function getRecommendationReason(type: SubstitutionType, candidate: Part) {
   return `${candidate.displayName} is a close same-tier substitute with a cleaner overall fit.`;
 }
 
-function getTradeOffSummary(type: SubstitutionType, priceDelta: number, performanceDelta: number | null) {
+function getTradeOffSummary(
+  type: SubstitutionType,
+  priceDelta: number,
+  performanceDelta: number | null,
+) {
   if (type === "performanceUpgrade") {
     return `Costs ${formatMoney(priceDelta)} more for a stronger scored part.`;
   }
@@ -358,7 +366,8 @@ export function getDynamicSubstitutionSuggestions(
           statusBefore: build.compatibilityStatus,
           statusAfter: candidateBuild.compatibilityStatus,
           confidenceDelta: candidateBuild.confidenceScore.score - build.confidenceScore.score,
-          warningDelta: candidateBuild.confidenceScore.warningCount - build.confidenceScore.warningCount,
+          warningDelta:
+            candidateBuild.confidenceScore.warningCount - build.confidenceScore.warningCount,
           failDelta: candidateBuild.confidenceScore.failCount - build.confidenceScore.failCount,
           summary: getCompatibilitySummary(build, candidateBuild),
         },

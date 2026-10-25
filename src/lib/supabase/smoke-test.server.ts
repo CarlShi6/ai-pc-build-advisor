@@ -25,7 +25,8 @@ export async function runSupabaseSmokeTest(): Promise<{
 }> {
   const config = getServerConfig();
   const environment = config.nodeEnv ?? "unknown";
-  const enabled = environment === "development" || isExplicitlyEnabled(config.supabaseSmokeTestEnabled);
+  const enabled =
+    environment === "development" || isExplicitlyEnabled(config.supabaseSmokeTestEnabled);
   const checks = {
     supabaseUrl: Boolean(config.supabaseUrl),
     supabaseAnonKey: Boolean(config.supabaseAnonKey),

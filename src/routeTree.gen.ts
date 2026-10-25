@@ -9,15 +9,34 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as StudioRouteImport } from './routes/studio'
+import { Route as MyBuildsRouteImport } from './routes/my-builds'
+import { Route as LegacyWorkspaceRouteImport } from './routes/legacy-workspace'
 import { Route as DashboardRouteImport } from './routes/dashboard'
 import { Route as ConsultRouteImport } from './routes/consult'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as CartRouteImport } from './routes/cart'
 import { Route as BuildRouteImport } from './routes/build'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as StartModeRouteImport } from './routes/start.$mode'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
 
+const StudioRoute = StudioRouteImport.update({
+  id: '/studio',
+  path: '/studio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const MyBuildsRoute = MyBuildsRouteImport.update({
+  id: '/my-builds',
+  path: '/my-builds',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LegacyWorkspaceRoute = LegacyWorkspaceRouteImport.update({
+  id: '/legacy-workspace',
+  path: '/legacy-workspace',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
@@ -48,6 +67,11 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const StartModeRoute = StartModeRouteImport.update({
+  id: '/start/$mode',
+  path: '/start/$mode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CheckoutSuccessRoute = CheckoutSuccessRouteImport.update({
   id: '/checkout/success',
   path: '/checkout/success',
@@ -66,8 +90,12 @@ export interface FileRoutesByFullPath {
   '/compare': typeof CompareRoute
   '/consult': typeof ConsultRoute
   '/dashboard': typeof DashboardRoute
+  '/legacy-workspace': typeof LegacyWorkspaceRoute
+  '/my-builds': typeof MyBuildsRoute
+  '/studio': typeof StudioRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/start/$mode': typeof StartModeRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -76,8 +104,12 @@ export interface FileRoutesByTo {
   '/compare': typeof CompareRoute
   '/consult': typeof ConsultRoute
   '/dashboard': typeof DashboardRoute
+  '/legacy-workspace': typeof LegacyWorkspaceRoute
+  '/my-builds': typeof MyBuildsRoute
+  '/studio': typeof StudioRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/start/$mode': typeof StartModeRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -87,8 +119,12 @@ export interface FileRoutesById {
   '/compare': typeof CompareRoute
   '/consult': typeof ConsultRoute
   '/dashboard': typeof DashboardRoute
+  '/legacy-workspace': typeof LegacyWorkspaceRoute
+  '/my-builds': typeof MyBuildsRoute
+  '/studio': typeof StudioRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
+  '/start/$mode': typeof StartModeRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -99,8 +135,12 @@ export interface FileRouteTypes {
     | '/compare'
     | '/consult'
     | '/dashboard'
+    | '/legacy-workspace'
+    | '/my-builds'
+    | '/studio'
     | '/checkout/cancel'
     | '/checkout/success'
+    | '/start/$mode'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -109,8 +149,12 @@ export interface FileRouteTypes {
     | '/compare'
     | '/consult'
     | '/dashboard'
+    | '/legacy-workspace'
+    | '/my-builds'
+    | '/studio'
     | '/checkout/cancel'
     | '/checkout/success'
+    | '/start/$mode'
   id:
     | '__root__'
     | '/'
@@ -119,8 +163,12 @@ export interface FileRouteTypes {
     | '/compare'
     | '/consult'
     | '/dashboard'
+    | '/legacy-workspace'
+    | '/my-builds'
+    | '/studio'
     | '/checkout/cancel'
     | '/checkout/success'
+    | '/start/$mode'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -130,12 +178,37 @@ export interface RootRouteChildren {
   CompareRoute: typeof CompareRoute
   ConsultRoute: typeof ConsultRoute
   DashboardRoute: typeof DashboardRoute
+  LegacyWorkspaceRoute: typeof LegacyWorkspaceRoute
+  MyBuildsRoute: typeof MyBuildsRoute
+  StudioRoute: typeof StudioRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
+  StartModeRoute: typeof StartModeRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/studio': {
+      id: '/studio'
+      path: '/studio'
+      fullPath: '/studio'
+      preLoaderRoute: typeof StudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/my-builds': {
+      id: '/my-builds'
+      path: '/my-builds'
+      fullPath: '/my-builds'
+      preLoaderRoute: typeof MyBuildsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/legacy-workspace': {
+      id: '/legacy-workspace'
+      path: '/legacy-workspace'
+      fullPath: '/legacy-workspace'
+      preLoaderRoute: typeof LegacyWorkspaceRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/dashboard': {
       id: '/dashboard'
       path: '/dashboard'
@@ -178,6 +251,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/start/$mode': {
+      id: '/start/$mode'
+      path: '/start/$mode'
+      fullPath: '/start/$mode'
+      preLoaderRoute: typeof StartModeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/checkout/success': {
       id: '/checkout/success'
       path: '/checkout/success'
@@ -202,8 +282,12 @@ const rootRouteChildren: RootRouteChildren = {
   CompareRoute: CompareRoute,
   ConsultRoute: ConsultRoute,
   DashboardRoute: DashboardRoute,
+  LegacyWorkspaceRoute: LegacyWorkspaceRoute,
+  MyBuildsRoute: MyBuildsRoute,
+  StudioRoute: StudioRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
+  StartModeRoute: StartModeRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

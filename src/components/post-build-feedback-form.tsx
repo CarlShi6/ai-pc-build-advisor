@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -9,7 +9,13 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import type {
   BuildFeedbackBoolean,
@@ -72,8 +78,7 @@ export function PostBuildFeedbackForm({
   onOpenChange: (open: boolean) => void;
   onSubmit: (feedback: PostBuildFeedbackInput) => void;
 }) {
-  const initialDraft = useMemo(() => ({ ...DEFAULT_DRAFT }), [buildId]);
-  const [draft, setDraft] = useState<FeedbackDraft>(initialDraft);
+  const [draft, setDraft] = useState<FeedbackDraft>(() => ({ ...DEFAULT_DRAFT }));
 
   useEffect(() => {
     if (open) {
@@ -157,7 +162,9 @@ export function PostBuildFeedbackForm({
             label="Cable management"
             value={draft.cableManagementExperience}
             options={ISSUE_OPTIONS}
-            onChange={(value) => update("cableManagementExperience", value as BuildFeedbackIssueLevel)}
+            onChange={(value) =>
+              update("cableManagementExperience", value as BuildFeedbackIssueLevel)
+            }
           />
           <SelectField
             label="GPU clearance"

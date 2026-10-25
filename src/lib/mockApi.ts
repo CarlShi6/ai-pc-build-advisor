@@ -56,4 +56,12 @@ export async function getOffers(partId: string): Promise<PartOffer[]> {
   return simulateLatency(getOffersForPart(partId));
 }
 
-export { createCandidateBuild, getCompatibilityNotesForPart, getPartPowerRequirement, getPartSummarySpecs, getRecommendedReplacementForWarning, getStoreEmployeeSummary, recalculateBuild };
+export {
+  createCandidateBuild,
+  getCompatibilityNotesForPart,
+  getPartPowerRequirement,
+  getPartSummarySpecs,
+  getRecommendedReplacementForWarning,
+  getStoreEmployeeSummary,
+  recalculateBuild,
+};

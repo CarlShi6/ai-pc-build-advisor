@@ -22,7 +22,9 @@ type CompatibilityRule = {
   id: string;
   label: string;
   checkedPartCategories: string[];
-  evaluate: (context: RuleContext) => Omit<CompatibilityRuleResult, "id" | "label" | "checkedPartCategories">;
+  evaluate: (
+    context: RuleContext,
+  ) => Omit<CompatibilityRuleResult, "id" | "label" | "checkedPartCategories">;
 };
 
 function getPart(build: Build, category: Part["category"]) {
@@ -41,7 +43,12 @@ function getNumberSpec(part: Part | undefined, key: string) {
 
 function splitListSpec(part: Part | undefined, key: string) {
   const value = getStringSpec(part, key);
-  return value ? value.split(",").map((item) => item.trim()).filter(Boolean) : [];
+  return value
+    ? value
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean)
+    : [];
 }
 
 function normalizeValue(value: string) {
@@ -58,7 +65,12 @@ function result(
 }
 
 function notEnoughData(message: string, affectedPartIds: string[]) {
-  return result("warning", message, affectedPartIds, "Verify the missing fit data before purchasing.");
+  return result(
+    "warning",
+    message,
+    affectedPartIds,
+    "Verify the missing fit data before purchasing.",
+  );
 }
 
 export function calculateBuildTotal(parts: Part[]) {
@@ -76,9 +88,19 @@ const compatibilityRules: CompatibilityRule[] = [
     id: "cpu-bios-support",
     label: "CPU BIOS support",
     checkedPartCategories: ["cpu", "motherboard"],
-    evaluate: ({ cpu, motherboard }) => getStringSpec(cpu, "biosCheck")
-      ? result("warning", "Verify that the motherboard BIOS supports this CPU before purchasing.", [cpu?.id, motherboard?.id].filter(Boolean) as string[], "Check the motherboard manufacturer CPU support list and required BIOS version.")
-      : result("pass", "No additional CPU-specific BIOS requirement recorded; verify the board support list.", [cpu?.id, motherboard?.id].filter(Boolean) as string[]),
+    evaluate: ({ cpu, motherboard }) =>
+      getStringSpec(cpu, "biosCheck")
+        ? result(
+            "warning",
+            "Verify that the motherboard BIOS supports this CPU before purchasing.",
+            [cpu?.id, motherboard?.id].filter(Boolean) as string[],
+            "Check the motherboard manufacturer CPU support list and required BIOS version.",
+          )
+        : result(
+            "pass",
+            "No additional CPU-specific BIOS requirement recorded; verify the board support list.",
+            [cpu?.id, motherboard?.id].filter(Boolean) as string[],
+          ),
   },
   {
     id: "cpu-motherboard-socket",
@@ -86,17 +108,20 @@ const compatibilityRules: CompatibilityRule[] = [
     checkedPartCategories: ["cpu", "motherboard"],
     evaluate: ({ cpu, motherboard }) => {
       if (!cpu || !motherboard) {
-        return notEnoughData("CPU and motherboard are required for socket validation.", [
-          cpu?.id,
-          motherboard?.id,
-        ].filter(Boolean) as string[]);
+        return notEnoughData(
+          "CPU and motherboard are required for socket validation.",
+          [cpu?.id, motherboard?.id].filter(Boolean) as string[],
+        );
       }
 
       const cpuSocket = getStringSpec(cpu, "socket");
       const boardSocket = getStringSpec(motherboard, "socket");
 
       if (!cpuSocket || !boardSocket) {
-        return notEnoughData("CPU or motherboard socket data is missing.", [cpu.id, motherboard.id]);
+        return notEnoughData("CPU or motherboard socket data is missing.", [
+          cpu.id,
+          motherboard.id,
+        ]);
       }
 
       if (normalizeValue(cpuSocket) !== normalizeValue(boardSocket)) {
@@ -117,17 +142,20 @@ const compatibilityRules: CompatibilityRule[] = [
     checkedPartCategories: ["motherboard", "ram"],
     evaluate: ({ motherboard, ram }) => {
       if (!motherboard || !ram) {
-        return notEnoughData("Motherboard and RAM are required for memory validation.", [
-          motherboard?.id,
-          ram?.id,
-        ].filter(Boolean) as string[]);
+        return notEnoughData(
+          "Motherboard and RAM are required for memory validation.",
+          [motherboard?.id, ram?.id].filter(Boolean) as string[],
+        );
       }
 
       const boardRamType = getStringSpec(motherboard, "ramType");
       const ramType = getStringSpec(ram, "ramType");
 
       if (!boardRamType || !ramType) {
-        return notEnoughData("Motherboard or RAM memory type data is missing.", [motherboard.id, ram.id]);
+        return notEnoughData("Motherboard or RAM memory type data is missing.", [
+          motherboard.id,
+          ram.id,
+        ]);
       }
 
       if (normalizeValue(boardRamType) !== normalizeValue(ramType)) {
@@ -148,10 +176,10 @@ const compatibilityRules: CompatibilityRule[] = [
     checkedPartCategories: ["gpu", "case"],
     evaluate: ({ gpu, pcCase }) => {
       if (!gpu || !pcCase) {
-        return notEnoughData("GPU and case are required for clearance validation.", [
-          gpu?.id,
-          pcCase?.id,
-        ].filter(Boolean) as string[]);
+        return notEnoughData(
+          "GPU and case are required for clearance validation.",
+          [gpu?.id, pcCase?.id].filter(Boolean) as string[],
+        );
       }
 
       const gpuLength = getNumberSpec(gpu, "lengthMm");
@@ -189,10 +217,10 @@ const compatibilityRules: CompatibilityRule[] = [
     checkedPartCategories: ["motherboard", "case"],
     evaluate: ({ motherboard, pcCase }) => {
       if (!motherboard || !pcCase) {
-        return notEnoughData("Motherboard and case are required for form factor validation.", [
-          motherboard?.id,
-          pcCase?.id,
-        ].filter(Boolean) as string[]);
+        return notEnoughData(
+          "Motherboard and case are required for form factor validation.",
+          [motherboard?.id, pcCase?.id].filter(Boolean) as string[],
+        );
       }
 
       const boardFormFactor = getStringSpec(motherboard, "formFactor");
@@ -255,7 +283,9 @@ const compatibilityRules: CompatibilityRule[] = [
         );
       }
 
-      return result("pass", `${psu.displayName} has at least 100W of estimated headroom.`, [psu.id]);
+      return result("pass", `${psu.displayName} has at least 100W of estimated headroom.`, [
+        psu.id,
+      ]);
     },
   },
   {
@@ -264,17 +294,20 @@ const compatibilityRules: CompatibilityRule[] = [
     checkedPartCategories: ["cpu", "cooler"],
     evaluate: ({ cpu, cooler }) => {
       if (!cpu || !cooler) {
-        return notEnoughData("CPU and cooler are required for socket support validation.", [
-          cpu?.id,
-          cooler?.id,
-        ].filter(Boolean) as string[]);
+        return notEnoughData(
+          "CPU and cooler are required for socket support validation.",
+          [cpu?.id, cooler?.id].filter(Boolean) as string[],
+        );
       }
 
       const cpuSocket = getStringSpec(cpu, "socket");
       const socketSupport = splitListSpec(cooler, "socketSupport");
 
       if (!cpuSocket || socketSupport.length === 0) {
-        return notEnoughData("CPU socket or cooler socket support data is missing.", [cpu.id, cooler.id]);
+        return notEnoughData("CPU socket or cooler socket support data is missing.", [
+          cpu.id,
+          cooler.id,
+        ]);
       }
 
       if (!socketSupport.map(normalizeValue).includes(normalizeValue(cpuSocket))) {
@@ -295,10 +328,10 @@ const compatibilityRules: CompatibilityRule[] = [
     checkedPartCategories: ["cooler", "case"],
     evaluate: ({ cooler, pcCase }) => {
       if (!cooler || !pcCase) {
-        return notEnoughData("Cooler and case are required for cooler fit validation.", [
-          cooler?.id,
-          pcCase?.id,
-        ].filter(Boolean) as string[]);
+        return notEnoughData(
+          "Cooler and case are required for cooler fit validation.",
+          [cooler?.id, pcCase?.id].filter(Boolean) as string[],
+        );
       }
 
       const coolerType = getStringSpec(cooler, "coolerType");
@@ -323,10 +356,11 @@ const compatibilityRules: CompatibilityRule[] = [
           );
         }
 
-        return result("pass", `${caseClearance - coolerHeight}mm of air cooler clearance remains.`, [
-          cooler.id,
-          pcCase.id,
-        ]);
+        return result(
+          "pass",
+          `${caseClearance - coolerHeight}mm of air cooler clearance remains.`,
+          [cooler.id, pcCase.id],
+        );
       }
 
       if (coolerType === "aio") {
@@ -364,17 +398,20 @@ const compatibilityRules: CompatibilityRule[] = [
     checkedPartCategories: ["gpu", "psu"],
     evaluate: ({ gpu, psu }) => {
       if (!gpu || !psu) {
-        return notEnoughData("GPU and PSU are required for vendor PSU guidance.", [
-          gpu?.id,
-          psu?.id,
-        ].filter(Boolean) as string[]);
+        return notEnoughData(
+          "GPU and PSU are required for vendor PSU guidance.",
+          [gpu?.id, psu?.id].filter(Boolean) as string[],
+        );
       }
 
       const gpuRecommendedPsu = getNumberSpec(gpu, "recommendedPsuW");
       const psuWattage = getNumberSpec(psu, "wattageW");
 
       if (!gpuRecommendedPsu || !psuWattage) {
-        return notEnoughData("GPU recommended PSU or PSU wattage data is missing.", [gpu.id, psu.id]);
+        return notEnoughData("GPU recommended PSU or PSU wattage data is missing.", [
+          gpu.id,
+          psu.id,
+        ]);
       }
 
       if (psuWattage < gpuRecommendedPsu) {
@@ -415,9 +452,14 @@ export function evaluateCompatibilityRules(build: Build): CompatibilityRuleResul
   }));
 }
 
-export function getCompatibilityWarnings(checks: CompatibilityRuleResult[]): CompatibilityWarning[] {
+export function getCompatibilityWarnings(
+  checks: CompatibilityRuleResult[],
+): CompatibilityWarning[] {
   return checks
-    .filter((check): check is CompatibilityRuleResult & { severity: CompatibilityWarning["severity"] } => check.severity !== "pass")
+    .filter(
+      (check): check is CompatibilityRuleResult & { severity: CompatibilityWarning["severity"] } =>
+        check.severity !== "pass",
+    )
     .map((check) => ({
       id: check.id,
       severity: check.severity,
@@ -453,7 +495,13 @@ export function calculateBuildConfidenceScore(
   const failCount = checks.filter((check) => check.severity === "fail").length;
   const totalChecks = Math.max(checks.length, 1);
   const penalty = warningCount * 8 + failCount * 25;
-  const score = Math.max(0, Math.min(100, Math.round(100 - penalty - (totalChecks - passCount - warningCount - failCount) * 5)));
+  const score = Math.max(
+    0,
+    Math.min(
+      100,
+      Math.round(100 - penalty - (totalChecks - passCount - warningCount - failCount) * 5),
+    ),
+  );
   const label = score >= 85 ? "High" : score >= 65 ? "Medium" : "Low";
   const summary =
     failCount > 0

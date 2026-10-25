@@ -6,12 +6,7 @@ import type {
   SavedBuild,
   SavedBuildSummary,
 } from "@/types/build";
-import type {
-  AffiliateClickEvent,
-  Entitlement,
-  PlanType,
-  UsageStatus,
-} from "@/types/monetization";
+import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
 import type { Part } from "@/types/parts";
 
 export type AuthStatus = "guest" | "authenticated" | "signed_out";
@@ -121,7 +116,7 @@ export interface AffiliateClickRecord extends AffiliateClickEvent {
   clickedAt: string;
 }
 
-export interface PostBuildFeedbackRecord extends PostBuildFeedback {}
+export type PostBuildFeedbackRecord = PostBuildFeedback;
 
 export interface CheckoutSessionRecord {
   id: string;
@@ -169,17 +164,23 @@ export interface PersistenceStore {
   signOut(request: Request): Promise<SignOutResponse>;
   getActor(request: Request): Promise<PersistenceActor>;
   getEntitlement(actor: PersistenceActor): Promise<Entitlement>;
-  activateBuildPro(actor: PersistenceActor, input: {
-    paymentProvider: "mock" | "stripe";
-    buildId?: string;
-    checkoutSessionId?: string;
-  }): Promise<Entitlement>;
-  recordCheckoutSession(actor: PersistenceActor, input: {
-    plan: PlanType;
-    paymentProvider: "mock" | "stripe";
-    checkoutSessionId?: string;
-    status: CheckoutSessionRecord["status"];
-  }): Promise<CheckoutSessionRecord>;
+  activateBuildPro(
+    actor: PersistenceActor,
+    input: {
+      paymentProvider: "mock" | "stripe";
+      buildId?: string;
+      checkoutSessionId?: string;
+    },
+  ): Promise<Entitlement>;
+  recordCheckoutSession(
+    actor: PersistenceActor,
+    input: {
+      plan: PlanType;
+      paymentProvider: "mock" | "stripe";
+      checkoutSessionId?: string;
+      status: CheckoutSessionRecord["status"];
+    },
+  ): Promise<CheckoutSessionRecord>;
   getUsageStatus(actor: PersistenceActor): Promise<UsageStatus>;
   consumeAiUsage(actor: PersistenceActor): Promise<{
     usage: UsageStatus;
@@ -197,7 +198,10 @@ export interface PersistenceStore {
   }>;
   saveBuild(actor: PersistenceActor, input: SaveBuildInput): Promise<SaveBuildResult>;
   getSavedBuild(actor: PersistenceActor, id: string): Promise<SavedBuild | null>;
-  deleteSavedBuild(actor: PersistenceActor, id: string): Promise<{
+  deleteSavedBuild(
+    actor: PersistenceActor,
+    id: string,
+  ): Promise<{
     builds: SavedBuildSummary[];
     limit: number;
   }>;

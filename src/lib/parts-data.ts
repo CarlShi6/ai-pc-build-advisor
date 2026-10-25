@@ -198,7 +198,6 @@ export const CPU_METRICS: Metric[] = [
   },
 ];
 
-
 export const GPU_METRICS: Metric[] = [
   {
     key: "price",
@@ -268,7 +267,11 @@ export const GPU_METRICS: Metric[] = [
 
 export type Verdict = "better" | "worse" | "similar";
 
-export function verdict(metric: Metric, options: ComparableOption[], current: ComparableOption): Verdict {
+export function verdict(
+  metric: Metric,
+  options: ComparableOption[],
+  current: ComparableOption,
+): Verdict {
   if (metric.dir === "neutral") return "similar";
   const vals = options.map((o) => metric.value(o)).filter((v): v is number => v !== null);
   if (vals.length < 2) return "similar";

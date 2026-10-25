@@ -3,10 +3,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { ComparisonTable } from "@/components/comparison-table";
-import {
-  COMPARE_DATA,
-  type ComparableOption,
-} from "@/lib/parts-data";
+import { COMPARE_DATA, type ComparableOption } from "@/lib/parts-data";
 import {
   Check,
   Star,
@@ -40,8 +37,8 @@ export function ComparePanel({
         </div>
         <h3 className="text-lg font-bold">{category} comparison coming soon</h3>
         <p className="mx-auto mt-1 max-w-md text-sm text-muted-foreground">
-          Alternative {category} options will appear here. For now this build's {category} is
-          locked in as the recommended choice.
+          Alternative {category} options will appear here. For now this build's {category} is locked
+          in as the recommended choice.
         </p>
         {onClose && (
           <Button variant="ghost" size="sm" onClick={onClose} className="mt-4 rounded-md">
@@ -109,7 +106,13 @@ function CompareBody({
             </h2>
             <div className="grid gap-3 sm:grid-cols-2">
               <SummaryItem
-                icon={category === "GPU" ? <MonitorPlay className="size-4 text-primary" /> : <Cpu className="size-4 text-primary" />}
+                icon={
+                  category === "GPU" ? (
+                    <MonitorPlay className="size-4 text-primary" />
+                  ) : (
+                    <Cpu className="size-4 text-primary" />
+                  )
+                }
                 label="Current Selection"
                 value={selected.name}
               />
@@ -157,7 +160,12 @@ function CompareBody({
               <span>
                 Selected {category} changed to{" "}
                 <span className="font-semibold">{selected.name}</span>.{" "}
-                <span className={cn("font-mono font-semibold", delta < 0 ? "text-success" : "text-warning")}>
+                <span
+                  className={cn(
+                    "font-mono font-semibold",
+                    delta < 0 ? "text-success" : "text-warning",
+                  )}
+                >
                   {delta < 0
                     ? `Estimated total saves $${Math.abs(delta).toLocaleString()}`
                     : `Estimated total increases $${delta.toLocaleString()}`}
@@ -262,18 +270,32 @@ function OptionCard({
     option.tag === "budget"
       ? { cls: "bg-success/15 text-success border-success/30", label: "Best Value", icon: Star }
       : option.tag === "alt"
-        ? { cls: "bg-warning/15 text-warning border-warning/30", label: "Highest Performance", icon: TrendingUp }
-        : { cls: "bg-primary/15 text-primary border-primary/30", label: "Recommended", icon: Sparkles };
+        ? {
+            cls: "bg-warning/15 text-warning border-warning/30",
+            label: "Highest Performance",
+            icon: TrendingUp,
+          }
+        : {
+            cls: "bg-primary/15 text-primary border-primary/30",
+            label: "Recommended",
+            icon: Sparkles,
+          };
   const BadgeIcon = badge.icon;
 
   const stockTone =
-    option.stock === "Ready" ? "text-success" : option.stock === "Low" ? "text-warning" : "text-destructive";
+    option.stock === "Ready"
+      ? "text-success"
+      : option.stock === "Low"
+        ? "text-warning"
+        : "text-destructive";
 
   return (
     <div
       className={cn(
         "relative flex flex-col gap-4 rounded-2xl border bg-card p-5 transition-all",
-        selected ? "border-primary/60 bg-primary/[0.06] shadow-glow" : "border-border hover:border-primary/30",
+        selected
+          ? "border-primary/60 bg-primary/[0.06] shadow-glow"
+          : "border-border hover:border-primary/30",
       )}
     >
       <div className="flex items-center justify-between gap-2">

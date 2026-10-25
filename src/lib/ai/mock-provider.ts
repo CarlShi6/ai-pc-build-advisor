@@ -196,10 +196,12 @@ export function createMockAdvisorResponse(request: AdvisorRequest): AdvisorProvi
   const assistantMessage = activeCompare
     ? [
         "Recommendation: Compare the top alternatives before replacing the current part.",
-        `Fit: You're reviewing ${activeCompare.currentPart.displayName} against ${activeCompare.candidateParts
-          .slice(0, 3)
-          .map((part) => part.displayName)
-          .join(", ") || "same-category options"}.`,
+        `Fit: You're reviewing ${activeCompare.currentPart.displayName} against ${
+          activeCompare.candidateParts
+            .slice(0, 3)
+            .map((part) => part.displayName)
+            .join(", ") || "same-category options"
+        }.`,
         `Budget impact: Use ${formatBudget(activeCompare.budget)} and the app-estimated ${formatBudget(activeCompare.buildTotal)} build total as the guardrails.`,
         "Compatibility impact: Let the local compatibility checks confirm fit before you swap anything.",
         "Performance tradeoff: Favor the part that improves your main workload without forcing PSU, case, or cooling compromises.",

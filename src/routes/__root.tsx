@@ -77,8 +77,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "AI PC Build Advisor — Decision Workspace" },
-      { name: "description", content: "Compare components, understand tradeoffs, and build a compatible PC with clarity." },
+      { title: "AIPC — Build your version" },
+      {
+        name: "description",
+        content:
+          "Turn a PC idea or parts list into an editable build and explore it in the Build Studio.",
+      },
       { name: "author", content: "AI Advisor" },
       { property: "og:title", content: "AI PC Build Advisor" },
       { property: "og:description", content: "Build with clarity." },

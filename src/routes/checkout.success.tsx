@@ -62,7 +62,9 @@ function CheckoutSuccessPage() {
           return;
         }
 
-        setMessage("Checkout succeeded, but local activation could not finish. Try Unlock Build Pro again.");
+        setMessage(
+          "Checkout succeeded, but local activation could not finish. Try Unlock Build Pro again.",
+        );
       } finally {
         if (active) {
           setIsActivating(false);
@@ -84,7 +86,11 @@ function CheckoutSuccessPage() {
         <section className="w-full rounded-2xl border border-success/20 bg-success/10 p-8">
           <div className="flex items-start gap-4">
             <div className="flex size-12 shrink-0 items-center justify-center rounded-xl border border-success/30 bg-background text-success">
-              {isActivating ? <LoaderCircle className="size-6 animate-spin" /> : <CheckCircle2 className="size-6" />}
+              {isActivating ? (
+                <LoaderCircle className="size-6 animate-spin" />
+              ) : (
+                <CheckCircle2 className="size-6" />
+              )}
             </div>
             <div>
               <div className="flex items-center gap-2 text-success">

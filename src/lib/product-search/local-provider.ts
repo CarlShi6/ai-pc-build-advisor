@@ -1,5 +1,9 @@
 import { seedParts } from "@/data/seedParts";
-import type { ProductSearchProvider, ProductSearchQuery, ProductSearchResult } from "@/lib/product-search/types";
+import type {
+  ProductSearchProvider,
+  ProductSearchQuery,
+  ProductSearchResult,
+} from "@/lib/product-search/types";
 import type { Part } from "@/types/parts";
 
 function tokenize(value: string) {
@@ -40,7 +44,10 @@ function scorePart(part: Part, query: string) {
     return 0;
   }
 
-  return Math.min(0.98, 0.5 + matches / tokens.length * 0.32 + (nameMatch ? 0.08 : 0) + (brandMatch ? 0.06 : 0));
+  return Math.min(
+    0.98,
+    0.5 + (matches / tokens.length) * 0.32 + (nameMatch ? 0.08 : 0) + (brandMatch ? 0.06 : 0),
+  );
 }
 
 function partToResult(part: Part, confidence: number): ProductSearchResult {
@@ -76,7 +83,9 @@ export const localProductSearchProvider: ProductSearchProvider = {
       .filter((part) => !query.category || part.category === query.category)
       .map((part) => ({ part, confidence: scorePart(part, query.query) }))
       .filter(({ confidence }) => confidence > 0)
-      .sort((left, right) => right.confidence - left.confidence || left.part.price - right.part.price)
+      .sort(
+        (left, right) => right.confidence - left.confidence || left.part.price - right.part.price,
+      )
       .slice(0, 12)
       .map(({ part, confidence }) => partToResult(part, confidence));
   },

@@ -46,12 +46,11 @@ export function createPostBuildFeedbackSummary(
   );
   const satisfactionScore =
     feedback.reduce((sum, item) => sum + item.overallSatisfaction, 0) / feedback.length;
-  const beginnerDifficulty = [...feedback]
-    .sort(
-      (left, right) =>
-        DIFFICULTY_WEIGHTS[right.installationDifficulty] -
-        DIFFICULTY_WEIGHTS[left.installationDifficulty],
-    )[0].installationDifficulty;
+  const beginnerDifficulty = [...feedback].sort(
+    (left, right) =>
+      DIFFICULTY_WEIGHTS[right.installationDifficulty] -
+      DIFFICULTY_WEIGHTS[left.installationDifficulty],
+  )[0].installationDifficulty;
 
   return {
     completedAt: latest.completedAt,

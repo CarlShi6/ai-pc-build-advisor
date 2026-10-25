@@ -1,6 +1,10 @@
 import { localProductSearchProvider } from "@/lib/product-search/local-provider";
 import { mockRetailerProductSearchProvider } from "@/lib/product-search/mock-retailer-provider";
-import type { ProductSearchQuery, ProductSearchResponse, ProductSearchResult } from "@/lib/product-search/types";
+import type {
+  ProductSearchQuery,
+  ProductSearchResponse,
+  ProductSearchResult,
+} from "@/lib/product-search/types";
 import {
   calculateBuildConfidenceScore,
   calculateBuildTotal,
@@ -20,7 +24,13 @@ function toAvailability(status: ProductSearchResult["stockStatus"]): PartAvailab
 }
 
 function toMerchant(retailer: ProductSearchResult["retailer"]): AffiliateMerchant {
-  if (retailer === "amazon" || retailer === "newegg" || retailer === "microcenter" || retailer === "bestbuy" || retailer === "bhphoto") {
+  if (
+    retailer === "amazon" ||
+    retailer === "newegg" ||
+    retailer === "microcenter" ||
+    retailer === "bestbuy" ||
+    retailer === "bhphoto"
+  ) {
     return retailer;
   }
 
@@ -127,7 +137,9 @@ export async function searchProducts(query: ProductSearchQuery): Promise<Product
 
   const [localResults, mockRetailerResults] = await Promise.all([
     localProductSearchProvider.search(safeQuery),
-    safeQuery.includeExternal ? mockRetailerProductSearchProvider.search(safeQuery) : Promise.resolve([]),
+    safeQuery.includeExternal
+      ? mockRetailerProductSearchProvider.search(safeQuery)
+      : Promise.resolve([]),
   ]);
 
   return {

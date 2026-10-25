@@ -19,10 +19,7 @@ import type {
 } from "@/types/monetization";
 import type { AdvisorApiRequest, AdvisorApiResponse } from "@/lib/ai/types";
 import type { PriceHistoryResponse } from "@/types/pricing";
-import type {
-  ProductSearchQuery,
-  ProductSearchResponse,
-} from "@/lib/product-search/types";
+import type { ProductSearchQuery, ProductSearchResponse } from "@/lib/product-search/types";
 import type {
   AuthSession,
   SignInRequest,

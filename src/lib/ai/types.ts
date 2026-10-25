@@ -141,7 +141,10 @@ export function normalizeAdvisorMessage(value: unknown): string {
   const orderedKeys = [
     ...ADVISOR_MESSAGE_SECTION_ORDER.filter((key) => key in value),
     ...Object.keys(value).filter(
-      (key) => !ADVISOR_MESSAGE_SECTION_ORDER.includes(key as (typeof ADVISOR_MESSAGE_SECTION_ORDER)[number]),
+      (key) =>
+        !ADVISOR_MESSAGE_SECTION_ORDER.includes(
+          key as (typeof ADVISOR_MESSAGE_SECTION_ORDER)[number],
+        ),
     ),
   ];
 

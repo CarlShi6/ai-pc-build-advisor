@@ -1,5 +1,6 @@
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import { recalculateBuild } from "@/lib/build-advisor";
+import { withDraftEnvelope } from "@/lib/persistence/draft-envelope";
 import { MockPersistenceStore } from "@/lib/persistence/mock-store";
 import { createPostBuildFeedbackSummary } from "@/lib/post-build-feedback";
 import {
@@ -8,7 +9,12 @@ import {
   isSupabasePersistenceEnabled,
 } from "@/lib/supabase/server";
 import type { Database } from "@/lib/supabase/types";
-import type { PostBuildFeedback, PostBuildFeedbackInput, SavedBuild, SavedBuildSummary } from "@/types/build";
+import type {
+  PostBuildFeedback,
+  PostBuildFeedbackInput,
+  SavedBuild,
+  SavedBuildSummary,
+} from "@/types/build";
 import type { AffiliateClickEvent, Entitlement, PlanType, UsageStatus } from "@/types/monetization";
 import type {
   AuthSession,
@@ -89,7 +95,12 @@ function createSavedBuildSummary(savedBuild: SavedBuild): SavedBuildSummary {
   };
 }
 
-function toUser(row: { id: string; email?: string; display_name?: string | null; created_at?: string }): User {
+function toUser(row: {
+  id: string;
+  email?: string;
+  display_name?: string | null;
+  created_at?: string;
+}): User {
   return {
     id: row.id,
     email: row.email ?? "",
@@ -99,7 +110,7 @@ function toUser(row: { id: string; email?: string; display_name?: string | null;
 }
 
 function toSavedBuild(row: SavedBuildRow): SavedBuild {
-  const safeBuild = recalculateBuild(row.build);
+  const safeBuild = withDraftEnvelope(row.build, recalculateBuild(row.build));
 
   return {
     id: row.id,
@@ -113,7 +124,8 @@ function toSavedBuild(row: SavedBuildRow): SavedBuild {
     totalPrice: safeBuild.totalPrice,
     compatibilityStatus: safeBuild.compatibilityStatus,
     ownedParts: safeBuild.parts.filter((part) => part.owned).length,
-    targetUseCase: safeBuild.targetUseCase.length > 0 ? safeBuild.targetUseCase : row.target_use_case,
+    targetUseCase:
+      safeBuild.targetUseCase.length > 0 ? safeBuild.targetUseCase : row.target_use_case,
   };
 }
 
@@ -362,8 +374,8 @@ export class SupabasePersistenceStore implements PersistenceStore {
     const plan = entitlement.active ? entitlement.plan : "free";
     const replacementLimit =
       plan === "build_pro"
-        ? BUILD_PRO_PLAN.replacementLimit ?? 25
-        : FREE_PLAN.replacementLimit ?? 3;
+        ? (BUILD_PRO_PLAN.replacementLimit ?? 25)
+        : (FREE_PLAN.replacementLimit ?? 3);
     const replacementsUsed = replacementRow?.replacements_used_for_build ?? 0;
     const remainingReplacements = Math.max(0, replacementLimit - replacementsUsed);
 
@@ -505,7 +517,7 @@ export class SupabasePersistenceStore implements PersistenceStore {
       );
     }
 
-    const safeBuild = recalculateBuild(input.build);
+    const safeBuild = withDraftEnvelope(input.build, recalculateBuild(input.build));
     const row = {
       user_id: actor.userId ?? null,
       session_id: actor.sessionId,
@@ -728,7 +740,9 @@ export class SupabasePersistenceStore implements PersistenceStore {
     query: T,
     actor: PersistenceActor,
   ): T {
-    return actor.userId ? query.eq("user_id", actor.userId) : query.eq("session_id", actor.sessionId);
+    return actor.userId
+      ? query.eq("user_id", actor.userId)
+      : query.eq("session_id", actor.sessionId);
   }
 
   private async getCurrentPlan(actor: PersistenceActor): Promise<PlanType> {
@@ -787,7 +801,9 @@ export class SupabasePersistenceStore implements PersistenceStore {
     return data;
   }
 
-  private async getReplacementCounter(actor: PersistenceActor): Promise<ReplacementCounterRow | null> {
+  private async getReplacementCounter(
+    actor: PersistenceActor,
+  ): Promise<ReplacementCounterRow | null> {
     const { data, error } = await this.actorFilter(
       this.service.from("replacement_counters").select("*").eq("build_id", MOCK_BUILD_ID),
       actor,
@@ -829,7 +845,9 @@ export class SupabasePersistenceStore implements PersistenceStore {
   }
 
   private async persistOwnedParts(actor: PersistenceActor, savedBuild: SavedBuild) {
-    const ownedParts = savedBuild.build.parts.filter((part) => part.owned || part.source === "user_owned");
+    const ownedParts = savedBuild.build.parts.filter(
+      (part) => part.owned || part.source === "user_owned",
+    );
 
     await this.actorFilter(
       this.service.from("owned_parts").delete().eq("build_id", savedBuild.id),
@@ -913,19 +931,23 @@ export class SupabasePersistenceStore implements PersistenceStore {
     },
   ): Promise<CheckoutSessionRecord> {
     const now = nowIso();
-    const { data, error } = await this.service.from("checkout_sessions").upsert(
-      {
-        user_id: actor.userId ?? null,
-        session_id: actor.sessionId,
-        plan: input.plan,
-        payment_provider: input.paymentProvider,
-        checkout_session_id: input.checkoutSessionId ?? null,
-        status: input.status,
-        created_at: now,
-        updated_at: now,
-      },
-      { onConflict: "checkout_session_id" },
-    ).select("*").single();
+    const { data, error } = await this.service
+      .from("checkout_sessions")
+      .upsert(
+        {
+          user_id: actor.userId ?? null,
+          session_id: actor.sessionId,
+          plan: input.plan,
+          payment_provider: input.paymentProvider,
+          checkout_session_id: input.checkoutSessionId ?? null,
+          status: input.status,
+          created_at: now,
+          updated_at: now,
+        },
+        { onConflict: "checkout_session_id" },
+      )
+      .select("*")
+      .single();
 
     if (error) {
       throw new Error(error.message);

@@ -56,9 +56,7 @@ function HeaderTag({ o, selectedId }: { o: ComparableOption; selectedId?: string
       </Badge>
     );
   if (o.tag === "alt")
-    return (
-      <Badge className="rounded-md bg-warning/15 text-warning">Highest Performance</Badge>
-    );
+    return <Badge className="rounded-md bg-warning/15 text-warning">Highest Performance</Badge>;
   return (
     <Badge variant="secondary" className="rounded-md">
       Recommended
@@ -167,9 +165,7 @@ function Row({
     <>
       <div className="bg-card p-5">
         <p className="text-sm font-semibold">{metric.label}</p>
-        {metric.hint && (
-          <p className="mt-1 text-xs text-muted-foreground">{metric.hint}</p>
-        )}
+        {metric.hint && <p className="mt-1 text-xs text-muted-foreground">{metric.hint}</p>}
       </div>
       {options.map((o) => {
         const v = verdict(metric, options, o);

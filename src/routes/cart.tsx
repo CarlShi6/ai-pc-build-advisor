@@ -11,7 +11,15 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { AffiliateLink, Entitlement } from "@/types/monetization";
 import type { Part } from "@/types/parts";
-import { Check, ClipboardList, Cpu, MonitorPlay, ShieldCheck, ShoppingBag, Star } from "lucide-react";
+import {
+  Check,
+  ClipboardList,
+  Cpu,
+  MonitorPlay,
+  ShieldCheck,
+  ShoppingBag,
+  Star,
+} from "lucide-react";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
@@ -96,9 +104,23 @@ function CartPage() {
       <main className="mx-auto max-w-6xl space-y-6 px-6 py-6">
         <section className="surface-panel overflow-hidden rounded-2xl">
           <div className="flex flex-wrap items-stretch gap-0 divide-y divide-border md:divide-y-0 md:divide-x">
-            <BuildStripItem icon={<Cpu className="size-4.5" />} label="CPU" value={cpu.displayName} />
-            <BuildStripItem icon={<MonitorPlay className="size-4.5" />} label="GPU" value={gpu.displayName} highlight />
-            <BuildStripItem icon={<ShieldCheck className="size-4.5" />} label="Compatibility" value="All passed" success />
+            <BuildStripItem
+              icon={<Cpu className="size-4.5" />}
+              label="CPU"
+              value={cpu.displayName}
+            />
+            <BuildStripItem
+              icon={<MonitorPlay className="size-4.5" />}
+              label="GPU"
+              value={gpu.displayName}
+              highlight
+            />
+            <BuildStripItem
+              icon={<ShieldCheck className="size-4.5" />}
+              label="Compatibility"
+              value="All passed"
+              success
+            />
             <div className="flex basis-[170px] flex-col items-start justify-center p-4 md:items-end">
               <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
                 Estimated total
@@ -113,10 +135,13 @@ function CartPage() {
         <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
           <section className="space-y-5">
             <div>
-              <Badge className="mb-1.5 rounded-sm bg-primary/10 text-primary">Mock references</Badge>
+              <Badge className="mb-1.5 rounded-sm bg-primary/10 text-primary">
+                Mock references
+              </Badge>
               <h2 className="text-2xl font-bold tracking-tight">Purchase Reference List</h2>
               <p className="mt-1 text-sm text-muted-foreground">
-                Use this as a planning list only. Prices and availability are mock data, not live checkout.
+                Use this as a planning list only. Prices and availability are mock data, not live
+                checkout.
               </p>
               <div className="mt-3">
                 <AffiliateDisclosure />
@@ -124,7 +149,9 @@ function CartPage() {
             </div>
 
             <div className="surface-panel overflow-hidden rounded-2xl">
-              <div className="border-b border-border/80 bg-surface-elevated/60 p-4 font-semibold">Parts to Check</div>
+              <div className="border-b border-border/80 bg-surface-elevated/60 p-4 font-semibold">
+                Parts to Check
+              </div>
               <table className="w-full text-left text-sm">
                 <thead>
                   <tr className="border-b border-border text-xs uppercase tracking-wider text-muted-foreground">
@@ -142,7 +169,9 @@ function CartPage() {
                         REF-{(1000 + index).toString()}
                       </td>
                       <td className="px-6 py-4">{part.displayName}</td>
-                      <td className="px-6 py-4 text-muted-foreground">{part.retailer ?? "Partner retailer"}</td>
+                      <td className="px-6 py-4 text-muted-foreground">
+                        {part.retailer ?? "Partner retailer"}
+                      </td>
                       <td className="px-6 py-4 text-right font-mono">${part.price.toFixed(2)}</td>
                       <td className="px-6 py-4 text-right">
                         {(part.affiliateLinks ?? []).slice(0, 1).map((link) => (
@@ -189,12 +218,16 @@ function CartPage() {
                         >
                           <span
                             className={`flex size-5 items-center justify-center rounded-md border ${
-                              isOn ? "border-primary bg-primary text-primary-foreground" : "border-border"
+                              isOn
+                                ? "border-primary bg-primary text-primary-foreground"
+                                : "border-border"
                             }`}
                           >
                             {isOn && <Check className="size-3" />}
                           </span>
-                          <span className={isOn ? "text-muted-foreground line-through" : ""}>{item}</span>
+                          <span className={isOn ? "text-muted-foreground line-through" : ""}>
+                            {item}
+                          </span>
                         </button>
                       </li>
                     );
@@ -236,9 +269,15 @@ function CartPage() {
                 <dd className="text-right font-semibold text-success">Ready</dd>
               </dl>
               {plan === "build_pro" ? (
-                <Button className="mt-5 w-full rounded-xl py-5 shadow-glow">Save Reference List</Button>
+                <Button className="mt-5 w-full rounded-xl py-5 shadow-glow">
+                  Save Reference List
+                </Button>
               ) : (
-                <UpgradeCard className="mt-5" compact onUpgraded={() => void refreshEntitlement()} />
+                <UpgradeCard
+                  className="mt-5"
+                  compact
+                  onUpgraded={() => void refreshEntitlement()}
+                />
               )}
             </div>
           </aside>
@@ -262,7 +301,13 @@ function BuildStripItem({
   success?: boolean;
 }) {
   return (
-    <div className={highlight ? "flex flex-1 basis-[220px] items-center gap-3 bg-primary/[0.04] p-4" : "flex flex-1 basis-[220px] items-center gap-3 p-4"}>
+    <div
+      className={
+        highlight
+          ? "flex flex-1 basis-[220px] items-center gap-3 bg-primary/[0.04] p-4"
+          : "flex flex-1 basis-[220px] items-center gap-3 p-4"
+      }
+    >
       <span
         className={
           success
@@ -283,7 +328,13 @@ function BuildStripItem({
             </Badge>
           )}
         </div>
-        <p className={success ? "mt-0.5 text-sm font-semibold text-success" : "mt-0.5 truncate text-sm font-semibold"}>
+        <p
+          className={
+            success
+              ? "mt-0.5 text-sm font-semibold text-success"
+              : "mt-0.5 truncate text-sm font-semibold"
+          }
+        >
           {value}
         </p>
       </div>

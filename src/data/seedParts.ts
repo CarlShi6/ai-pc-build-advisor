@@ -51,7 +51,8 @@ export const seedParts: Part[] = [
       productivityScore: 90,
     },
     compatibilityTags: ["intel", "lga1700", "ddr5"],
-    recommendationReason: "Great value for mixed creator and gaming builds without paying for the i9 tier.",
+    recommendationReason:
+      "Great value for mixed creator and gaming builds without paying for the i9 tier.",
   }),
   createPart({
     id: "cpu-i9-14900k",
@@ -73,7 +74,8 @@ export const seedParts: Part[] = [
       productivityScore: 96,
     },
     compatibilityTags: ["intel", "lga1700", "ddr5", "creator"],
-    recommendationReason: "Recommended for heavier 4K timelines, background exports, and streaming.",
+    recommendationReason:
+      "Recommended for heavier 4K timelines, background exports, and streaming.",
   }),
   createPart({
     id: "cpu-r9-7950x3d",
@@ -95,7 +97,8 @@ export const seedParts: Part[] = [
       productivityScore: 91,
     },
     compatibilityTags: ["amd", "am5", "ddr5", "gaming"],
-    recommendationReason: "Top-tier gaming option if you prefer AMD and are comfortable with an AM5 platform.",
+    recommendationReason:
+      "Top-tier gaming option if you prefer AMD and are comfortable with an AM5 platform.",
   }),
   createPart({
     id: "cpu-r7-7800x3d",
@@ -117,7 +120,8 @@ export const seedParts: Part[] = [
       productivityScore: 78,
     },
     compatibilityTags: ["amd", "am5", "ddr5", "gaming", "value"],
-    recommendationReason: "Excellent gaming CPU for buyers who want high frame rates without workstation pricing.",
+    recommendationReason:
+      "Excellent gaming CPU for buyers who want high frame rates without workstation pricing.",
   }),
   createPart({
     id: "cpu-r5-7600",
@@ -139,7 +143,8 @@ export const seedParts: Part[] = [
       productivityScore: 68,
     },
     compatibilityTags: ["amd", "am5", "ddr5", "budget"],
-    recommendationReason: "Budget-friendly AM5 entry point that leaves more room for the graphics card.",
+    recommendationReason:
+      "Budget-friendly AM5 entry point that leaves more room for the graphics card.",
   }),
   createPart({
     id: "gpu-rtx-4070-ti-super",
@@ -162,7 +167,8 @@ export const seedParts: Part[] = [
       color: "Black",
     },
     compatibilityTags: ["nvidia", "16gb-vram", "creator", "gaming"],
-    recommendationReason: "Best value alternative if you want to trim budget without losing 16GB of VRAM.",
+    recommendationReason:
+      "Best value alternative if you want to trim budget without losing 16GB of VRAM.",
   }),
   createPart({
     id: "gpu-rtx-4080-super",
@@ -185,7 +191,8 @@ export const seedParts: Part[] = [
       color: "Black",
     },
     compatibilityTags: ["nvidia", "16gb-vram", "creator", "gaming"],
-    recommendationReason: "Balanced flagship for 4K editing, CUDA workflows, and smooth high-end gaming.",
+    recommendationReason:
+      "Balanced flagship for 4K editing, CUDA workflows, and smooth high-end gaming.",
   }),
   createPart({
     id: "gpu-rtx-4090",
@@ -208,7 +215,8 @@ export const seedParts: Part[] = [
       color: "Black",
     },
     compatibilityTags: ["nvidia", "24gb-vram", "creator", "gaming", "upsell"],
-    recommendationReason: "Premium pick for buyers who want maximum GPU headroom for 4K, AI, or 3D work.",
+    recommendationReason:
+      "Premium pick for buyers who want maximum GPU headroom for 4K, AI, or 3D work.",
   }),
   createPart({
     id: "gpu-rx-7900-xt",
@@ -231,7 +239,8 @@ export const seedParts: Part[] = [
       color: "Black",
     },
     compatibilityTags: ["amd", "20gb-vram", "gaming", "value"],
-    recommendationReason: "Strong raster gaming value with more VRAM, best if CUDA acceleration is not a priority.",
+    recommendationReason:
+      "Strong raster gaming value with more VRAM, best if CUDA acceleration is not a priority.",
   }),
   createPart({
     id: "gpu-rtx-4070-super",
@@ -276,7 +285,8 @@ export const seedParts: Part[] = [
       memorySupport: "DDR5 up to 192GB",
     },
     compatibilityTags: ["intel", "lga1700", "ddr5", "atx"],
-    recommendationReason: "Premium Intel board with strong VRM and plenty of connectivity for creator builds.",
+    recommendationReason:
+      "Premium Intel board with strong VRM and plenty of connectivity for creator builds.",
   }),
   createPart({
     id: "mobo-b760-aorus",
@@ -342,7 +352,8 @@ export const seedParts: Part[] = [
       memorySupport: "DDR5 up to 192GB",
     },
     compatibilityTags: ["amd", "am5", "ddr5", "atx", "value"],
-    recommendationReason: "Practical AM5 board that keeps AMD builds affordable without losing Wi-Fi.",
+    recommendationReason:
+      "Practical AM5 board that keeps AMD builds affordable without losing Wi-Fi.",
   }),
   createPart({
     id: "mobo-z790-tuf",
@@ -384,7 +395,8 @@ export const seedParts: Part[] = [
       color: "Black RGB",
     },
     compatibilityTags: ["ddr5", "64gb", "creator"],
-    recommendationReason: "Ideal capacity for 4K editing with room for multitasking and future growth.",
+    recommendationReason:
+      "Ideal capacity for 4K editing with room for multitasking and future growth.",
   }),
   createPart({
     id: "ram-gskill-32-ddr5-6000",
@@ -404,7 +416,8 @@ export const seedParts: Part[] = [
       color: "Black RGB",
     },
     compatibilityTags: ["ddr5", "32gb", "value"],
-    recommendationReason: "Budget-friendly choice for lighter creator workloads and general gaming.",
+    recommendationReason:
+      "Budget-friendly choice for lighter creator workloads and general gaming.",
   }),
   createPart({
     id: "ram-kingston-64-ddr5-6000",
@@ -424,7 +437,8 @@ export const seedParts: Part[] = [
       color: "Black",
     },
     compatibilityTags: ["ddr5", "64gb", "value"],
-    recommendationReason: "Slightly cheaper 64GB option if you value capacity over premium timings.",
+    recommendationReason:
+      "Slightly cheaper 64GB option if you value capacity over premium timings.",
   }),
   createPart({
     id: "ram-teamgroup-32-ddr5-6400",
@@ -463,7 +477,8 @@ export const seedParts: Part[] = [
       formFactor: "M.2 2280",
     },
     compatibilityTags: ["nvme", "fast-storage", "creator"],
-    recommendationReason: "Fast scratch-disk performance for large media projects and fast game loads.",
+    recommendationReason:
+      "Fast scratch-disk performance for large media projects and fast game loads.",
   }),
   createPart({
     id: "ssd-sn850x-2tb",
@@ -501,7 +516,8 @@ export const seedParts: Part[] = [
       formFactor: "M.2 2280",
     },
     compatibilityTags: ["nvme", "fast-storage", "upsell"],
-    recommendationReason: "Good upgrade when you want more local media storage without external drives.",
+    recommendationReason:
+      "Good upgrade when you want more local media storage without external drives.",
   }),
   createPart({
     id: "ssd-crucial-t500-1tb",
@@ -520,7 +536,8 @@ export const seedParts: Part[] = [
       formFactor: "M.2 2280",
     },
     compatibilityTags: ["nvme", "fast-storage", "budget"],
-    recommendationReason: "Budget SSD for buyers who mostly play a few games and can add more storage later.",
+    recommendationReason:
+      "Budget SSD for buyers who mostly play a few games and can add more storage later.",
   }),
   createPart({
     id: "psu-rm850x",
@@ -539,7 +556,8 @@ export const seedParts: Part[] = [
       nativeGpuConnector: true,
     },
     compatibilityTags: ["atx", "850w", "gold"],
-    recommendationReason: "Reliable wattage headroom for the recommended Intel + RTX 4080 Super pairing.",
+    recommendationReason:
+      "Reliable wattage headroom for the recommended Intel + RTX 4080 Super pairing.",
   }),
   createPart({
     id: "psu-rm1000x",
@@ -616,7 +634,8 @@ export const seedParts: Part[] = [
       color: "Black",
     },
     compatibilityTags: ["atx", "showcase", "large-gpu"],
-    recommendationReason: "Matches the current premium Lovable design direction and fits nearly all upgrades.",
+    recommendationReason:
+      "Matches the current premium Lovable design direction and fits nearly all upgrades.",
   }),
   createPart({
     id: "case-fractal-north-xl",
@@ -656,7 +675,8 @@ export const seedParts: Part[] = [
       color: "Black",
     },
     compatibilityTags: ["atx", "value", "airflow"],
-    recommendationReason: "Budget case option that still handles mainstream high-performance parts.",
+    recommendationReason:
+      "Budget case option that still handles mainstream high-performance parts.",
   }),
   createPart({
     id: "case-4000d-airflow",
@@ -676,7 +696,8 @@ export const seedParts: Part[] = [
       color: "Black",
     },
     compatibilityTags: ["atx", "airflow", "value"],
-    recommendationReason: "Popular airflow case with clean styling and enough room for most mainstream builds.",
+    recommendationReason:
+      "Popular airflow case with clean styling and enough room for most mainstream builds.",
   }),
   createPart({
     id: "cooler-nh-d15",
@@ -695,7 +716,8 @@ export const seedParts: Part[] = [
       socketSupport: "LGA1700,AM5",
     },
     compatibilityTags: ["air-cooler", "quiet", "premium"],
-    recommendationReason: "Quiet premium air cooler for strong thermals without moving to liquid cooling.",
+    recommendationReason:
+      "Quiet premium air cooler for strong thermals without moving to liquid cooling.",
   }),
   createPart({
     id: "cooler-ls720",
@@ -714,7 +736,8 @@ export const seedParts: Part[] = [
       socketSupport: "LGA1700,AM5",
     },
     compatibilityTags: ["aio", "360mm", "creator"],
-    recommendationReason: "Better thermal headroom for the hottest Intel options or showcase builds.",
+    recommendationReason:
+      "Better thermal headroom for the hottest Intel options or showcase builds.",
   }),
   createPart({
     id: "cooler-pa120",
@@ -752,7 +775,8 @@ export const seedParts: Part[] = [
       socketSupport: "LGA1700,AM5",
     },
     compatibilityTags: ["aio", "280mm", "value"],
-    recommendationReason: "Strong liquid cooling option that fits more cases than a 360mm radiator.",
+    recommendationReason:
+      "Strong liquid cooling option that fits more cases than a 360mm radiator.",
   }),
 ];
 

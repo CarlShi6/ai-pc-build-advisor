@@ -10,13 +10,7 @@ export type FocusPart = {
   whyItMatters: string;
 };
 
-export function FocusCard({
-  part,
-  onCompare,
-}: {
-  part: FocusPart;
-  onCompare?: () => void;
-}) {
+export function FocusCard({ part, onCompare }: { part: FocusPart; onCompare?: () => void }) {
   return (
     <section className="relative overflow-hidden rounded-2xl border border-primary/40 bg-gradient-to-br from-primary/15 via-card to-card p-6 shadow-glow">
       <div className="pointer-events-none absolute -right-20 -top-20 size-56 rounded-full bg-primary/20 blur-3xl" />
@@ -43,11 +37,7 @@ export function FocusCard({
           </p>
         </div>
         {onCompare && (
-          <Button
-            onClick={onCompare}
-            size="lg"
-            className="shrink-0 rounded-xl shadow-glow"
-          >
+          <Button onClick={onCompare} size="lg" className="shrink-0 rounded-xl shadow-glow">
             <GitCompare className="mr-2 size-4" /> Compare {part.category} options
           </Button>
         )}
