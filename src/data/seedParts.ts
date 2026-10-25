@@ -1,3 +1,4 @@
+import { expandedParts } from "@/data/expandedParts";
 import type { Part, PartCategory } from "@/types/parts";
 
 type PartSeed = Omit<Part, "searchUrl">;
@@ -21,7 +22,7 @@ function createPart(part: PartSeed): Part {
         merchant: "newegg",
         url: searchUrl,
         price: part.price,
-        inStock: part.availability !== "out_of_stock",
+        inStock: part.availability === "in_stock" || part.availability === "low_stock",
         label: "Check price",
       },
     ],
@@ -29,6 +30,7 @@ function createPart(part: PartSeed): Part {
 }
 
 export const seedParts: Part[] = [
+  ...expandedParts.map(createPart),
   createPart({
     id: "cpu-i7-14700k",
     category: "cpu",

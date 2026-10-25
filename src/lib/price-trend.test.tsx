@@ -354,7 +354,7 @@ describe("price trend UI states and accessibility", () => {
     expect(markup).toContain("No comparable price can be ranked");
   });
 
-  it("keeps successful chart analysis collapsed behind an accessible disclosure", () => {
+  it("shows the price chart by default with an accessible disclosure", () => {
     const markup = renderView({
       key: "cpu-i7-14700k:30d",
       status: "success",
@@ -362,8 +362,8 @@ describe("price trend UI states and accessibility", () => {
     });
 
     expect(markup).toContain("<details");
-    expect(markup).not.toContain("<details open");
-    expect(markup).toContain("Show price chart and trend explanation");
+    expect(markup).toContain("<details open");
+    expect(markup).toContain("Price chart and trend explanation");
     expect(markup).toContain("Observation details (1)");
   });
 });

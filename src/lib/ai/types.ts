@@ -115,6 +115,44 @@ export interface AiProvider {
   getAdvisorResponse(request: AdvisorRequest): Promise<AdvisorProviderResponse>;
 }
 
+const ADVISOR_MESSAGE_SECTION_ORDER = [
+  "Recommendation",
+  "Fit",
+  "Budget impact",
+  "Compatibility impact",
+  "Performance tradeoff",
+  "Next action",
+  "Direct answer",
+  "Reasoning",
+  "Practical recommendation",
+  "Next step",
+] as const;
+
+export function normalizeAdvisorMessage(value: unknown): string {
+  if (typeof value === "string") return value.trim();
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => normalizeAdvisorMessage(item))
+      .filter(Boolean)
+      .join("\n");
+  }
+  if (!isRecord(value)) return "";
+
+  const orderedKeys = [
+    ...ADVISOR_MESSAGE_SECTION_ORDER.filter((key) => key in value),
+    ...Object.keys(value).filter(
+      (key) => !ADVISOR_MESSAGE_SECTION_ORDER.includes(key as (typeof ADVISOR_MESSAGE_SECTION_ORDER)[number]),
+    ),
+  ];
+
+  return orderedKeys
+    .flatMap((key) => {
+      const section = normalizeAdvisorMessage(value[key]);
+      return section ? [`${key}: ${section}`] : [];
+    })
+    .join("\n");
+}
+
 const VALID_CATEGORIES = new Set<PartCategory>([
   "cpu",
   "gpu",

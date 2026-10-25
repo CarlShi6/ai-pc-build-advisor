@@ -199,7 +199,7 @@ function PriceTrendSuccessState({
         <p className="mt-1 text-muted-foreground">
           No price observations exist for this exact item in the selected range.
         </p>
-        <PriceSourceDisclosure message={response.disclosure.message} />
+        <PriceSourceDisclosure message={response.disclosure.message} containsMockData={response.disclosure.containsMockData} />
       </div>
     );
   }
@@ -214,7 +214,7 @@ function PriceTrendSuccessState({
 
   return (
     <div className="min-w-0 space-y-4">
-      <PriceSourceDisclosure message={response.disclosure.message} />
+      <PriceSourceDisclosure message={response.disclosure.message} containsMockData={response.disclosure.containsMockData} />
 
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
         <SummaryField
@@ -265,11 +265,12 @@ function PriceTrendSuccessState({
         </p>
       )}
 
-      <details className="rounded-xl border border-border bg-background/55">
+      <details open className="rounded-xl border border-border bg-background/55">
         <summary className="cursor-pointer rounded-xl px-4 py-3 text-sm font-semibold outline-none focus-visible:ring-2 focus-visible:ring-primary">
-          Show price chart and trend explanation
+          Price chart and trend explanation
         </summary>
         <div className="border-t border-border p-3">
+          <div className="flex justify-between text-xs text-muted-foreground"><span>High {formatUsdMinorUnits(response.rangeHighMinor)}</span><span>Low {formatUsdMinorUnits(response.rangeLowMinor)}</span></div>
           <svg
             className="h-auto min-h-32 w-full"
             viewBox="0 0 100 48"
@@ -277,18 +278,19 @@ function PriceTrendSuccessState({
             role="img"
             aria-labelledby={`${chartTitleId}-chart-title ${chartTitleId}-chart-description`}
           >
-            <title id={`${chartTitleId}-chart-title`}>Comparable sample price trend</title>
+            <title id={`${chartTitleId}-chart-title`}>Comparable price observations</title>
             <desc id={`${chartTitleId}-chart-description`}>{trendSummary}</desc>
             <line x1="6" x2="94" y1="42" y2="42" className="stroke-border" strokeWidth="0.5" />
-            {chart.comparablePoints.length > 1 && (
+            {chart.series.map((series) => series.points.length > 1 && (
               <polyline
-                points={chart.polylinePoints}
+                key={series.key}
+                points={series.points.map((point) => `${point.x},${point.y}`).join(" ")}
                 fill="none"
                 className="stroke-primary"
                 strokeWidth="1.5"
                 vectorEffect="non-scaling-stroke"
               />
-            )}
+            ))}
             {chart.comparablePoints.map((point) => (
               <circle
                 key={point.id}
@@ -330,6 +332,7 @@ function PriceTrendSuccessState({
               ),
             )}
           </svg>
+          <div className="flex justify-between gap-3 text-[10px] text-muted-foreground"><span>{formatObservationDate(response.observations.reduce((a, b) => a.observedAt < b.observedAt ? a : b).observedAt)}</span><span>{formatObservationDate(response.lastObservationAt)}</span></div>
           <p className="mt-2 text-xs text-muted-foreground">{trendSummary}</p>
           <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-muted-foreground">
             <span>● Comparable in-stock total</span>
@@ -337,7 +340,7 @@ function PriceTrendSuccessState({
             <span>× Unavailable / not rankable</span>
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground">
-            Observed samples are connected chronologically. Lines do not imply continuous price
+            Only observations from the same retailer, seller and listing are connected. Lines do not imply continuous price
             tracking between sparse observations.
           </p>
         </div>
@@ -348,11 +351,11 @@ function PriceTrendSuccessState({
   );
 }
 
-function PriceSourceDisclosure({ message }: { message: string }) {
+function PriceSourceDisclosure({ message, containsMockData }: { message: string; containsMockData: boolean }) {
   return (
     <div className="rounded-lg border border-primary/25 bg-primary/10 px-3 py-2 text-xs">
       <p className="font-semibold text-foreground">
-        Development sample data — not live retailer pricing.
+        {containsMockData ? "Development sample data — not live retailer pricing." : "Recorded observations — check the observation date before buying."}
       </p>
       <p className="mt-0.5 text-muted-foreground">{message}</p>
     </div>

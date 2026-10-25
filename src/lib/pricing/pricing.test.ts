@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { handleInternalApiRequest } from "@/lib/api-router";
 import { InMemoryPriceRepository } from "@/lib/pricing/repository";
 import {
@@ -226,6 +226,8 @@ describe("in-memory price repository", () => {
 });
 
 describe("price history range and internal API", () => {
+  beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(NOW); });
+  afterEach(() => { vi.useRealTimers(); });
   it("rejects arbitrary public ranges", () => {
     expect(() => normalizePriceHistoryRange("365d")).toThrow(PriceValidationError);
   });

@@ -73,6 +73,14 @@ export function estimateSystemPower(build: Build) {
 
 const compatibilityRules: CompatibilityRule[] = [
   {
+    id: "cpu-bios-support",
+    label: "CPU BIOS support",
+    checkedPartCategories: ["cpu", "motherboard"],
+    evaluate: ({ cpu, motherboard }) => getStringSpec(cpu, "biosCheck")
+      ? result("warning", "Verify that the motherboard BIOS supports this CPU before purchasing.", [cpu?.id, motherboard?.id].filter(Boolean) as string[], "Check the motherboard manufacturer CPU support list and required BIOS version.")
+      : result("pass", "No additional CPU-specific BIOS requirement recorded; verify the board support list.", [cpu?.id, motherboard?.id].filter(Boolean) as string[]),
+  },
+  {
     id: "cpu-motherboard-socket",
     label: "CPU socket matches motherboard",
     checkedPartCategories: ["cpu", "motherboard"],
