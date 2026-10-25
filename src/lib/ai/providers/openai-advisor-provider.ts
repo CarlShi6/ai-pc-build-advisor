@@ -4,6 +4,7 @@ import { getServerConfig } from "@/lib/config.server";
 import { buildAdvisorSystemPrompt, buildResponseQualityContext } from "@/lib/ai/response-quality";
 import {
   normalizeAdvisorActions,
+  normalizeAdvisorMessage,
   type AdvisorProviderResponse,
   type AdvisorRequest,
   type AiProvider,
@@ -161,12 +162,14 @@ export const openAiAdvisorProvider: AiProvider = {
     });
     const parsed = extractJsonObject(getResponseText(response));
 
-    if (!parsed?.assistantMessage) {
+    const assistantMessage = normalizeAdvisorMessage(parsed?.assistantMessage);
+
+    if (!parsed || !assistantMessage) {
       throw new Error("AI provider returned an unsupported response shape.");
     }
 
     return {
-      assistantMessage: parsed.assistantMessage,
+      assistantMessage,
       extractedNeeds: parsed.extractedNeeds,
       suggestedActions: normalizeAdvisorActions(parsed.suggestedActions),
       warnings: Array.isArray(parsed.warnings)

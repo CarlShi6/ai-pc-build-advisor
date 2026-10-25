@@ -113,6 +113,7 @@ export type PriceChartPresentation = {
   comparablePoints: PriceChartPoint[];
   unavailablePoints: PriceChartPoint[];
   polylinePoints: string;
+  series: { key: string; points: PriceChartPoint[] }[];
 };
 
 export function createPriceChartPresentation(
@@ -167,7 +168,15 @@ export function createPriceChartPresentation(
     }
   });
 
+  const seriesByListing = new Map<string, PriceChartPoint[]>();
+  for (const observation of sorted) {
+    const identity = observation.retailerSku ?? observation.listingUrl;
+    const key = [observation.retailerId, observation.sellerName ?? "retailer-direct", identity ?? observation.id, observation.condition].join("|");
+    const point = comparablePoints.find((candidate) => candidate.id === observation.id);
+    if (point) seriesByListing.set(key, [...(seriesByListing.get(key) ?? []), point]);
+  }
   return {
+    series: [...seriesByListing].map(([key, points]) => ({ key, points })),
     comparablePoints,
     unavailablePoints,
     polylinePoints: comparablePoints.map((point) => `${point.x},${point.y}`).join(" "),

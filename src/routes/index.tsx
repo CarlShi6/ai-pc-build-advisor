@@ -1,3 +1,7 @@
+import { BudgetBreakdown } from "@/components/budget-breakdown";
+import { PriceTrendPanel } from "@/components/price-trend-panel";
+import { CurrentOfferPanel } from "@/components/current-offer-panel";
+import { trackAnalyticsEvent } from "@/lib/analytics";
 import { createFileRoute } from "@tanstack/react-router";
 import {
   AlertTriangle, ArrowDownRight, ArrowRight, BadgeCheck, Bot, Box, Check,
@@ -10,12 +14,18 @@ import {
 import { useEffect, useId, useMemo, useRef, useState, type ComponentType, type KeyboardEvent } from "react";
 import { seedParts, recommendedBuildPartIds, categoryLabels } from "@/data/seedParts";
 import { getPartDecisionMetadata } from "@/lib/decision-metadata";
+import { askAdvisor, getAuthSession, getRecommendedBuild, getSavedBuild, getSavedBuilds, saveCurrentBuild, signIn, signOut } from "@/lib/apiClient";
+import { advisorActionsFromNeeds, createOperationGate, createRequestSequence, mergeCustomerNeeds, needsUpdateFromAdvisorAction, summarizeBuildChange, type JourneyOperation } from "@/lib/decision-workspace/journey-state";
 import {
   createSeedBuild, estimateBuildPower, getValidatedOfficialUrl, getValidatedPurchaseUrl,
   replaceBuildPartLocally, trustedAvailability, trustedPartPrice, trustForPart,
 } from "@/lib/product-trust";
 import type { Build, PartDecisionMetadata } from "@/types/build";
 import type { Part as CanonicalPart, PartCategory } from "@/types/parts";
+import type { CustomerNeeds } from "@/types/api";
+import type { AdvisorSuggestedAction } from "@/lib/ai/types";
+import type { AuthSession } from "@/lib/persistence/types";
+import type { SavedBuildSummary } from "@/types/build";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -32,6 +42,21 @@ type Part = {
   retailer: string; stock: string; stockTone: "good" | "low"; specs: string[];
   reason: string; Icon: ComponentType<{ size?: number; strokeWidth?: number }>;
   visual: string; compatibility: string; manufacturer?: string; officialUrl?: string;
+};
+
+type WorkspaceMessage = {
+  id: string;
+  role: "user" | "assistant";
+  text: string;
+  actions?: AdvisorSuggestedAction[];
+  provider?: "mock" | "openai" | "generic";
+  fallbackUsed?: boolean;
+};
+
+type RefinementProposal = {
+  needs: CustomerNeeds;
+  build: Build;
+  source: "manual" | "advisor";
 };
 
 function mockOfficialUrl(manufacturer: string, id: string) {
@@ -684,6 +709,17 @@ function CompareWorkspace({
 
 function BuildWorkspace() {
   const [build, setBuild] = useState<Build>(() => createSeedBuild(Object.values(recommendedBuildPartIds).filter(Boolean).map((id) => seedParts.find((part) => part.id === id)!).filter(Boolean)));
+  const [customerNeeds, setCustomerNeeds] = useState<CustomerNeeds>({ budget: 2500, targetUseCase: ["4K video editing", "casual gaming"], appearancePreference: "black", experienceLevel: "intermediate", gpuBrandPreference: "nvidia" });
+  const [draftNeeds, setDraftNeeds] = useState<CustomerNeeds>({});
+  const [authSession, setAuthSession] = useState<AuthSession | null>(null);
+  const [savedBuilds, setSavedBuilds] = useState<SavedBuildSummary[]>([]);
+  const [savedBuildId, setSavedBuildId] = useState<string | null>(null);
+  const [savedBuildsOpen, setSavedBuildsOpen] = useState(false);
+  const [refineOpen, setRefineOpen] = useState(false);
+  const [refinementProposal, setRefinementProposal] = useState<RefinementProposal | null>(null);
+  const [operation, setOperation] = useState<JourneyOperation>("idle");
+  const [journeyFeedback, setJourneyFeedback] = useState("");
+  const [unsavedChanges, setUnsavedChanges] = useState(false);
   const parts = useMemo(() => build.parts.map((part) => adaptCanonicalPart(part, build)), [build]);
   const initialGpuId = build.parts.find((part) => part.category === "gpu")?.id ?? build.parts[0]?.id ?? "";
   const [selectedId, setSelectedId] = useState(initialGpuId);
@@ -700,9 +736,23 @@ function BuildWorkspace() {
   const [mobilePanel, setMobilePanel] = useState<"needs" | "build" | "summary">("build");
   const [failedImages, setFailedImages] = useState<string[]>([]);
   const [chatText, setChatText] = useState("");
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<WorkspaceMessage[]>([
+    { id: "workspace-welcome", role: "assistant", text: "I can explain this active build or propose structured requirement changes. I will not replace the build without your confirmation.", provider: "generic" },
+  ]);
+  const requestSequenceRef = useRef(createRequestSequence());
+  const operationGateRef = useRef(createOperationGate());
+  const buildRevisionRef = useRef(0);
   const detailCloseRef = useRef<HTMLButtonElement>(null);
   const shoppingCloseRef = useRef<HTMLButtonElement>(null);
+  const beginOperation = (next: Exclude<JourneyOperation, "idle">) => {
+    if (!operationGateRef.current.tryBegin(next)) return false;
+    setOperation(next);
+    return true;
+  };
+  const finishOperation = (expected: Exclude<JourneyOperation, "idle">) => {
+    operationGateRef.current.finish(expected);
+    setOperation(operationGateRef.current.current());
+  };
   const total = build.totalPrice;
   const budget = build.budget;
   const delta = budget - total;
@@ -736,31 +786,235 @@ function BuildWorkspace() {
   };
   const openCompare = (part: CanonicalViewPart) => {
     setDetailPart(null);
+    trackAnalyticsEvent("compare_opened", { part_id: part.id, category: part.canonical.category });
     setComparePart(part);
   };
   const confirmReplacement = () => {
     if (!pendingCurrent || !pendingNextPart) return;
+    trackAnalyticsEvent("replacement_started", { part_id: pendingCurrent.id, replacement_id: pendingNextPart.id });
     setReplacementStatus("pending");
     setReplacementFeedback("Recalculating build consequences…");
     try {
       const previousCompatibility = build.compatibilityStatus;
       const nextBuild = replaceBuildPartLocally(build, pendingCurrent.id, pendingNextPart.canonical);
       setBuild(nextBuild);
+      buildRevisionRef.current += 1;
+      requestSequenceRef.current.invalidate();
+      setRefinementProposal(null);
+      setUnsavedChanges(true);
       setSelectedId(pendingNextPart.id);
+      trackAnalyticsEvent("replacement_succeeded", { part_id: pendingNextPart.id, total: nextBuild.totalPrice });
       setReplacementStatus("succeeded");
-      setReplacementFeedback(`${pendingNextPart.name} applied. Compatibility ${previousCompatibility === nextBuild.compatibilityStatus ? "is unchanged" : `changed from ${previousCompatibility} to ${nextBuild.compatibilityStatus}`}. Persistence is unavailable in this guest preview.`);
+      setReplacementFeedback(`${pendingNextPart.name} applied. Compatibility ${previousCompatibility === nextBuild.compatibilityStatus ? "is unchanged" : `changed from ${previousCompatibility} to ${nextBuild.compatibilityStatus}`}. ${authSession?.status === "authenticated" ? "This build now has unsaved changes." : "Available in this local session only."}`);
       closeReplacement();
     } catch (error) {
+      trackAnalyticsEvent("replacement_failed", { part_id: pendingCurrent.id });
       setReplacementStatus("failed");
       setReplacementFeedback(error instanceof Error ? error.message : "Replacement could not be applied. The build is unchanged.");
     }
   };
   const toggleImageFailure = (id: string) => setFailedImages((current) => current.includes(id) ? current.filter((item) => item !== id) : [...current, id]);
-  const sendMessage = () => {
-    if (!chatText.trim()) return;
-    setMessages((current) => [...current, chatText.trim()]);
-    setChatText("");
+  const proposeRequirements = async (nextNeeds: CustomerNeeds, source: RefinementProposal["source"]) => {
+    const mergedNeeds = mergeCustomerNeeds(customerNeeds, nextNeeds);
+    if (!mergedNeeds.budget || mergedNeeds.budget < 500) {
+      setJourneyFeedback("Enter a budget of at least $500 before generating a refined build.");
+      return;
+    }
+    if (!beginOperation("refining")) return;
+    trackAnalyticsEvent("build_generation_started", { budget: mergedNeeds.budget, source });
+    setDraftNeeds(mergedNeeds);
+    setRefinementProposal(null);
+    setRefineOpen(true);
+    const requestId = requestSequenceRef.current.begin();
+    const revision = buildRevisionRef.current;
+    setJourneyFeedback("Generating a recommendation while keeping the current build in place…");
+    try {
+      const candidate = await getRecommendedBuild(mergedNeeds);
+      if (!requestSequenceRef.current.isLatest(requestId) || revision !== buildRevisionRef.current) {
+        setJourneyFeedback("A newer build decision was made, so this recommendation was not applied.");
+        return;
+      }
+      trackAnalyticsEvent("build_generation_succeeded", { budget: mergedNeeds.budget, total: candidate.totalPrice });
+      setRefinementProposal({ needs: mergedNeeds, build: candidate, source });
+      setJourneyFeedback("A refined build is ready for review. Your current build is unchanged.");
+    } catch {
+      trackAnalyticsEvent("build_generation_failed");
+      if (requestSequenceRef.current.isLatest(requestId)) setJourneyFeedback("The recommendation could not be generated. Your current build and requirements are unchanged. Retry when the service is available.");
+    } finally {
+      finishOperation("refining");
+    }
   };
+
+  const handleAdvisorAction = (action: AdvisorSuggestedAction) => {
+    const update = needsUpdateFromAdvisorAction(action);
+    if (update) void proposeRequirements(update, "advisor");
+    else if (action.type === "open_part_explorer") {
+      const target = parts.find((part) => part.canonical.category === action.category);
+      if (target) openCompare(target);
+    } else if (action.type === "ask_clarifying_question") {
+      setChatText(action.question);
+    }
+  };
+
+  const sendMessage = async (messageOverride?: string) => {
+    const message = (messageOverride ?? chatText).trim();
+    if (!message || !beginOperation("advisor")) return;
+    const requestId = requestSequenceRef.current.begin();
+    const revision = buildRevisionRef.current;
+    const userMessage: WorkspaceMessage = { id: `user-${Date.now()}`, role: "user", text: message };
+    setMessages((current) => [...current, userMessage]);
+    setChatText("");
+    setJourneyFeedback("Advisor is reviewing the current requirements and active build…");
+    try {
+      const focusedPart = comparePart ?? selectedPart;
+      const response = await askAdvisor({
+        message,
+        conversationHistory: [...messages, userMessage].slice(-8).map(({ role, text }) => ({ role, text })),
+        currentBuild: build,
+        collectedNeeds: customerNeeds,
+        activeCompare: focusedPart ? {
+          category: focusedPart.canonical.category,
+          currentPart: focusedPart.canonical,
+          candidateParts: canonicalComparisonCatalog(focusedPart, build).slice(1, 4).map((candidate) => candidate.canonical),
+          budget: build.budget,
+          buildTotal: build.totalPrice,
+        } : null,
+      });
+      if (!requestSequenceRef.current.isLatest(requestId) || revision !== buildRevisionRef.current) {
+        setChatText(message);
+        setJourneyFeedback("The advisor response is stale because the active build changed. Send the request again to use the current build.");
+        return;
+      }
+      const reviewActions = response.suggestedActions?.length
+        ? response.suggestedActions
+        : advisorActionsFromNeeds(response.extractedNeeds ?? {});
+      setMessages((current) => [...current, { id: `assistant-${Date.now()}`, role: "assistant", text: response.assistantMessage, actions: reviewActions, provider: response.provider, fallbackUsed: response.fallbackUsed }]);
+      setJourneyFeedback(response.fallbackUsed ? "The configured provider was unavailable, so the safe local advisor responded. No build changes were applied." : "Advisor response received. Any build-changing action still requires review.");
+    } catch {
+      if (requestSequenceRef.current.isLatest(requestId)) {
+        setChatText(message);
+        setMessages((current) => [...current, { id: `assistant-error-${Date.now()}`, role: "assistant", text: "The advisor could not be reached. Your current build is unchanged. You can retry or continue using Compare, Detail, and Shopping Plan." }]);
+        setJourneyFeedback("Advisor request failed. The active build remains available and unchanged.");
+      }
+    } finally {
+      finishOperation("advisor");
+    }
+  };
+
+  const applyRefinement = () => {
+    if (!refinementProposal) return;
+    trackAnalyticsEvent("build_applied", { budget: refinementProposal.build.budget, total: refinementProposal.build.totalPrice });
+    setBuild(refinementProposal.build);
+    setCustomerNeeds(refinementProposal.needs);
+    setSelectedId(refinementProposal.build.parts.find((part) => part.category === "gpu")?.id ?? refinementProposal.build.parts[0]?.id ?? "");
+    setComparePart(null);
+    setDetailPart(null);
+    buildRevisionRef.current += 1;
+    requestSequenceRef.current.invalidate();
+    setUnsavedChanges(true);
+    setRefinementProposal(null);
+    setRefineOpen(false);
+    setJourneyFeedback("Refined build applied. Every decision view now uses the updated build. Changes are not saved yet.");
+  };
+
+  const saveBuild = async () => {
+    if (authSession?.status !== "authenticated") {
+      setJourneyFeedback("Guest build available in this local session only. Sign in through the existing account flow to save it to your account.");
+      return;
+    }
+    if (!beginOperation("saving")) return;
+    setJourneyFeedback("Saving the current active build…");
+    try {
+      const result = await saveCurrentBuild({ id: savedBuildId ?? undefined, name: build.name, build, buildNeeds: customerNeeds });
+      setSavedBuildId(result.savedBuild.id);
+      setSavedBuilds(result.builds);
+      setUnsavedChanges(false);
+      setJourneyFeedback(`“${result.savedBuild.name}” saved to your account.`);
+    } catch {
+      setJourneyFeedback("The build could not be saved. Your current local build is unchanged. Retry when persistence is available.");
+    } finally {
+      finishOperation("saving");
+    }
+  };
+
+  const openSavedBuilds = async () => {
+    if (authSession?.status !== "authenticated") {
+      setJourneyFeedback("Saved builds require an authenticated account. This guest build remains available in the current local session.");
+      return;
+    }
+    if (!beginOperation("loading")) return;
+    setSavedBuildsOpen(true);
+    try { setSavedBuilds((await getSavedBuilds()).builds); }
+    catch { setJourneyFeedback("Saved builds could not be loaded. The current build is unchanged."); }
+    finally { finishOperation("loading"); }
+  };
+
+  const loadSavedBuild = async (id: string) => {
+    if (!beginOperation("loading")) return;
+    try {
+      const saved = await getSavedBuild(id);
+      setBuild(saved.build);
+      setCustomerNeeds(saved.buildNeeds);
+      setSavedBuildId(saved.id);
+      setUnsavedChanges(false);
+      setComparePart(null);
+      setDetailPart(null);
+      setReplacementPart(null);
+      setComparisonReplacement(null);
+      setRefinementProposal(null);
+      buildRevisionRef.current += 1;
+      requestSequenceRef.current.invalidate();
+      setSavedBuildsOpen(false);
+      setJourneyFeedback(`“${saved.name}” restored. The ledger, receipt, compare, detail, and shopping plan now use this build.`);
+    } catch { setJourneyFeedback("That saved build could not be restored. The current build is unchanged."); }
+    finally { finishOperation("loading"); }
+  };
+
+  const handleAccountAction = async () => {
+    if (operation !== "idle") return;
+
+    if (authSession?.status === "authenticated") {
+      if (!window.confirm("Sign out of this account? The active build will remain available in this local session.")) return;
+      if (!beginOperation("loading")) return;
+      try {
+        const result = await signOut();
+        setAuthSession(result.session);
+        setSavedBuildId(null);
+        setSavedBuilds([]);
+        setUnsavedChanges(true);
+        setJourneyFeedback("Signed out. The active build is still available locally, but it is no longer linked to a saved account build.");
+      } catch {
+        setJourneyFeedback("Sign out failed. Your account session and active build are unchanged.");
+      } finally {
+        finishOperation("loading");
+      }
+      return;
+    }
+
+    const email = window.prompt("Email for the existing account sign-in flow")?.trim();
+    if (!email || !beginOperation("loading")) return;
+    try {
+      const session = await signIn({ email, password: "local-mock-password" });
+      setAuthSession(session);
+      setSavedBuildId(null);
+      setUnsavedChanges(true);
+      const saved = await getSavedBuilds();
+      setSavedBuilds(saved.builds);
+      setJourneyFeedback(`Signed in as ${session.user?.email ?? email}. Save the active build to attach it to this account.`);
+    } catch {
+      setJourneyFeedback("Sign in failed. The active build remains available in this local session.");
+    } finally {
+      finishOperation("loading");
+    }
+  };
+
+  useEffect(() => {
+    let active = true;
+    const requestSequence = requestSequenceRef.current;
+    trackAnalyticsEvent("workspace_viewed");
+    void getAuthSession().then((session) => { if (active) setAuthSession(session); }).catch(() => { if (active) setJourneyFeedback("Account state is unavailable. Continuing with local-session behavior."); });
+    return () => { active = false; requestSequence.invalidate(); };
+  }, []);
 
   useEffect(() => {
     const openDialog = detailPart || shoppingOpen;
@@ -801,6 +1055,7 @@ function BuildWorkspace() {
       document.execCommand("copy");
       textarea.remove();
     }
+    trackAnalyticsEvent("shopping_plan_copied");
     setShoppingFeedback("Purchase plan copied");
   };
 
@@ -817,6 +1072,7 @@ function BuildWorkspace() {
     link.download = "1440p-performance-build-purchase-plan.csv";
     link.click();
     window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    trackAnalyticsEvent("shopping_plan_exported");
     setShoppingFeedback("Purchase plan exported");
   };
 
@@ -824,37 +1080,35 @@ function BuildWorkspace() {
     <div className="advisor-shell">
       <header className="workspace-header">
         <div className="workspace-brand"><BrandMark /><span className="brand-name">AI装机助手</span><span className="brand-divider">/</span><span className="brand-subtitle">BUILD ADVISOR</span></div>
-        <div className="build-context"><span className="context-dot" /><div><small>ACTIVE BUILD</small><strong>1440p Performance</strong></div><button aria-label="Open build menu"><ChevronRight size={16} /></button></div>
-        <nav className="header-actions" aria-label="Account"><button>Saved Builds</button><button className="avatar-button" aria-label="Account menu">CG</button></nav>
+        <div className="build-context"><span className="context-dot" /><div><small>ACTIVE BUILD {unsavedChanges ? "· UNSAVED" : savedBuildId ? "· SAVED" : "· LOCAL"}</small><strong>{build.name}</strong></div><button aria-label="Open build menu"><ChevronRight size={16} /></button></div>
+        <nav className="header-actions" aria-label="Account"><button onClick={() => void openSavedBuilds()}>Saved Builds</button><button className="avatar-button" disabled={operation !== "idle"} onClick={() => void handleAccountAction()} aria-label={authSession?.status === "authenticated" ? "Sign out" : "Sign in"} title={authSession?.status === "authenticated" ? `Signed in as ${authSession.user?.email ?? "account"}. Click to sign out.` : "Guest mode. Click to sign in."}>{authSession?.user?.displayName?.slice(0, 2).toUpperCase() ?? (authSession?.status === "authenticated" ? "ME" : "G")}</button></nav>
       </header>
 
       <main className={`workspace-frame ${comparePart ? "compare-active" : ""}`}>
         <aside className={`requirements-rail ${mobilePanel === "needs" ? "mobile-active" : ""}`}>
           <div className="rail-scroll">
-            <div className="rail-heading"><div><span className="section-kicker">YOUR BUILD BRIEF</span><h2>What matters most</h2></div><button className="icon-button" aria-label="Edit requirements"><SlidersHorizontal size={17} /></button></div>
+            <div className="rail-heading"><div><span className="section-kicker">YOUR BUILD BRIEF</span><h2>What matters most</h2></div><button className="icon-button" aria-label="Edit requirements" onClick={() => { setDraftNeeds(customerNeeds); setRefineOpen(true); }}><SlidersHorizontal size={17} /></button></div>
             <section className="brief-card">
-              <div className="brief-budget"><span>Target budget</span><strong>$2,500</strong><em>Flexible by $100</em></div>
-              <div className="brief-meter"><span style={{ width: "91%" }} /></div>
+              <div className="brief-budget"><span>Target budget</span><strong>{formatPartPrice(customerNeeds.budget)}</strong><em>{authSession?.status === "authenticated" ? "Account session" : "Local session"}</em></div>
+              <div className="brief-meter"><span style={{ width: `${Math.min(100, Math.round((build.totalPrice / Math.max(customerNeeds.budget ?? build.budget, 1)) * 100))}%` }} /></div>
               <div className="brief-grid">
                 <div><Target size={15} /><span><small>PLAY AT</small>1440p / 165Hz</span></div>
                 <div><Gauge size={15} /><span><small>PRIORITY</small>Performance</span></div>
-                <div><Sparkles size={15} /><span><small>LOOK</small>Dark / minimal</span></div>
-                <div><MonitorCog size={15} /><span><small>USE</small>Gaming + creator</span></div>
+                <div><Sparkles size={15} /><span><small>LOOK</small>{customerNeeds.appearancePreference ?? "Not set"}</span></div>
+                <div><MonitorCog size={15} /><span><small>USE</small>{customerNeeds.targetUseCase?.join(" + ") ?? "Not set"}</span></div>
               </div>
-              <div className="preference-tags"><span>NVIDIA preferred</span><span>Wi‑Fi required</span><span>Quiet build</span></div>
+              <div className="preference-tags">{customerNeeds.gpuBrandPreference && <span>{customerNeeds.gpuBrandPreference.toUpperCase()} preferred</span>}<span>{customerNeeds.experienceLevel ?? "Experience not set"}</span><span>Optional context: quiet build</span></div>
             </section>
             <section className="advisor-chat">
               <div className="chat-title"><span><Bot size={17} /> AI build guide</span></div>
               <div className="chat-thread">
-                <div className="chat-message assistant"><div className="mini-avatar"><Sparkles size={13} /></div><p>I’ve balanced your build around high-refresh 1440p play, with enough memory and storage for creative work.</p></div>
-                <div className="chat-message user"><p>Keep it quiet, and don’t sacrifice upgrade room.</p></div>
-                <div className="chat-message assistant"><div className="mini-avatar"><Sparkles size={13} /></div><p>Done. The case and cooling are intentionally oversized for lower fan speeds.</p></div>
-                {messages.map((message, index) => <div className="chat-message user" key={`${message}-${index}`}><p>{message}</p></div>)}
+                {messages.map((message) => <div className={`chat-message ${message.role}`} key={message.id}>{message.role === "assistant" && <div className="mini-avatar"><Sparkles size={13} /></div>}<div><p>{message.text}</p>{message.role === "assistant" && <small className="advisor-source">{message.fallbackUsed ? "Local fallback advisor" : message.provider ? `${message.provider} advisor` : "Workspace guidance"}</small>}{message.actions?.length ? <div className="advisor-actions">{message.actions.map((action, index) => <button key={`${message.id}-${action.type}-${index}`} disabled={operation !== "idle"} onClick={() => handleAdvisorAction(action)}>{action.label ?? (needsUpdateFromAdvisorAction(action) ? "Review proposed update" : action.type === "open_part_explorer" ? "Open comparison" : "Use this next step")}</button>)}</div> : null}</div></div>)}
+                {operation === "advisor" && <div className="chat-message assistant advisor-working" role="status"><div className="mini-avatar"><Sparkles size={13} /></div><p>Reviewing the active requirements and current build…</p></div>}
               </div>
-              <div className="quick-prompts"><button onClick={() => openCompare(parts[1])}>Can I save $200?</button><button onClick={() => setWarningOpen(true)}>Check upgrade headroom</button></div>
+              <div className="quick-prompts"><button disabled={operation !== "idle"} onClick={() => void sendMessage("Can I save $200 without losing much 1440p performance?")}>Can I save $200?</button><button disabled={operation !== "idle"} onClick={() => void sendMessage("Check this build's PSU upgrade headroom.")}>Check upgrade headroom</button></div>
             </section>
           </div>
-          <div className="chat-composer"><input value={chatText} onChange={(event) => setChatText(event.target.value)} onKeyDown={(event) => event.key === "Enter" && sendMessage()} placeholder="Ask about this build…" aria-label="Ask the AI build guide" /><button onClick={sendMessage} aria-label="Send message"><Send size={16} /></button></div>
+          <div className="chat-composer"><input value={chatText} disabled={operation === "advisor"} onChange={(event) => setChatText(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") void sendMessage(); }} placeholder="Ask about this active build…" aria-label="Ask the AI build guide" /><button disabled={!chatText.trim() || operation !== "idle"} onClick={() => void sendMessage()} aria-label="Send message"><Send size={16} /></button></div>
         </aside>
 
         {comparePart ? (
@@ -874,10 +1128,12 @@ function BuildWorkspace() {
         <section className={`build-workspace ${mobilePanel === "build" ? "mobile-active" : ""}`}>
           <div className="workspace-scroll">
             <div className="workspace-intro">
-              <div><h1>1440p Performance Build</h1><p>A balanced, quiet gaming system with creator-ready headroom.</p></div>
-              <div className="workspace-tools"><button className="outline-button"><SlidersHorizontal size={15} /> Refine build</button></div>
+              <div><h1>{build.name}</h1><p>Choose your parts. Understand the tradeoffs. Build with confidence.</p></div>
+              <div className="workspace-tools"><button className="outline-button" onClick={() => { setDraftNeeds(customerNeeds); setRefineOpen(true); }}><SlidersHorizontal size={15} /> Refine build</button></div>
             </div>
-            <div className="parts-heading"><div><h2>Component decision ledger</h2><span>8 selected parts. Choose a row to inspect the decision.</span></div></div>
+<section className="build-start-banner" aria-label="Start your own build"><div><span className="section-kicker">MAKE IT YOURS</span><h2>Your budget. Your next PC.</h2><p>This is a sample configuration. Set your budget and workload to get your own recommendation.</p></div><button className="primary-button" onClick={() => { trackAnalyticsEvent("landing_cta_clicked", { source: "workspace_start" }); setDraftNeeds(customerNeeds); setRefineOpen(true); }}>Build my PC <ArrowRight size={15} /></button></section>
+            {journeyFeedback && <div className="journey-status" role="status" aria-live="polite"><span>{journeyFeedback}</span><button onClick={() => setJourneyFeedback("")} aria-label="Dismiss workflow status"><X size={13} /></button></div>}
+            <div className="parts-heading"><div><h2>Component decision ledger</h2><span>{parts.length} selected parts · {seedParts.length} catalog options. Compare a component to explore alternatives.</span></div></div>
             <div className="component-list">
               {parts.map((part) => (
                 <article key={part.id} className={`component-card ${selectedId === part.id ? "selected" : ""}`} onClick={() => setSelectedId(part.id)} tabIndex={0} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(part.id); } }}>
@@ -895,7 +1151,7 @@ function BuildWorkspace() {
                     <div className="card-buttons">
                       <button onClick={(event) => { event.stopPropagation(); openCompare(part); }}><GitCompareArrows size={15} /> Compare</button>
                       <button onClick={(event) => { event.stopPropagation(); setReplacementPart(part); }}><Layers3 size={15} /> Replace</button>
-                      <button className="detail-button" onClick={(event) => { event.stopPropagation(); setDetailPart(part); }} aria-label={`View details for ${part.name}`}>More <ChevronRight size={15} /></button>
+                      <button className="detail-button" onClick={(event) => { event.stopPropagation(); setDetailPart(part); }} aria-label={`View details for ${part.name}`}>Details & prices <ChevronRight size={15} /></button>
                     </div>
                   </div>
                 </article>
@@ -941,12 +1197,15 @@ function BuildWorkspace() {
               <section><span className="detail-section-label">POWER AND THERMALS</span><p><Thermometer size={14} />{detailPowerThermal(detailPart)}</p></section>
               <section><span className="detail-section-label">UPGRADE LIMITS</span><p>{upgradeLimit(detailPart)}</p></section>
             </div>
+            <CurrentOfferPanel key={`offer-${detailPart.id}`} partId={detailPart.id} />
+            <PriceTrendPanel key={`history-${detailPart.id}`} partId={detailPart.id} partName={detailPart.name} />
             <div className="detail-footer"><button className="outline-button" onClick={() => { const part = detailPart; setDetailPart(null); setReplacementPart(part); }}><Layers3 size={15} /> Replace</button><button className="primary-button" onClick={() => openCompare(detailPart)}><GitCompareArrows size={15} /> Compare alternatives</button></div>
           </div>}
         </section>
 
         <aside className={`summary-rail ${mobilePanel === "summary" ? "mobile-active" : ""}`}>
           <div className="summary-top"><div className="summary-heading"><span className="section-kicker">DECISION RECEIPT</span></div><div className="total-price"><span>Estimated build total</span><strong>{formatPartPrice(total)}</strong><small>{parts.length} selected components · Seed prices</small></div><div className="budget-status"><div><span>Target budget</span><strong>{formatPartPrice(budget)}</strong></div><div><span>{delta >= 0 ? "Remaining" : "Over budget"}</span><strong className={delta >= 0 ? "semantic-excellent" : "semantic-risk"}>{formatPartPrice(Math.abs(delta))}</strong></div><p className={delta >= 0 ? "semantic-excellent" : "semantic-risk"}>{delta >= 0 ? `${Math.round((delta / budget) * 100)}% below your target` : "Budget adjustment required"}</p></div></div>
+          <BudgetBreakdown build={build} onSelect={(id) => { const part = parts.find((item) => item.id === id); if (part) openCompare(part); }} />
           <div className="receipt-metrics">
             <button className="receipt-row receipt-warning" onClick={() => setWarningOpen(!warningOpen)}><span>Compatibility<small>{build.compatibilityChecks.length} rules evaluated · calculated</small></span><strong className={build.compatibilityStatus === "pass" ? "semantic-excellent" : build.compatibilityStatus === "warning" ? "semantic-caution" : "semantic-risk"}>{compatibilityReviewCount ? `${compatibilityReviewCount} ${compatibilityReviewCount === 1 ? "note" : "notes"} to review` : "All checks passed"}</strong><ChevronRight size={15} /></button>
             {warningOpen && <div className="warning-detail"><strong>{build.compatibilityWarnings[0]?.severity === "fail" ? "Compatibility issue" : "Compatibility review"}</strong><p>{build.compatibilityWarnings[0]?.message ?? "All evaluated compatibility rules currently pass."}</p>{parts.find((part) => part.canonical.category === "psu") && <button onClick={() => setReplacementPart(parts.find((part) => part.canonical.category === "psu")!)}>Review PSU options</button>}</div>}
@@ -955,13 +1214,27 @@ function BuildWorkspace() {
             <div className="receipt-row"><span>Estimated power<small>{powerEstimate.trust.disclosure}</small></span><strong className="semantic-strong">{powerEstimate.value === null ? "Unknown" : `${powerEstimate.value}W`}</strong></div>
             <div className="receipt-row"><span>PSU headroom<small>Derived from selected PSU and estimated draw</small></span><strong className={psuHeadroom !== null && psuHeadroom < 100 ? "semantic-caution" : "semantic-strong"}>{psuHeadroom === null ? "Unknown" : `${psuHeadroom}W`}</strong></div>
           </div>
-          <p className="receipt-insight"><strong>Well balanced.</strong> The GPU carries the target resolution while the CPU protects high-frame-rate responsiveness.</p>
-          <div className="summary-footer"><button className="primary-button shopping-button" onClick={() => setShoppingOpen(true)}><ShoppingBag size={17} /> Preview shopping list <ArrowRight size={16} /></button><button className="save-button"><ClipboardList size={15} /> Save or export build</button><p><ShieldCheck size={12} /> {build.compatibilityChecks.length} rules evaluated · calculated result</p></div>
+          <p className="receipt-insight">{delta < 0 ? "Your estimate is above budget. Compare the largest cost categories to find savings." : compatibilityReviewCount ? "Review compatibility notes before choosing your final parts." : "Your estimate fits the budget. Review prices and availability in the shopping list."}</p>
+          <div className="summary-footer"><button className="primary-button shopping-button" onClick={() => { trackAnalyticsEvent("shopping_list_opened", { total, component_count: parts.length }); setShoppingOpen(true); }}><ShoppingBag size={17} /> Preview shopping list <ArrowRight size={16} /></button><button className="save-button" disabled={operation !== "idle"} onClick={() => void saveBuild()}><ClipboardList size={15} /> {operation === "saving" ? "Saving…" : unsavedChanges ? "Save changes" : savedBuildId ? "Saved" : "Save build"}</button><p><ShieldCheck size={12} /> {authSession?.status === "authenticated" ? (unsavedChanges ? "Authenticated · unsaved changes" : savedBuildId ? "Saved to account" : "Ready to save") : "Guest · local session only"}</p></div>
         </aside>
         </>)}
       </main>
 
       <nav className={`mobile-tabs ${comparePart ? "compare-open" : ""}`} aria-label="Workspace sections"><button className={mobilePanel === "needs" ? "active" : ""} onClick={() => setMobilePanel("needs")}><PanelLeft size={18} />Needs</button><button className={mobilePanel === "build" ? "active" : ""} onClick={() => setMobilePanel("build")}><Cpu size={18} />Build</button><button className={mobilePanel === "summary" ? "active" : ""} onClick={() => setMobilePanel("summary")}><ClipboardList size={18} />Summary</button></nav>
+
+      {refineOpen && <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="refine-build-title"><div className="journey-modal refine-modal">
+        <div className="overlay-header"><div><span className="section-kicker">ACTIVE REQUIREMENTS</span><h2 id="refine-build-title">Refine build</h2><p>Edit supported advisor inputs. The current build stays active until you apply a reviewed recommendation.</p></div><button className="icon-button" onClick={() => { setRefineOpen(false); setRefinementProposal(null); }} aria-label="Close refine build"><X size={18} /></button></div>
+        <fieldset className="requirements-form" disabled={Boolean(refinementProposal)}>
+          <label>Budget <input type="number" min="500" step="50" value={draftNeeds.budget ?? ""} onChange={(event) => setDraftNeeds((current) => ({ ...current, budget: event.target.value ? Number(event.target.value) : undefined }))} /></label>
+          <label>Primary workloads <input value={draftNeeds.targetUseCase?.join(", ") ?? ""} onChange={(event) => setDraftNeeds((current) => ({ ...current, targetUseCase: event.target.value.split(",").map((item) => item.trim()).filter(Boolean) }))} placeholder="4K editing, gaming" /></label>
+          <label>Appearance <select value={draftNeeds.appearancePreference ?? ""} onChange={(event) => setDraftNeeds((current) => ({ ...current, appearancePreference: event.target.value ? event.target.value as NonNullable<CustomerNeeds["appearancePreference"]> : undefined }))}><option value="">Not set</option><option value="black">Black</option><option value="white">White</option><option value="rgb">RGB</option></select></label>
+          <label>GPU preference <select value={draftNeeds.gpuBrandPreference ?? ""} onChange={(event) => setDraftNeeds((current) => ({ ...current, gpuBrandPreference: event.target.value ? event.target.value as NonNullable<CustomerNeeds["gpuBrandPreference"]> : undefined }))}><option value="">No preference</option><option value="nvidia">NVIDIA</option><option value="amd">AMD</option></select></label>
+          <label>Experience <select value={draftNeeds.experienceLevel ?? ""} onChange={(event) => setDraftNeeds((current) => ({ ...current, experienceLevel: event.target.value ? event.target.value as NonNullable<CustomerNeeds["experienceLevel"]> : undefined }))}><option value="">Not set</option><option value="beginner">Beginner</option><option value="intermediate">Intermediate</option><option value="expert">Expert</option></select></label>
+        </fieldset>
+        {!refinementProposal ? <div className="journey-actions"><button className="outline-button" onClick={() => setRefineOpen(false)}>Cancel</button><button className="primary-button" disabled={operation !== "idle"} onClick={() => void proposeRequirements(draftNeeds, "manual")}>{operation === "refining" ? "Generating…" : "Generate refined build"}</button></div> : (() => { const summary = summarizeBuildChange(build, refinementProposal.build); return <div className="change-review"><span className="detail-section-label">REVIEW CHANGES</span><dl><div><dt>Build total</dt><dd>{formatSignedCurrency(summary.totalDelta, true)} · {formatPartPrice(refinementProposal.build.totalPrice)}</dd></div><div><dt>Budget position</dt><dd>{formatSignedCurrency(summary.budgetDeltaAfter)}</dd></div><div><dt>Compatibility</dt><dd>{summary.compatibilityBefore} → {summary.compatibilityAfter}</dd></div><div><dt>Changed components</dt><dd>{summary.changedCategories.length ? summary.changedCategories.map((category) => categoryLabels[category as PartCategory]).join(", ") : "No component changes"}</dd></div><div><dt>Source</dt><dd>{refinementProposal.source === "advisor" ? "Advisor-proposed requirements" : "User-edited requirements"} · canonical recommendation API</dd></div></dl><div className="journey-actions"><button className="outline-button" onClick={() => { setRefinementProposal(null); setJourneyFeedback("Refined build rejected. The current build remains active."); }}>Keep current build</button><button className="primary-button" onClick={applyRefinement}>Apply refined build</button></div></div>; })()}
+      </div></div>}
+
+      {savedBuildsOpen && <div className="modal-scrim" role="dialog" aria-modal="true" aria-labelledby="saved-builds-title"><div className="journey-modal saved-builds-modal"><div className="overlay-header"><div><span className="section-kicker">PERSISTED BUILDS</span><h2 id="saved-builds-title">Saved builds</h2><p>Restoring a build updates the complete decision workspace.</p></div><button className="icon-button" onClick={() => setSavedBuildsOpen(false)} aria-label="Close saved builds"><X size={18} /></button></div>{operation === "loading" ? <div className="journey-loading" role="status">Loading saved builds…</div> : savedBuilds.length ? <div className="saved-build-list">{savedBuilds.map((saved) => <button key={saved.id} onClick={() => void loadSavedBuild(saved.id)}><span><strong>{saved.name}</strong><small>{new Date(saved.updatedAt).toLocaleDateString()} · {saved.compatibilityStatus}</small></span><span>{formatPartPrice(saved.totalPrice)}<ChevronRight size={14} /></span></button>)}</div> : <div className="journey-empty"><strong>No saved builds yet</strong><p>Save the active build first, then it will be available here.</p></div>}</div></div>}
 
       {replacementFeedback && <div className={`replacement-feedback ${replacementStatus}`} role="status" aria-live="polite">{replacementFeedback}</div>}
       {pendingCurrent && pendingNextPart && <div className="modal-scrim" role="dialog" aria-modal="true" aria-label="Confirm replacement"><div className="confirm-modal consequence-confirmation">
@@ -1008,7 +1281,7 @@ function BuildWorkspace() {
                   <div className="purchase-price"><strong className={priceAvailable ? "" : "semantic-caution"}>{formatPartPrice(part.price)}</strong><span>{part.retailer || "Retailer unavailable"}</span><small className="data-trust-label">Seed price · not live</small></div>
                   <div className={`purchase-review ${needsReview ? "semantic-caution" : "semantic-excellent"}`}>{needsReview ? <AlertTriangle size={13} /> : <ShieldCheck size={13} />}<span>{needsReview ? "Review required" : "Compatibility checked"}</span></div>
                   <div className="purchase-actions">
-                    {purchaseUrl ? <a className="purchase-reference" href={purchaseUrl} target="_blank" rel="noreferrer">Purchase reference <ExternalLink size={12} /></a> : <button className="purchase-reference unavailable" disabled>Purchase link unavailable</button>}
+                    {purchaseUrl ? <a className="purchase-reference" href={purchaseUrl} onClick={() => trackAnalyticsEvent("affiliate_link_opened", { part_id: part.id, source: "shopping_list" })} target="_blank" rel="noreferrer">Purchase reference <ExternalLink size={12} /></a> : <button className="purchase-reference unavailable" disabled>Purchase link unavailable</button>}
                     {part.officialUrl && <a className="official-link" href={part.officialUrl} target="_blank" rel="noreferrer">Official page <ExternalLink size={11} /></a>}
                     <button onClick={() => { setShoppingOpen(false); openCompare(part); }}>Compare</button>
                     <button onClick={() => { setShoppingOpen(false); setReplacementPart(part); }}>Replace</button>

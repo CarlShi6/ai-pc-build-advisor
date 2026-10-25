@@ -1,5 +1,12 @@
 export const ANALYTICS_EVENT_NAMES = [
   "landing_cta_clicked",
+  "workspace_viewed",
+  "build_generation_started",
+  "build_generation_succeeded",
+  "build_generation_failed",
+  "build_applied",
+  "shopping_plan_copied",
+  "shopping_plan_exported",
   "consultation_load_succeeded",
   "consultation_load_failed",
   "consultation_load_retried",
@@ -108,7 +115,7 @@ export function trackAnalyticsEvent(
     eventId: createEventId(),
     occurredAt: new Date().toISOString(),
     path: window.location.pathname,
-    properties: normalizeProperties(properties),
+    properties: normalizeProperties({ ...properties, ...getSessionAttribution() }),
   };
 
   window.dispatchEvent(new CustomEvent("ai-pc-advisor:analytics", { detail: payload }));
@@ -121,4 +128,14 @@ export function trackAnalyticsEvent(
   }).catch(() => {
     // Analytics must never interrupt the product flow.
   });
+}
+
+function getSessionAttribution(): AnalyticsProperties {
+  try {
+    const key = "ai-pc-advisor:session";
+    let sessionId = window.sessionStorage.getItem(key);
+    if (!sessionId) { sessionId = createEventId(); window.sessionStorage.setItem(key, sessionId); }
+    const params = new URLSearchParams(window.location.search);
+    return { session_id: sessionId, utm_source: params.get("utm_source")?.slice(0, 80), utm_medium: params.get("utm_medium")?.slice(0, 80), utm_campaign: params.get("utm_campaign")?.slice(0, 80) };
+  } catch { return {}; }
 }
