@@ -55,3 +55,25 @@ test("image → observations → review → draft → Studio → save keeps unkn
   await expect(slotRow(page, "Case").locator(".v3-slot-status")).toHaveText("Review");
   await expect(compatibility(page)).toHaveText("Incomplete");
 });
+
+// Demo track week 1: the home hero is the photo entry (PRD §4.2).
+test("home hero upload runs the same image → Build flow", async ({ page }) => {
+  await signInTestUser(page);
+  await openReady(page, "/");
+  await expect(page.getByText("Upload a PC photo")).toBeVisible();
+  await expect(page.getByRole("navigation", { name: "Other ways to start" })).toContainText(
+    "Describe your dream PC",
+  );
+  await page.locator("input[type=file]").setInputFiles(fixtureImage);
+  await clickUntil(
+    page.getByRole("button", { name: "Load local fixture (no AI call)" }),
+    async () => {
+      await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
+    },
+  );
+  await page.getByRole("button", { name: "Preview Build draft" }).click();
+  await page.getByRole("button", { name: "Confirm and open Build Studio" }).click();
+  await expect(page).toHaveURL(/\/studio$/);
+  await expect(page.getByText("Reference-photo draft")).toBeVisible();
+  await expect(compatibility(page)).toHaveText("Incomplete");
+});

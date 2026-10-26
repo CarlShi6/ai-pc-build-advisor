@@ -1586,3 +1586,16 @@
 .v3-plan-findings,.v3-plan-notes{margin:16px 0 0;padding-left:18px;font-size:12px;line-height:1.6}.v3-plan-findings .is-fail{color:#a2412f}.v3-plan-findings .is-warning{color:#8a5a12}.v3-plan-notes{color:#728676;font-size:11px}
 @media(max-width:700px){.v3-plan{padding:18px}.v3-plan-head{display:none!important}.v3-plan-row{grid-template-columns:1fr 1fr;row-gap:8px}.v3-plan-summary{grid-template-columns:1fr}}
 .v3-plan-unchecked{margin-top:14px;font-size:12px;color:#5f7564}.v3-plan-unchecked summary{cursor:pointer;font-weight:700}.v3-plan-unchecked ul{margin:8px 0 0;padding-left:18px;line-height:1.6}
+/* Demo track week 1: home hero is the photo upload (PRD §4.2). */
+.v3-hero-upload{align-items:start}.v3-hero-upload .v3-hero-copy{padding-top:46px}
+.v3-hero-drop{display:flex;flex-direction:column;gap:14px;min-width:0}
+.v3-image-flow{display:flex;flex-direction:column;gap:14px;min-width:0}
+.v3-image-flow-hero{background:#fff;border:1px solid #dfe7de;border-radius:20px;padding:18px;box-shadow:0 24px 60px rgba(29,61,38,.10)}
+.v3-image-flow-hero .v3-upload{min-height:300px;border-radius:14px;gap:12px;background:radial-gradient(120% 90% at 50% 0%,#eef6ea 0%,#f6faf3 60%);transition:background .2s,border-color .2s}
+.v3-image-flow-hero .v3-upload strong{font-size:22px;letter-spacing:-.02em}
+.v3-image-flow-hero .v3-upload span{font-size:13px}
+.v3-image-flow-hero .v3-upload.has-file{min-height:120px}
+.v3-upload.dragging{border-color:#3d754c;background:#e6f2e2}
+.v3-privacy-details{font-size:12px;color:#66756a}.v3-privacy-details summary{cursor:pointer;display:flex;align-items:center;gap:6px;list-style:none}.v3-privacy-details summary::-webkit-details-marker{display:none}.v3-privacy-details[open] summary{margin-bottom:8px}
+.v3-other-starts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;font-size:13px;color:#718278;padding:0 4px}.v3-other-starts a{display:inline-flex;align-items:center;gap:6px;color:#2f6b43;font-weight:650;text-decoration:none}.v3-other-starts a:hover{text-decoration:underline}
+.v3-inline-budget{max-width:220px}

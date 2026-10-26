@@ -1,15 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import {
-  Camera,
-  FileText,
-  ListChecks,
-  Plus,
-  ArrowUpRight,
-  ShieldCheck,
-  Box,
-  ScanSearch,
-} from "lucide-react";
+import { FileText, ListChecks, Plus } from "lucide-react";
 import { V3Shell } from "@/components/v3-shell";
+import { ImageStartFlow } from "@/components/image-start-flow";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,106 +13,42 @@ export const Route = createFileRoute("/")({
   component: HomePage,
 });
 
-const entries = [
-  {
-    mode: "image",
-    title: "Start from an image",
-    description: "Preview a reference photo, then build from what you can verify.",
-    Icon: Camera,
-    label: "PHOTO",
-  },
-  {
-    mode: "describe",
-    title: "Describe your PC",
-    description: "Set a budget and goal, then choose the parts that fit.",
-    Icon: FileText,
-    label: "WORDS",
-  },
-  {
-    mode: "import",
-    title: "Import a parts list",
-    description: "Review exact catalog matches before creating a draft.",
-    Icon: ListChecks,
-    label: "LIST",
-  },
-  {
-    mode: "blank",
-    title: "Start blank",
-    description: "Open an empty eight-slot workspace and build at your pace.",
-    Icon: Plus,
-    label: "BLANK",
-  },
+// PRD §4.2: photo upload is the primary action; the other starts are secondary links.
+const otherStarts = [
+  { mode: "describe", label: "Describe your dream PC", Icon: FileText },
+  { mode: "import", label: "Import a parts list", Icon: ListChecks },
+  { mode: "blank", label: "Start from scratch", Icon: Plus },
 ] as const;
 
 function HomePage() {
   return (
     <V3Shell>
       <main>
-        <section className="v3-hero">
+        <section className="v3-hero v3-hero-upload" aria-labelledby="v3-hero-title">
           <div className="v3-hero-copy">
             <span className="v3-eyebrow">
               <span className="v3-dot" /> IMAGE TO BUILD · EARLY ACCESS
             </span>
-            <h1>
+            <h1 id="v3-hero-title">
               See a PC you love.
               <br />
               <em>Build your version.</em>
             </h1>
             <p>
-              Start with the look, a goal, or a parts list. Shape a real build with visible choices,
-              compatibility checks, and room for the unknowns.
+              Upload a photo of a build you like. We point out what is visible, suggest catalog
+              parts for you to confirm, and keep the hidden hardware open for you to choose.
             </p>
-            <div className="v3-hero-actions">
-              <Link className="v3-primary" to="/start/$mode" params={{ mode: "image" }}>
-                Start from an image <ArrowUpRight size={17} />
-              </Link>
-              <Link className="v3-secondary" to="/studio">
-                Open Build Studio <span aria-hidden="true">→</span>
-              </Link>
-            </div>
-            <div className="v3-hero-note">
-              <ShieldCheck size={17} /> Review visible details and local catalog alternatives, or
-              continue manually.
-            </div>
           </div>
-          <div className="v3-hero-art" aria-hidden="true">
-            <div className="v3-orbit v3-orbit-one" />
-            <div className="v3-orbit v3-orbit-two" />
-            <div className="v3-tower">
-              <span className="v3-tower-glow" />
-              <span className="v3-fan v3-fan-one" />
-              <span className="v3-fan v3-fan-two" />
-              <span className="v3-fan v3-fan-three" />
-              <span className="v3-gpu" />
-            </div>
-            <div className="v3-art-tag v3-tag-top">
-              <ScanSearch size={15} /> Inspiration
-            </div>
-            <div className="v3-art-tag v3-tag-bottom">
-              <Box size={15} /> Your build
-            </div>
-          </div>
-        </section>
-        <section className="v3-section" aria-labelledby="v3-start-title">
-          <div className="v3-section-heading">
-            <div>
-              <span className="v3-kicker">CHOOSE YOUR START</span>
-              <h2 id="v3-start-title">Every build starts somewhere.</h2>
-            </div>
-            <span>01 / 04</span>
-          </div>
-          <div className="v3-entry-grid">
-            {entries.map(({ mode, title, description, Icon, label }) => (
-              <Link className="v3-entry" key={mode} to="/start/$mode" params={{ mode }}>
-                <span className="v3-entry-top">
-                  <Icon size={25} strokeWidth={1.6} />
-                  <small>{label}</small>
-                </span>
-                <strong>{title}</strong>
-                <span>{description}</span>
-                <b aria-hidden="true">↗</b>
-              </Link>
-            ))}
+          <div className="v3-hero-drop">
+            <ImageStartFlow variant="hero" />
+            <nav className="v3-other-starts" aria-label="Other ways to start">
+              <span>No photo?</span>
+              {otherStarts.map(({ mode, label, Icon }) => (
+                <Link key={mode} to="/start/$mode" params={{ mode }}>
+                  <Icon size={15} /> {label}
+                </Link>
+              ))}
+            </nav>
           </div>
         </section>
         <section className="v3-trust">
