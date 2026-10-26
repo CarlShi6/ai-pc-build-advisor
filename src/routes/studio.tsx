@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useState, type ComponentType } from "react";
 import {
   ArrowRight,
   Check,
@@ -61,6 +61,19 @@ const balanceLabels: Array<[BalanceWeight, string]> = [
   [0.75, "Favor performance"],
 ];
 import { scenePresentation } from "@/lib/v3/scene-presentation";
+import { getValidatedOfficialUrl } from "@/lib/product-trust";
+
+/** A manufacturer page when the catalog has one; otherwise the existing retailer search, labeled as such. */
+function partLinkFor(part: Part | undefined) {
+  if (!part) return null;
+  const official = getValidatedOfficialUrl(part);
+  if (official) return { href: official, label: "Manufacturer page" };
+  if (!part.searchUrl) return null;
+  return {
+    href: part.searchUrl,
+    label: `Search ${new URL(part.searchUrl).hostname.replace(/^www./, "")}`,
+  };
+}
 
 export const Route = createFileRoute("/studio")({ component: StudioPage });
 
@@ -81,6 +94,8 @@ function StudioPage() {
   const [mode, setMode] = useState<SceneMode>("standard");
   const [explode, setExplode] = useState(55);
   const [resetKey, setResetKey] = useState(0);
+  const [focusSlot, setFocusSlot] = useState<SlotId | null>(null);
+  const clearFocus = useCallback(() => setFocusSlot(null), []);
   const [saving, setSaving] = useState(false);
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
   const [saveError, setSaveError] = useState("");
@@ -307,6 +322,10 @@ function StudioPage() {
                       setOptimizationCandidate(null);
                       setRemovalProposal(null);
                     }}
+                    focusSlot={focusSlot}
+                    onFocus={setFocusSlot}
+                    onClearFocus={clearFocus}
+                    partLink={(slot) => partLinkFor(selectedPart(document, slot))}
                   />
                 </SceneBoundary>
               ) : (

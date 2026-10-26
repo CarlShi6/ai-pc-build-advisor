@@ -26,3 +26,16 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - Gate: lint 0, typecheck passed, 174 tests in 25 files passed, build passed. E2E **7/7** (includes the 2D-view edit flow).
 - Screenshots: fixture build and a full eight-part build. They were rendered in headless Edge with SwiftShader WebGL; a real GPU will look smoother.
 - Notes: part geometry is still generic and illustrative (`geometryAccuracy: "illustrative"`); millimetre-accurate reference reconstructions are week 3. The lazy-loaded `BuildScene` chunk is now about 1.27 MB (postprocessing included); it loads only when the 3D view opens. Performance check and reduced-motion handling are week 4.
+
+## Week 2
+
+### Slice 3: single-part Focus/Isolate and label links — 2026-10-25
+
+- `src/lib/v3/scene-focus.ts` (new, pure): slot layout moved out of the scene, plus `focusOffset`, `slotPosition(slot, mode, explode, focusSlot)` and `isDimmed`. Unit-tested in `scene-focus.test.ts` (4 tests).
+- `src/features/build-3d/BuildScene.tsx`:
+  - Clicking a part (or its 3D label) selects and **focuses** it. The part eases out of the case towards the viewer (it snaps under `prefers-reduced-motion`), while every other part, the case, its glass and RGB fade to ghosts.
+  - **Show full build** (chip), **Esc**, or clicking empty space returns to the full view. The case is isolated by dimming only, never moved. Dashed callouts follow the moved part; dimmed callouts and labels fade.
+  - Dimming remounts materials, because three.js only recompiles `transparent` on a new material. The interior fill light moved deeper into the case and softens during focus, so a pulled-out part isn't blown out.
+  - New optional props `focusSlot`, `onFocus`, `onClearFocus`, `focusCard` (slice 4) and `partLink`.
+- **Label links:** each 3D label now carries a part link. It is a manufacturer product page when the catalog has a validated one (`getValidatedOfficialUrl`), otherwise the existing retailer search, labeled "Search newegg.com". **No seed part has a manufacturer URL today**, so every label currently shows the search link. The week 3 white showcase parts will carry verified manufacturer URLs. No BuildCores data is used.
+- Gate: lint 0, typecheck passed, **178 tests in 26 files** passed, build passed. E2E 7/7. Focus has no E2E yet (the default E2E browser has no WebGL); it is planned with the week 4 E2E pass.
