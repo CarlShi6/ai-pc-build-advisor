@@ -197,3 +197,23 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - the draft leaves absent slots open, and a manual note still flags the slot
 - Gate: lint 0, typecheck passed, **208 tests in 32 files** passed, build passed, **E2E 8/8**.
 
+## Week 4
+
+### Slice 11: performance check and adaptive scene quality — 2026-10-26
+
+- **Bundles (production build):** the 3D scene is its own lazy chunk, `BuildScene` 1.30 MB / 393 KB gzip (three, R3F, drei, postprocessing), fetched only when the Studio shows 3D. Main entry 416 KB / 128 KB gzip; Studio route 49 KB / 15 KB gzip. With WebGL disabled, none of the 3D chunk is downloaded (checked in headless Edge with WebGL off).
+- **Frame rate, white showcase sample in 3D**, measured over 5 s with `requestAnimationFrame`:
+
+  | Renderer | Tier | fps | median / p95 frame |
+  |---|---|---|---|
+  | Software (SwiftShader, headless Edge), worst-case stand-in for weak hardware | before: always full | 1.6 | 720 / 750 ms |
+  | Same | after: light tier, entered automatically | **8.9–9.5** | 104–111 / 118 ms |
+  | NVIDIA RTX 5080 (D3D11 via ANGLE, headless Edge) | full, kept | **144** (display cap) | 6.9 / 7.0 ms |
+
+- **Adaptive quality** (`BuildScene.tsx`), using drei `PerformanceMonitor`, which was already a dependency.
+  - If the scene can't hold ~30 fps (bounds 30/55), it switches once, for the session, to a light tier: 1× pixel ratio instead of up to 1.5×, plain floor instead of `MeshReflectorMaterial`, no SSAO, no depth of field, no multisampling, glass without the extra transmission pass, and contact shadow rendered once.
+  - Bloom (RGB glow) and vignette stay, so the light tier looks almost the same.
+  - The tier is exposed as `data-scene-quality` on the scene region. Fast hardware never leaves the full tier.
+- In software rendering the switch takes ~15–25 s, because the monitor needs ten sampling windows of rendered frames; on real weak GPUs (10–25 fps) it takes about 3–5 s.
+- Gate: lint 0, typecheck passed, 208 tests passed, build passed, E2E 8/8. Screenshots: both tiers of the same view.
+

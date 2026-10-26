@@ -3,6 +3,7 @@ import {
   useContext,
   useEffect,
   useRef,
+  useState,
   type ReactNode,
   type RefObject,
 } from "react";
@@ -15,6 +16,7 @@ import {
   Line,
   MeshReflectorMaterial,
   OrbitControls,
+  PerformanceMonitor,
 } from "@react-three/drei";
 import { Bloom, DepthOfField, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
 import type { ThreeEvent } from "@react-three/fiber";
@@ -70,6 +72,8 @@ const plastic = { color: "#18191c", metalness: 0.05, roughness: 0.55 };
 
 /** True inside a slot that is dimmed because another part is focused. */
 const DimContext = createContext(false);
+/** True in the light quality tier: glass skips the extra transmission render pass. */
+const LightTierContext = createContext(false);
 
 function prefersReducedMotion() {
   return (
@@ -144,6 +148,7 @@ function RgbStrip({ size, position, color }: { size: Point; position: Point; col
 
 function CaseModel({ size, presentation }: { size: Point; presentation: ScenePresentation }) {
   const dim = useContext(DimContext);
+  const light = useContext(LightTierContext);
   const [w, h, d] = size;
   const t = 0.035;
   const panel = { color: presentation.caseColor, metalness: 0.55, roughness: 0.42 };
@@ -170,7 +175,7 @@ function CaseModel({ size, presentation }: { size: Point; presentation: ScenePre
           color="#d8e2e6"
           metalness={0}
           roughness={0.04}
-          transmission={1}
+          transmission={light ? 0 : 1}
           thickness={0.05}
           ior={1.5}
           transparent
@@ -204,6 +209,7 @@ const gpuFrameRotation = new Euler().setFromRotationMatrix(
 /** A per-SKU reference reconstruction, drawn 1:1 from its millimetre parts. */
 function ReferenceModelMesh({ model }: { model: ReferenceModel }) {
   const dim = useContext(DimContext);
+  const light = useContext(LightTierContext);
   return (
     <group
       rotation={model.frame === "gpu" ? gpuFrameRotation : undefined}
@@ -227,7 +233,7 @@ function ReferenceModelMesh({ model }: { model: ReferenceModel }) {
                 color={material.color}
                 metalness={0}
                 roughness={material.roughness}
-                transmission={material.transmission}
+                transmission={light ? 0 : material.transmission}
                 thickness={0.05}
                 ior={1.5}
                 transparent
@@ -601,101 +607,125 @@ export default function BuildScene({
     return () => window.removeEventListener("keydown", onKey);
   }, [focusSlot, onClearFocus]);
   const cardAnchor = focusSlot ? slotPosition(focusSlot, mode, explode, focusSlot) : null;
+  // Adaptive quality: a device that can't hold ~30 fps drops to the light tier for the session.
+  const [quality, setQuality] = useState<"high" | "low">("high");
+  const lowerQuality = () => setQuality("low");
   return (
     <div
       className={`v3-scene-canvas ${focusSlot ? "is-focused" : ""}`}
+      data-scene-quality={quality}
       role="region"
       aria-label="Illustrative interactive PC scene. The eight 2D slot buttons below provide keyboard access."
     >
       <Canvas
         key={resetKey}
         camera={{ position: [5.8, 3.2, 7.2], fov: 38 }}
-        dpr={[1, 1.5]}
+        dpr={quality === "high" ? [1, 1.5] : 1}
         gl={{ antialias: false, powerPreference: "high-performance" }}
         shadows
         onPointerMissed={() => onClearFocus?.()}
       >
-        <color attach="background" args={["#17191c"]} />
-        <fog attach="fog" args={["#17191c", 11, 22]} />
-        <StudioEnvironment />
-        <ambientLight intensity={0.15} />
-        <directionalLight position={[3, 6, 6]} intensity={2.4} castShadow />
-        <directionalLight position={[-5, 3, -4]} intensity={1.2} color="#cfd8ff" />
-        {/* Interior fill so parts read through the glass, plus a soft accent glow. */}
-        <pointLight
-          position={[0, 0.3, 0.1]}
-          intensity={focusSlot ? 2 : 6}
-          distance={4.5}
-          decay={1.6}
-        />
-        <pointLight
-          position={[0.6, -0.2, 0.7]}
-          intensity={2.5}
-          distance={3}
-          color={presentation.accentColor}
-        />
-        {primarySlots.map((slot) => (
-          <SlotMesh
-            key={slot}
-            slot={slot}
-            document={document}
-            selected={selectedSlot === slot}
-            mode={mode}
-            explode={explode}
-            focusSlot={focusSlot}
-            onPick={pick}
-            presentation={presentation}
+        <LightTierContext.Provider value={quality === "low"}>
+          <PerformanceMonitor
+            bounds={() => [30, 55]}
+            onDecline={lowerQuality}
+            onFallback={lowerQuality}
           />
-        ))}
-        {primarySlots.map((slot) => (
-          <SlotCallout
-            key={`${slot}-callout`}
-            slot={slot}
-            document={document}
-            selected={selectedSlot === slot}
-            mode={mode}
-            explode={explode}
-            focusSlot={focusSlot}
+          <color attach="background" args={["#17191c"]} />
+          <fog attach="fog" args={["#17191c", 11, 22]} />
+          <StudioEnvironment />
+          <ambientLight intensity={0.15} />
+          <directionalLight position={[3, 6, 6]} intensity={2.4} castShadow />
+          <directionalLight position={[-5, 3, -4]} intensity={1.2} color="#cfd8ff" />
+          {/* Interior fill so parts read through the glass, plus a soft accent glow. */}
+          <pointLight
+            position={[0, 0.3, 0.1]}
+            intensity={focusSlot ? 2 : 6}
+            distance={4.5}
+            decay={1.6}
           />
-        ))}
-        <ContactShadows
-          position={[0, FLOOR_Y + 0.005, 0]}
-          opacity={0.65}
-          scale={9}
-          blur={2.6}
-          far={3.2}
-        />
-        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]}>
-          <planeGeometry args={[40, 40]} />
-          <MeshReflectorMaterial
-            resolution={512}
-            blur={[300, 80]}
-            mixBlur={1}
-            mixStrength={18}
-            mirror={0.35}
-            depthScale={1}
-            minDepthThreshold={0.6}
-            maxDepthThreshold={1.4}
-            color="#151619"
-            metalness={0.5}
-            roughness={0.9}
+          <pointLight
+            position={[0.6, -0.2, 0.7]}
+            intensity={2.5}
+            distance={3}
+            color={presentation.accentColor}
           />
-        </mesh>
-        <ProjectOverlay labelRefs={labelRefs} cardRef={cardRef} cardAnchor={cardAnchor} />
-        <OrbitControls
-          enablePan
-          enableZoom
-          minDistance={5}
-          maxDistance={15}
-          maxPolarAngle={Math.PI / 2 - 0.05}
-          target={[0, 0, 0]}
-        />
-        <EffectComposer multisampling={4}>
-          <N8AO aoRadius={0.6} intensity={2.2} distanceFalloff={1} halfRes />
-          <Bloom mipmapBlur luminanceThreshold={1} intensity={0.9} />
-          <DepthOfField target={[0, 0, 0.6]} focalLength={0.2} bokehScale={0.7} />
-          <Vignette eskil={false} offset={0.25} darkness={0.55} />
-        </EffectComposer>
+          {primarySlots.map((slot) => (
+            <SlotMesh
+              key={slot}
+              slot={slot}
+              document={document}
+              selected={selectedSlot === slot}
+              mode={mode}
+              explode={explode}
+              focusSlot={focusSlot}
+              onPick={pick}
+              presentation={presentation}
+            />
+          ))}
+          {primarySlots.map((slot) => (
+            <SlotCallout
+              key={`${slot}-callout`}
+              slot={slot}
+              document={document}
+              selected={selectedSlot === slot}
+              mode={mode}
+              explode={explode}
+              focusSlot={focusSlot}
+            />
+          ))}
+          <ContactShadows
+            frames={quality === "low" ? 1 : Infinity}
+            position={[0, FLOOR_Y + 0.005, 0]}
+            opacity={0.65}
+            scale={9}
+            blur={2.6}
+            far={3.2}
+          />
+          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]}>
+            <planeGeometry args={[40, 40]} />
+            {quality === "low" ? (
+              <meshStandardMaterial color="#151619" metalness={0.5} roughness={0.9} />
+            ) : (
+              <MeshReflectorMaterial
+                resolution={512}
+                blur={[300, 80]}
+                mixBlur={1}
+                mixStrength={18}
+                mirror={0.35}
+                depthScale={1}
+                minDepthThreshold={0.6}
+                maxDepthThreshold={1.4}
+                color="#151619"
+                metalness={0.5}
+                roughness={0.9}
+              />
+            )}
+          </mesh>
+          <ProjectOverlay labelRefs={labelRefs} cardRef={cardRef} cardAnchor={cardAnchor} />
+          <OrbitControls
+            enablePan
+            enableZoom
+            minDistance={5}
+            maxDistance={15}
+            maxPolarAngle={Math.PI / 2 - 0.05}
+            target={[0, 0, 0]}
+          />
+          {quality === "high" ? (
+            <EffectComposer multisampling={4}>
+              <N8AO aoRadius={0.6} intensity={2.2} distanceFalloff={1} halfRes />
+              <Bloom mipmapBlur luminanceThreshold={1} intensity={0.9} />
+              <DepthOfField target={[0, 0, 0.6]} focalLength={0.2} bokehScale={0.7} />
+              <Vignette eskil={false} offset={0.25} darkness={0.55} />
+            </EffectComposer>
+          ) : (
+            // Light tier: no SSAO or depth of field, no multisampling; RGB glow and vignette stay.
+            <EffectComposer multisampling={0}>
+              <Bloom mipmapBlur luminanceThreshold={1} intensity={0.9} />
+              <Vignette eskil={false} offset={0.25} darkness={0.55} />
+            </EffectComposer>
+          )}
+        </LightTierContext.Provider>
       </Canvas>
       <div className="v3-scene-overlay">
         {primarySlots.map((slot) => {
