@@ -4,7 +4,7 @@ import { openAiAdvisorProvider } from "@/lib/ai/providers/openai-advisor-provide
 import type { AdvisorRequest, AdvisorProviderResponse, AiProvider } from "@/lib/ai/providers/types";
 
 function getRequestedProviderName() {
-  const configuredProvider = getServerConfig().aiProvider?.trim().toLowerCase();
+  const configuredProvider = getServerConfig().advisorAiProvider?.trim().toLowerCase();
 
   if (!configuredProvider || configuredProvider === "mock") {
     return "mock";
@@ -19,7 +19,7 @@ export function getAdvisorProvider(): AiProvider {
   if (providerName !== "openai") {
     if (providerName !== "mock") {
       console.warn(
-        `[ai-advisor] Unsupported AI_PROVIDER "${providerName}" configured. Falling back to mock provider.`,
+        `[ai-advisor] Unsupported ADVISOR_AI_PROVIDER "${providerName}" configured. Falling back to mock provider.`,
       );
     }
 
@@ -28,7 +28,7 @@ export function getAdvisorProvider(): AiProvider {
 
   if (!openAiAdvisorProvider.isConfigured()) {
     console.warn(
-      "[ai-advisor] AI_PROVIDER=openai but no OpenAI API key was configured. Falling back to mock provider.",
+      "[ai-advisor] ADVISOR_AI_PROVIDER=openai but no OpenAI API key was configured. Falling back to mock provider.",
     );
     return mockAdvisorProvider;
   }

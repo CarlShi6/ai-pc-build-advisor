@@ -30,6 +30,7 @@ export default defineConfig({
     env: {
       PERSISTENCE_PROVIDER: "mock",
       AI_PROVIDER: "",
+      ADVISOR_AI_PROVIDER: "",
       OPENAI_API_KEY: "",
       AI_PROVIDER_API_KEY: "",
     },

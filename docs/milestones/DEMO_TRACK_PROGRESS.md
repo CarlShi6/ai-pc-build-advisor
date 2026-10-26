@@ -151,3 +151,11 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   E2E: `e2e/showcase-sample.e2e.ts` covers home → Studio, with the heading, seed-parts note, 8/8, pass, unknown price and reconstruction label.
 - Gate: lint 0, typecheck passed, **202 tests in 30 files** passed, build passed, **E2E 8/8**. Before/after screenshots of the home page and the sample Studio were shared.
 - Still open in week 3: real image recognition (ask before `OPENAI_API_KEY`).
+
+### Slice 8: separate image AI from the advisor — 2026-10-26
+
+- User decision before adding a key: `AI_PROVIDER=openai` must turn on image recognition only.
+- `src/lib/config.server.ts`: new server-only `ADVISOR_AI_PROVIDER` (`advisorAiProvider`). `src/lib/ai/advisor-provider.ts` now reads it instead of `AI_PROVIDER`, so the advisor chat stays on mock unless it is set to `openai` separately (with a key). Image analysis still reads `AI_PROVIDER` plus `OPENAI_API_KEY` / `AI_PROVIDER_API_KEY` and `AI_PROVIDER_MODEL`.
+- `.env.example` documents both switches; `playwright.config.ts` blanks `ADVISOR_AI_PROVIDER` like the other AI settings, so E2E never calls a provider.
+- Tests: `src/lib/ai/advisor-provider.test.ts` (2): image AI on → advisor mock; advisor on → OpenAI only with a key.
+- No key has been configured. Next: the user adds `AI_PROVIDER`, `OPENAI_API_KEY` and `AI_PROVIDER_MODEL` to `.env.local` themselves; then verify that the dev server reads them and run real photos.

@@ -19,7 +19,10 @@ import process from "node:process";
 export function getServerConfig() {
   return {
     nodeEnv: process.env.NODE_ENV,
+    // Image recognition provider (v3 photo analysis).
     aiProvider: process.env.AI_PROVIDER,
+    // Build advisor chat provider; separate so turning on image recognition keeps the advisor on mock.
+    advisorAiProvider: process.env.ADVISOR_AI_PROVIDER,
     openAiApiKey: process.env.OPENAI_API_KEY,
     aiProviderApiKey: process.env.AI_PROVIDER_API_KEY,
     aiProviderModel: process.env.AI_PROVIDER_MODEL ?? "gpt-4.1-mini",
