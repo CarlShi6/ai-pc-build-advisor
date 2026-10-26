@@ -31,6 +31,7 @@ import {
 import { readDraft } from "@/lib/v3/draft-session";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
 import type { CandidateReview } from "@/lib/v3/candidate-matcher";
+import { funnel } from "@/lib/v3/funnel-analytics";
 
 export const Route = createFileRoute("/start/$mode")({ component: StartPage });
 const modes = ["image", "describe", "import", "blank"] as const;
@@ -118,6 +119,7 @@ function StartPage() {
     setImageProposal(null);
     setAnalysisError("");
     setAnalysisState("preparing");
+    funnel.imageSubmitted({ fixture: false });
     try {
       const prepared = await prepareImageForAnalysis(file);
       if (requestId !== requestNumber.current) return;
@@ -126,8 +128,15 @@ function StartPage() {
       if (requestId !== requestNumber.current) return;
       setAnalysis(result);
       setAnalysisState("ready");
+      funnel.imageAnalysisCompleted(result);
     } catch (caught) {
       if (requestId !== requestNumber.current) return;
+      funnel.imageAnalysisFailed(
+        { fixture: false },
+        caught && typeof caught === "object" && "code" in caught && typeof caught.code === "string"
+          ? caught.code
+          : "UNKNOWN",
+      );
       setAnalysisError(
         caught instanceof Error ? caught.message : "Image analysis failed. Try again.",
       );
@@ -138,6 +147,7 @@ function StartPage() {
   function reviewCandidate(category: VisibleCatalogCategory, review: CandidateReview) {
     setReviews((current) => ({ ...current, [category]: review }));
     setImageProposal(null);
+    funnel.candidateReviewed(category, review);
   }
 
   function previewImageBuild() {
@@ -155,7 +165,9 @@ function StartPage() {
   function confirmImageDraft() {
     if (!imageProposal) return;
     try {
-      writeDraft(confirmImageBuild(imageProposal, readDraft()));
+      const draft = confirmImageBuild(imageProposal, readDraft());
+      writeDraft(draft);
+      funnel.draftCreated(draft);
       void navigate({ to: "/studio" });
     } catch (caught) {
       setError(
@@ -171,8 +183,11 @@ function StartPage() {
     analysisController.current?.abort();
     const { createOgImageFixture } = await import("@/lib/v3/dev-image-fixture");
     if (requestId !== requestNumber.current) return;
-    setAnalysis(createOgImageFixture());
+    const fixture = createOgImageFixture();
+    funnel.imageSubmitted({ fixture: true });
+    setAnalysis(fixture);
     setAnalysisState("ready");
+    funnel.imageAnalysisCompleted(fixture);
     setAnalysisError("");
     setReviews({});
     setImageProposal(null);
@@ -222,6 +237,7 @@ function StartPage() {
       unresolved: mode === "import" ? unresolvedBySlot(matches) : {},
     });
     writeDraft(draft);
+    funnel.draftCreated(draft);
     void navigate({ to: "/studio" });
   }
 

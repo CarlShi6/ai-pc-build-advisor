@@ -7,6 +7,7 @@ import {
   shoppingPlanMarkdown,
   type PlanLineStatus,
 } from "@/lib/v3/shopping-plan";
+import { funnel } from "@/lib/v3/funnel-analytics";
 
 const statusLabel: Record<PlanLineStatus, string> = {
   planned: "Planned",
@@ -49,6 +50,7 @@ export function ShoppingPlanPanel({
     try {
       await navigator.clipboard.writeText(shoppingPlanMarkdown(plan));
       setMessage("Report copied as Markdown.");
+      funnel.reportExported(document, "markdown_copy");
     } catch {
       setMessage("The browser blocked clipboard access. Use Download instead.");
     }
@@ -70,26 +72,28 @@ export function ShoppingPlanPanel({
           <button
             type="button"
             className="v3-secondary"
-            onClick={() =>
+            onClick={() => {
               download(
                 `${fileSlug(plan.name)}.md`,
                 shoppingPlanMarkdown(plan),
                 "text/markdown;charset=utf-8",
-              )
-            }
+              );
+              funnel.reportExported(document, "markdown_file");
+            }}
           >
             <Download size={15} /> Markdown
           </button>
           <button
             type="button"
             className="v3-secondary"
-            onClick={() =>
+            onClick={() => {
               download(
                 `${fileSlug(plan.name)}.json`,
                 JSON.stringify(shoppingPlanJson(plan, document), null, 2),
                 "application/json",
-              )
-            }
+              );
+              funnel.reportExported(document, "json_file");
+            }}
           >
             <FileJson size={15} /> JSON
           </button>
@@ -132,7 +136,13 @@ export function ShoppingPlanPanel({
             <span role="cell" className="v3-plan-links">
               {line.links.length
                 ? line.links.map((link) => (
-                    <a key={link.url} href={link.url} target="_blank" rel="noopener noreferrer">
+                    <a
+                      key={link.url}
+                      href={link.url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => funnel.shoppingLinkOpened(document, line.slot, link.kind)}
+                    >
                       {link.label} <ExternalLink size={12} />
                     </a>
                   ))

@@ -56,3 +56,34 @@ Two tabs could open the same saved Build. Whichever tab saved last silently repl
 - Post-build feedback also bumps a saved Build's `updatedAt`, so feedback added elsewhere makes the next Studio save report a conflict even though the parts didn't change. Overwriting is safe in that case, because feedback is stored separately.
 - The Supabase conditional update is untested against a real project here. The mock store checks and writes synchronously, so it has no race window.
 - A deleted saved Build is still recreated by a later save from an open tab (existing behavior, unchanged).
+
+# R6 slice 4: v3 funnel analytics — 2026-10-25
+
+## Implemented
+
+Reuses the existing pipeline (`trackAnalyticsEvent` → `POST /api/analytics/events` → structured `product_analytics` log line). No new dependency.
+
+- `src/lib/analytics.ts`: nine allow-listed v3 event names.
+- `src/lib/v3/funnel-analytics.ts`: typed `funnel.*` helpers plus property builders. They send only enums, counts and slot/category names: `source`, `selected_count`, `unresolved_count`, `empty_count`, `complete`, `quality`, `observation_count`, `review_status`, `format`, `link_kind`. **Never** image bytes, file names, observation or summary text, pasted lists, descriptions, manual notes or part names. The existing per-tab `session_id` joins the steps of one funnel.
+
+| PRD §19.1 step | Event | Fired from |
+|---|---|---|
+| image submitted | `v3_image_submitted` (`fixture`) | Analyze click, or Load local fixture (`fixture: true`) — `start.$mode.tsx` |
+| analysis completed | `v3_image_analysis_completed` / `v3_image_analysis_failed` (`error_code`) | analysis result; superseded or cancelled requests send nothing |
+| candidate reviewed | `v3_candidate_reviewed` | each choose/replace/exclude/unknown/manual change |
+| draft created | `v3_draft_created` | image draft confirmation; Describe/Import/Blank create |
+| saved / exported | `v3_build_saved` (`first_save`), `v3_build_save_conflict`, `v3_report_exported` (`markdown_copy` / `markdown_file` / `json_file`) | Studio save; shopping-plan Copy, Markdown and JSON. A failed clipboard copy is not counted. |
+| shopping intent (only when evidenced) | `v3_shopping_link_opened` (`slot`, `link_kind`) | an actual click on an official or search link |
+
+- `src/lib/v3/funnel-analytics.test.ts`: 4 tests. They cover occupancy counts (unresolved is never complete), fixture flag and count-only analysis summary, no manual notes in review events, and all steps sent through the endpoint with one `session_id` and no free text. Each sent event also passes the server normalizer.
+
+## Verification
+
+- Gate: lint 0, typecheck passed, **153 tests in 21 files** passed, build passed.
+- Browser (`http://127.0.0.1:5175/`): Import of "Intel Core i7-14700K" plus "Some mystery 1000W PSU" → Create reviewed draft → Save build. Captured `v3_draft_created` and `v3_build_saved` (`source: import`, `selected_count: 1`, `unresolved_count: 1`, `complete: false`, `first_save: true`, same `session_id`), and both `POST /api/analytics/events` returned 202. Neither event contained the pasted text. Copy report was blocked by the pane's clipboard policy, so no export event was sent (intended).
+- Not checked in the browser: image submit/analysis/review events (needs a file upload in the pane), file downloads and link clicks. These are covered by the unit tests only.
+
+## Limitations
+
+- Events go to the server log only. There is no analytics store or dashboard yet, so funnel rates must be computed from logs.
+- The legacy routes' `shopping_plan_*` and `affiliate_link_opened` events are unchanged. v3 events use their own `v3_` names, so the two funnels don't mix.

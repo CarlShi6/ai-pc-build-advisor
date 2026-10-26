@@ -24,6 +24,16 @@ export const ANALYTICS_EVENT_NAMES = [
   "replacement_blocked",
   "shopping_list_opened",
   "affiliate_link_opened",
+  // v3 image-to-build funnel (PRD §19.1); see src/lib/v3/funnel-analytics.ts.
+  "v3_image_submitted",
+  "v3_image_analysis_completed",
+  "v3_image_analysis_failed",
+  "v3_candidate_reviewed",
+  "v3_draft_created",
+  "v3_build_saved",
+  "v3_build_save_conflict",
+  "v3_report_exported",
+  "v3_shopping_link_opened",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];

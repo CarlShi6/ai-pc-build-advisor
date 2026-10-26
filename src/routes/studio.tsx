@@ -34,6 +34,7 @@ import {
 import { readDraft, writeDraft } from "@/lib/v3/draft-session";
 import { ApiClientError, getSavedBuild, saveCurrentBuild } from "@/lib/apiClient";
 import { SAVE_CONFLICT_CODE } from "@/lib/persistence/save-version";
+import { funnel } from "@/lib/v3/funnel-analytics";
 import type { Part } from "@/types/parts";
 import type { BuildSceneProps, SceneMode } from "@/features/build-3d/BuildScene";
 import { SceneBoundary } from "@/features/build-3d/SceneBoundary";
@@ -115,9 +116,12 @@ function StudioPage() {
       writeDraft(next);
       setDocument(next);
       setSavedRevision(next.revision);
+      funnel.buildSaved(next, !current.savedBuildId);
     } catch (failure) {
-      if (failure instanceof ApiClientError && failure.code === SAVE_CONFLICT_CODE)
+      if (failure instanceof ApiClientError && failure.code === SAVE_CONFLICT_CODE) {
         setSaveConflict(true);
+        funnel.buildSaveConflict(current);
+      }
       setSaveError(failure instanceof Error ? failure.message : "This build could not be saved.");
     } finally {
       setSaving(false);
