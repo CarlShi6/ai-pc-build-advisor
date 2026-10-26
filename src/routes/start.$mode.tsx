@@ -319,6 +319,13 @@ function StartPage() {
                   stays in this browser tab; AIPC does not save it. Visual findings are estimates,
                   and no hidden hardware is identified from the photo.
                 </p>
+                <p className="v3-inline-note" aria-label="Image retention">
+                  <AlertCircle size={17} /> Retention: AIPC never stores the photo, the resized copy
+                  or its file name. The copy is sent with OpenAI response storage turned off;
+                  OpenAI's own data policies still apply. Only the text findings stay in this tab's
+                  draft, and they are kept with the build if you save it. Each browser session can
+                  run 3 analyses per minute and 15 per day.
+                </p>
                 {file && (
                   <div className="v3-image-actions">
                     <button

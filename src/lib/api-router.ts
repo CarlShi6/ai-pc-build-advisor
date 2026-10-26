@@ -25,6 +25,12 @@ import { normalizeRecommendedBuildInput, ValidationError } from "@/lib/validatio
 import { readBoundedImage, ImageInputError } from "@/lib/v3/image-input";
 import { analyzeReferenceImage, ImageAnalysisError } from "@/lib/v3/image-analysis.server";
 import type { ImageAnalyzer } from "@/lib/v3/image-contract";
+import {
+  imageSessionKey,
+  imageSessionLimiter,
+  ImageSessionLimitError,
+  type ImageSessionLimiter,
+} from "@/lib/v3/image-rate-limit.server";
 import type {
   AdvisorRequestPayload,
   AdvisorResponsePayload,
@@ -166,7 +172,11 @@ async function readBoundedJson<T>(request: Request, maxBytes: number): Promise<T
 
 export async function handleInternalApiRequest(
   request: Request,
-  dependencies: { retailPriceProvider?: RetailPriceProvider; imageAnalyzer?: ImageAnalyzer } = {},
+  dependencies: {
+    retailPriceProvider?: RetailPriceProvider;
+    imageAnalyzer?: ImageAnalyzer;
+    imageLimiter?: ImageSessionLimiter;
+  } = {},
 ): Promise<Response | null> {
   const url = new URL(request.url);
   const pathname = normalizeApiPath(url.pathname);
@@ -180,8 +190,26 @@ export async function handleInternalApiRequest(
     if (pathname === "/api/image-analyses") {
       if (request.method !== "POST") return methodNotAllowed(["POST"]);
       const image = await readBoundedImage(request);
-      const result = await (dependencies.imageAnalyzer ?? analyzeReferenceImage)(image);
-      return jsonResponse(result, { headers: { "cache-control": "no-store" } });
+      const actor = await store.getActor(request);
+      const { key, setCookie } = imageSessionKey(request, actor.userId);
+      const headers: Record<string, string> = { "cache-control": "no-store" };
+      if (setCookie) headers["set-cookie"] = setCookie;
+      let release: (() => void) | undefined;
+      try {
+        release = (dependencies.imageLimiter ?? imageSessionLimiter).reserve(key);
+        const result = await (dependencies.imageAnalyzer ?? analyzeReferenceImage)(image);
+        return jsonResponse(result, { headers });
+      } catch (error) {
+        if (!(error instanceof ImageAnalysisError)) throw error;
+        // Requests that never reached the provider don't use up the session's allowance.
+        if (error.code === "IMAGE_AI_NOT_CONFIGURED" || error.code === "RATE_LIMITED") release?.();
+        if (error instanceof ImageSessionLimitError)
+          headers["retry-after"] = String(error.retryAfterSeconds);
+        return jsonResponse(
+          { error: { code: error.code, message: error.message } },
+          { status: error.status, headers },
+        );
+      }
     }
 
     if (pathname === "/api/analytics/events") {

@@ -28,6 +28,7 @@ Decisions are provisional until each R1/R2 vertical slice passes its contract te
 | [docyx/pc-part-dataset](https://github.com/docyx/pc-part-dataset) | MIT (code); data scraped from PCPartPicker | **Reject** | Data provenance conflicts with the no-unauthorized-scraping principle (PRD 13.2, legacy PRD 3.3). |
 | Grounding DINO / OWLv2, CLIP/SigLIP + pgvector | Apache-2.0 / MIT (verify per checkpoint) | **Defer** | Region detection and appearance embeddings need hosted GPU inference. Revisit after the real image provider is connected and attribute matching proves insufficient (PRD Appendix B). |
 | Playwright | Apache-2.0 | **Adopt in R7** | E2E browser tests. |
+| Rate limiting: `rate-limiter-flexible` (ISC), `@upstash/ratelimit` (MIT), Cloudflare Workers rate-limiting binding | Permissive / platform | **Not adopted now; revisit at deployment** | R6 per-session image limit (2026-10-25) is about 70 lines in `src/lib/v3/image-rate-limit.server.ts`, next to the existing in-memory process cap. A library's memory backend would be just as non-durable on Workers isolates, so it would add a dependency without fixing durability. At deployment, use the host's rate-limit binding or a shared store (e.g. Upstash Redis) behind the same `ImageSessionLimiter.reserve` interface. |
 | Open LLM VRAM calculators (e.g. gguf-llm-vram-calculator) | Check per repo | **Defer to P1** | Reference formulas for the Local AI Workstation Lab only. |
 
 ## Guardrails

@@ -129,3 +129,27 @@ Stated requirements are kept as notes. Corsair needs an iCUE LINK System Hub. NZ
 
 - 14 entries is a style-matching sample, not broad coverage. Manufacturer pages change, so `verifiedAt` marks when each value was last true.
 - Fans don't enter the Build, the shopping plan or compatibility rules. Showing a chosen fan in Studio is not built.
+
+# R6 slice 6: per-session image analysis limit and retention note — 2026-10-25
+
+## Implemented
+
+- `src/lib/v3/image-rate-limit.server.ts`: `ImageSessionLimiter`, an in-memory sliding window, **3 analyses per minute and 15 per 24 hours per session**. It is checked before the existing process-wide cap (12/min in `image-analysis.server.ts`, kept as a global cost guard).
+  - Session key: signed-in user → this browser's `aipc_image_session` cookie (random UUID, HttpOnly, SameSite=Lax, path `/api/image-analyses`, 1 day) → `cf-connecting-ip` / `x-forwarded-for` → one shared bucket. A browser without the cookie gets one on its first response.
+  - Over the limit: `429 { error: { code: "SESSION_RATE_LIMITED" } }` with `Retry-After`. The provider is not called. The message tells the user roughly how long to wait and that they can continue manually.
+  - Requests that never reach the provider give their slot back: `IMAGE_AI_NOT_CONFIGURED`, and `RATE_LIMITED` from the global cap. A provider-side 429 shares the `RATE_LIMITED` code, so it is also given back.
+  - Tracked keys are capped at 10,000, oldest dropped first.
+- `src/lib/api-router.ts`: `/api/image-analyses` resolves the key, reserves, calls the analyzer and returns errors with the cookie and `Retry-After` headers. The limiter can be injected for tests.
+- `src/routes/start.$mode.tsx`: a **Retention** note on the Image page. It says AIPC never stores the photo, the resized copy or the file name; the copy is sent with OpenAI response storage off (`store: false`) and OpenAI's own policies still apply; only the text findings stay in the tab's draft and are kept with the build if saved; and it states the per-session limits. Each claim was checked against the code: the client sends only the resized blob, the server never reads a file name, and the draft keeps `imageStored: false`.
+- Reuse decision recorded in `docs/engineering/REUSE_DECISIONS.md`: no rate-limit library now; a platform binding or shared store at deployment.
+
+## Verification
+
+- `src/lib/v3/image-rate-limit.test.ts` (5 tests) covers: 3/min and 15/day windows with a fake clock and per-session isolation; `Retry-After` of 60 s; release happens exactly once; key priority (user > cookie > IP > shared) and a malformed cookie being ignored; over HTTP, the 4th request in a minute gets 429 `SESSION_RATE_LIMITED` with `Retry-After: 60` and the analyzer runs only 3 times; and unconfigured-provider requests set the cookie but don't use the allowance.
+- Gate: lint 0, typecheck passed, **163 tests in 23 files** passed, build passed.
+- Browser (`http://127.0.0.1:5175/start/image`, no provider configured): the Retention note renders. Four Analyze clicks in a row all returned 503 "not configured", none 429, so unconfigured requests aren't counted. The live 429 path is verified by tests only (no provider credentials here).
+
+## Limitations
+
+- In-memory and per process or isolate: restarts reset it, and on serverless each isolate counts separately. It also doesn't stop a client that drops cookies and rotates IPs. The global cap still bounds total cost. A durable limit is a deployment task.
+- The shared fallback bucket (no cookie, no IP header) mostly applies to local or test traffic.
