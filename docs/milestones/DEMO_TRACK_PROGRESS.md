@@ -11,3 +11,18 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - `/start/image` uses the same component, so existing links and E2E tests keep working.
 - E2E: new "home hero upload runs the same image → Build flow". **7/7 passed.** Gate: lint 0, typecheck passed, 174 tests in 25 files passed, build passed.
 - Known rough edge (week 4 polish): after analysis, the review cards stay in the hero's right column, which is narrow on desktop. PRD §4.2's sample/demo mode for users without a photo is not built yet; the week 3 white showcase build is the natural sample.
+
+### Slice 2: Studio 3D studio look — 2026-10-25
+
+- Libraries: `@react-three/postprocessing` 3.2.0 and `postprocessing` 6.39.5 (pinned exact; MIT / Zlib, plus `n8ao` ISC), recorded in `REUSE_DECISIONS.md`. The studio light rig uses drei `Lightformer`s inside `Environment`, so no HDRI file is downloaded at runtime.
+- `src/features/build-3d/BuildScene.tsx` (same props, slots, layout, interactions and dashed callouts):
+  - dark grey background with fog, a reflective floor (`MeshReflectorMaterial`) and `ContactShadows`, key, rim and interior lights
+  - postprocessing: N8AO SSAO, bloom (threshold 1, so only emissive RGB parts glow), light depth of field and a vignette
+  - a case built from metal panels, a dark front, a PSU shroud and a **tempered-glass side panel** (`meshPhysicalMaterial` transmission), with RGB front fans from the photo's fan count
+  - PBR part shapes: PCB motherboard with heatsinks, metal CPU, air-tower cooler with RGB ring, GPU shroud with backplate, three fans and an RGB strip, RAM sticks with RGB tops, M.2 storage, PSU
+  - empty or unresolved slots stay faint placeholder volumes with grey or amber outlines, never fake parts; the selected part gets a thin outline
+- `src/lib/v3/scene-presentation.ts`: black, white and silver now map to realistic material colors (they were the old green theme's tints).
+- `src/styles.css`: the scene toolbar, mode buttons and disclosure float over a taller 640 px canvas; callouts are dark glass chips with a status-colored edge. Mobile falls back to the stacked layout.
+- Gate: lint 0, typecheck passed, 174 tests in 25 files passed, build passed. E2E **7/7** (includes the 2D-view edit flow).
+- Screenshots: fixture build and a full eight-part build. They were rendered in headless Edge with SwiftShader WebGL; a real GPU will look smoother.
+- Notes: part geometry is still generic and illustrative (`geometryAccuracy: "illustrative"`); millimetre-accurate reference reconstructions are week 3. The lazy-loaded `BuildScene` chunk is now about 1.27 MB (postprocessing included); it loads only when the 3D view opens. Performance check and reduced-motion handling are week 4.

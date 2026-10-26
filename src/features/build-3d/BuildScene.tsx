@@ -1,6 +1,15 @@
-import { useRef, type RefObject } from "react";
+import { useRef, type ReactNode, type RefObject } from "react";
 import { Canvas, useFrame } from "@react-three/fiber";
-import { Line, OrbitControls } from "@react-three/drei";
+import {
+  ContactShadows,
+  Edges,
+  Environment,
+  Lightformer,
+  Line,
+  MeshReflectorMaterial,
+  OrbitControls,
+} from "@react-three/drei";
+import { Bloom, DepthOfField, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
 import type { ThreeEvent } from "@react-three/fiber";
 import { Vector3 } from "three";
 import {
@@ -70,6 +79,230 @@ const layout: Record<SlotId, { anchor: Point; label: Point; size: Point; offset:
   },
 };
 
+const FLOOR_Y = -1.7;
+
+// PBR material presets (illustrative; exact per-SKU models arrive with the demo track week 3).
+const metal = { color: "#c3c8cf", metalness: 1, roughness: 0.3 };
+const darkMetal = { color: "#2a2d32", metalness: 0.75, roughness: 0.36 };
+const pcb = { color: "#15201a", metalness: 0.2, roughness: 0.78 };
+const plastic = { color: "#18191c", metalness: 0.05, roughness: 0.55 };
+
+function Box({
+  size,
+  position = [0, 0, 0],
+  material,
+}: {
+  size: Point;
+  position?: Point;
+  material: Record<string, unknown>;
+}) {
+  return (
+    <mesh position={position} castShadow receiveShadow>
+      <boxGeometry args={size} />
+      <meshStandardMaterial {...material} />
+    </mesh>
+  );
+}
+
+/** Emissive ring that bloom picks up as RGB lighting. */
+function RgbRing({
+  radius,
+  position,
+  rotation = [0, 0, 0],
+  color,
+}: {
+  radius: number;
+  position: Point;
+  rotation?: Point;
+  color: string;
+}) {
+  return (
+    <mesh position={position} rotation={rotation}>
+      <torusGeometry args={[radius, radius * 0.07, 12, 48]} />
+      <meshStandardMaterial
+        color={color}
+        emissive={color}
+        emissiveIntensity={2.4}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+function RgbStrip({ size, position, color }: { size: Point; position: Point; color: string }) {
+  return (
+    <mesh position={position}>
+      <boxGeometry args={size} />
+      <meshStandardMaterial
+        color={color}
+        emissive={color}
+        emissiveIntensity={2.2}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+function CaseModel({ size, presentation }: { size: Point; presentation: ScenePresentation }) {
+  const [w, h, d] = size;
+  const t = 0.035;
+  const panel = { color: presentation.caseColor, metalness: 0.55, roughness: 0.42 };
+  const fanCount = Math.min(3, Math.max(0, presentation.fanAccentCount));
+  return (
+    <group>
+      <Box size={[w, t, d]} position={[0, h / 2, 0]} material={panel} />
+      <Box size={[w, t, d]} position={[0, -h / 2, 0]} material={panel} />
+      <Box size={[w, h, t]} position={[0, 0, -d / 2]} material={panel} />
+      <Box size={[t, h, d]} position={[-w / 2, 0, 0]} material={panel} />
+      {/* Front panel: dark mesh look. */}
+      <Box
+        size={[t, h, d]}
+        position={[w / 2, 0, 0]}
+        material={{ color: "#101113", metalness: 0.3, roughness: 0.8 }}
+      />
+      {/* PSU shroud. */}
+      <Box size={[w - t * 2, 0.04, d - t * 2]} position={[0, -h / 2 + 0.72, 0]} material={panel} />
+      {/* Tempered glass side panel, facing the default camera. */}
+      <mesh position={[0, 0, d / 2]}>
+        <boxGeometry args={[w, h, 0.02]} />
+        <meshPhysicalMaterial
+          color="#d8e2e6"
+          metalness={0}
+          roughness={0.04}
+          transmission={1}
+          thickness={0.05}
+          ior={1.5}
+          transparent
+          opacity={0.22}
+        />
+      </mesh>
+      {Array.from({ length: fanCount }, (_, index) => (
+        <group
+          key={index}
+          position={[w / 2 - 0.09, h / 2 - 0.62 - index * 0.78, 0]}
+          rotation={[0, Math.PI / 2, 0]}
+        >
+          <mesh>
+            <cylinderGeometry args={[0.3, 0.3, 0.05, 32]} />
+            <meshStandardMaterial {...plastic} />
+          </mesh>
+          <RgbRing radius={0.28} position={[0, 0, 0.03]} color={presentation.accentColor} />
+        </group>
+      ))}
+    </group>
+  );
+}
+
+function PartModel({
+  slot,
+  size,
+  accent,
+}: {
+  slot: Exclude<SlotId, "case">;
+  size: Point;
+  accent: string;
+}): ReactNode {
+  const [w, h, d] = size;
+  switch (slot) {
+    case "motherboard":
+      return (
+        <group>
+          <Box size={size} material={pcb} />
+          <Box
+            size={[w * 0.5, 0.18, 0.1]}
+            position={[-w * 0.12, h * 0.42, d]}
+            material={darkMetal}
+          />
+          <Box
+            size={[0.16, h * 0.42, 0.1]}
+            position={[-w * 0.42, h * 0.12, d]}
+            material={darkMetal}
+          />
+          <Box
+            size={[w * 0.32, 0.12, 0.06]}
+            position={[w * 0.18, -h * 0.28, d * 0.8]}
+            material={metal}
+          />
+        </group>
+      );
+    case "cpu":
+      return <Box size={[w, h, d * 0.35]} material={metal} />;
+    case "cooler":
+      return (
+        <group>
+          <Box size={[w * 0.66, h * 0.92, d * 0.62]} material={metal} />
+          <mesh position={[0, 0, d * 0.42]} rotation={[Math.PI / 2, 0, 0]}>
+            <cylinderGeometry args={[w * 0.4, w * 0.4, 0.05, 32]} />
+            <meshStandardMaterial {...plastic} />
+          </mesh>
+          <RgbRing radius={w * 0.38} position={[0, 0, d * 0.46]} color={accent} />
+        </group>
+      );
+    case "gpu":
+      return (
+        <group>
+          <Box size={[w, h * 0.72, d]} material={darkMetal} />
+          <Box size={[w, 0.03, d]} position={[0, h * 0.38, 0]} material={metal} />
+          {[-w * 0.31, 0, w * 0.31].map((x) => (
+            <group key={x} position={[x, -h * 0.37, 0]}>
+              <mesh>
+                <cylinderGeometry args={[d * 0.4, d * 0.4, 0.02, 32]} />
+                <meshStandardMaterial {...plastic} />
+              </mesh>
+              <RgbRing
+                radius={d * 0.38}
+                position={[0, -0.012, 0]}
+                rotation={[Math.PI / 2, 0, 0]}
+                color={accent}
+              />
+            </group>
+          ))}
+          <RgbStrip
+            size={[w * 0.7, 0.025, 0.012]}
+            position={[0, h * 0.1, d / 2 + 0.006]}
+            color={accent}
+          />
+        </group>
+      );
+    case "memory":
+      return (
+        <group>
+          {[-w * 0.25, w * 0.25].map((x) => (
+            <group key={x} position={[x, 0, 0]}>
+              <Box size={[w * 0.32, h, d]} material={darkMetal} />
+              <RgbStrip
+                size={[w * 0.32, 0.05, d]}
+                position={[0, h / 2 + 0.025, 0]}
+                color={accent}
+              />
+            </group>
+          ))}
+        </group>
+      );
+    case "storage":
+      return (
+        <group>
+          <Box size={[w, h * 0.3, d]} material={pcb} />
+          <Box
+            size={[w * 0.7, h * 0.18, d * 0.9]}
+            position={[w * 0.05, h * 0.22, 0]}
+            material={metal}
+          />
+        </group>
+      );
+    case "psu":
+      return (
+        <group>
+          <Box size={size} material={{ ...plastic, color: "#121315", metalness: 0.45 }} />
+          <mesh position={[0, -h / 2 - 0.001, 0]} rotation={[Math.PI / 2, 0, 0]}>
+            <ringGeometry args={[d * 0.18, d * 0.36, 32]} />
+            <meshStandardMaterial {...darkMetal} />
+          </mesh>
+        </group>
+      );
+  }
+}
+
 function SlotMesh({
   slot,
   document,
@@ -89,47 +322,65 @@ function SlotMesh({
 }) {
   const spec = layout[slot];
   const occupancy = slotOccupancy(document, slot);
-  const isCase = slot === "case";
   const factor = mode === "exploded" ? explode / 100 : 0;
   const position: Point = spec.anchor.map(
     (value, index) => value + spec.offset[index] * factor,
   ) as Point;
-  const color = selected
-    ? "#b3ed9a"
-    : occupancy === "unresolved"
-      ? "#d9a468"
+  const size: Point =
+    slot === "case" && presentation.layout === "showcase" ? [2.55, 3.05, 1.75] : spec.size;
+  const flagged =
+    mode === "review" &&
+    document.build.compatibilityWarnings.some((warning) =>
+      warning.affectedPartIds.includes(selectedPart(document, slot)?.id ?? ""),
+    );
+  const edgeColor = selected
+    ? "#c4f59f"
+    : occupancy === "unresolved" || flagged
+      ? "#edba75"
       : occupancy === "unselected"
-        ? "#708f7b"
-        : mode === "review" &&
-            document.build.compatibilityWarnings.some((warning) =>
-              warning.affectedPartIds.includes(selectedPart(document, slot)?.id ?? ""),
-            )
-          ? "#d9a468"
-          : "#78bb86";
+        ? "#6d7c74"
+        : null;
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
     onSelect(slot);
   }
   return (
-    <mesh
+    <group
       position={position}
       rotation={slot === "gpu" && presentation.gpuVertical ? [0, 0, Math.PI / 2] : [0, 0, 0]}
       onClick={handleClick}
     >
-      <boxGeometry
-        args={isCase && presentation.layout === "showcase" ? [2.55, 3.05, 1.75] : spec.size}
-      />
-      <meshStandardMaterial
-        color={isCase ? presentation.caseColor : color}
-        emissive={selected ? presentation.accentColor : "#000000"}
-        emissiveIntensity={selected ? 0.18 : 0}
-        transparent
-        opacity={isCase ? 0.38 : occupancy === "unselected" ? 0.12 : 0.7}
-        wireframe={isCase || occupancy !== "selected"}
-        metalness={0.3}
-        roughness={0.55}
-      />
-    </mesh>
+      {occupancy === "selected" ? (
+        slot === "case" ? (
+          <CaseModel size={size} presentation={presentation} />
+        ) : (
+          <PartModel slot={slot} size={size} accent={presentation.accentColor} />
+        )
+      ) : (
+        // Empty or unresolved slot: a faint placeholder volume, never a fake part.
+        <mesh>
+          <boxGeometry args={size} />
+          <meshStandardMaterial
+            color={occupancy === "unresolved" ? "#3a2f22" : "#23272b"}
+            transparent
+            opacity={slot === "case" ? 0.05 : 0.18}
+            depthWrite={false}
+          />
+        </mesh>
+      )}
+      {edgeColor && !(slot === "case" && occupancy === "selected") && (
+        <mesh>
+          <boxGeometry args={[size[0] * 1.02, size[1] * 1.02, size[2] * 1.02]} />
+          <meshBasicMaterial visible={false} />
+          <Edges
+            color={edgeColor}
+            lineWidth={selected && slot !== "case" ? 1.4 : 0.8}
+            transparent
+            opacity={selected ? 0.75 : 0.45}
+          />
+        </mesh>
+      )}
+    </group>
   );
 }
 
@@ -152,15 +403,17 @@ function SlotCallout({
     (value, index) => value + spec.offset[index] * factor,
   ) as Point;
   const occupancy = slotOccupancy(document, slot);
-  const color = selected ? "#c4f59f" : occupancy === "unresolved" ? "#edba75" : "#a4c7a5";
+  const color = selected ? "#c4f59f" : occupancy === "unresolved" ? "#edba75" : "#8f9a94";
   return (
     <Line
       points={[anchor, spec.label]}
       color={color}
-      lineWidth={1.5}
+      lineWidth={1.2}
       dashed
       dashSize={0.1}
       gapSize={0.07}
+      transparent
+      opacity={selected ? 1 : 0.7}
     />
   );
 }
@@ -184,6 +437,36 @@ function ProjectLabels({
   return null;
 }
 
+/** Studio light rig built from lightformers, so no HDRI file is downloaded at runtime. */
+function StudioEnvironment() {
+  return (
+    <Environment resolution={256} frames={1} environmentIntensity={1.5}>
+      <Lightformer
+        form="rect"
+        intensity={3}
+        position={[0, 6, 0]}
+        rotation={[Math.PI / 2, 0, 0]}
+        scale={[10, 4, 1]}
+      />
+      <Lightformer
+        form="rect"
+        intensity={2}
+        position={[-6, 2, 2]}
+        rotation={[0, Math.PI / 2, 0]}
+        scale={[6, 3, 1]}
+      />
+      <Lightformer
+        form="rect"
+        intensity={1.4}
+        position={[6, 1, -2]}
+        rotation={[0, -Math.PI / 2, 0]}
+        scale={[6, 3, 1]}
+      />
+      <Lightformer form="ring" intensity={1.2} position={[0, 2, 8]} scale={3} color="#dfe8ff" />
+    </Environment>
+  );
+}
+
 export default function BuildScene({
   document,
   selectedSlot,
@@ -202,15 +485,25 @@ export default function BuildScene({
     >
       <Canvas
         key={resetKey}
-        camera={{ position: [5.8, 3.5, 7.2], fov: 42 }}
-        dpr={[1, 2]}
-        gl={{ antialias: true }}
+        camera={{ position: [5.8, 3.2, 7.2], fov: 38 }}
+        dpr={[1, 1.5]}
+        gl={{ antialias: false, powerPreference: "high-performance" }}
+        shadows
       >
-        <color attach="background" args={["#10251a"]} />
-        <ambientLight intensity={1.1} />
-        <directionalLight position={[4, 7, 5]} intensity={2} />
-        <pointLight position={[-3, 1, 3]} intensity={7} color={presentation.accentColor} />
-        <gridHelper args={[10, 10, "#31533a", "#23412d"]} position={[0, -1.7, 0]} />
+        <color attach="background" args={["#17191c"]} />
+        <fog attach="fog" args={["#17191c", 11, 22]} />
+        <StudioEnvironment />
+        <ambientLight intensity={0.15} />
+        <directionalLight position={[3, 6, 6]} intensity={2.4} castShadow />
+        <directionalLight position={[-5, 3, -4]} intensity={1.2} color="#cfd8ff" />
+        {/* Interior fill so parts read through the glass, plus a soft accent glow. */}
+        <pointLight position={[0.2, 0.4, 0.55]} intensity={6} distance={4.5} decay={1.6} />
+        <pointLight
+          position={[0.6, -0.2, 0.7]}
+          intensity={2.5}
+          distance={3}
+          color={presentation.accentColor}
+        />
         {primarySlots.map((slot) => (
           <SlotMesh
             key={slot}
@@ -223,12 +516,6 @@ export default function BuildScene({
             presentation={presentation}
           />
         ))}
-        {Array.from({ length: Math.min(3, presentation.fanAccentCount) }, (_, index) => (
-          <mesh key={`fan-accent-${index}`} position={[0.72, 0.95 - index * 0.9, 0.82]}>
-            <torusGeometry args={[0.25, 0.025, 8, 32]} />
-            <meshBasicMaterial color={presentation.accentColor} transparent opacity={0.75} />
-          </mesh>
-        ))}
         {primarySlots.map((slot) => (
           <SlotCallout
             key={`${slot}-callout`}
@@ -239,8 +526,44 @@ export default function BuildScene({
             explode={explode}
           />
         ))}
+        <ContactShadows
+          position={[0, FLOOR_Y + 0.005, 0]}
+          opacity={0.65}
+          scale={9}
+          blur={2.6}
+          far={3.2}
+        />
+        <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]}>
+          <planeGeometry args={[40, 40]} />
+          <MeshReflectorMaterial
+            resolution={512}
+            blur={[300, 80]}
+            mixBlur={1}
+            mixStrength={18}
+            mirror={0.35}
+            depthScale={1}
+            minDepthThreshold={0.6}
+            maxDepthThreshold={1.4}
+            color="#151619"
+            metalness={0.5}
+            roughness={0.9}
+          />
+        </mesh>
         <ProjectLabels refs={labelRefs} />
-        <OrbitControls enablePan enableZoom minDistance={5} maxDistance={15} target={[0, 0, 0]} />
+        <OrbitControls
+          enablePan
+          enableZoom
+          minDistance={5}
+          maxDistance={15}
+          maxPolarAngle={Math.PI / 2 - 0.05}
+          target={[0, 0, 0]}
+        />
+        <EffectComposer multisampling={4}>
+          <N8AO aoRadius={0.6} intensity={2.2} distanceFalloff={1} halfRes />
+          <Bloom mipmapBlur luminanceThreshold={1} intensity={0.9} />
+          <DepthOfField target={[0, 0, 0.6]} focalLength={0.2} bokehScale={0.7} />
+          <Vignette eskil={false} offset={0.25} darkness={0.55} />
+        </EffectComposer>
       </Canvas>
       <div className="v3-scene-overlay">
         {primarySlots.map((slot) => {

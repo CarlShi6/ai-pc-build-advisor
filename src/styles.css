@@ -1599,3 +1599,21 @@
 .v3-privacy-details{font-size:12px;color:#66756a}.v3-privacy-details summary{cursor:pointer;display:flex;align-items:center;gap:6px;list-style:none}.v3-privacy-details summary::-webkit-details-marker{display:none}.v3-privacy-details[open] summary{margin-bottom:8px}
 .v3-other-starts{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px;font-size:13px;color:#718278;padding:0 4px}.v3-other-starts a{display:inline-flex;align-items:center;gap:6px;color:#2f6b43;font-weight:650;text-decoration:none}.v3-other-starts a:hover{text-decoration:underline}
 .v3-inline-budget{max-width:220px}
+/* Demo track week 1: studio-look 3D panel, chrome floats over the canvas. */
+.v3-scene-panel{position:relative;background:#17191c;color:#e9ecef;box-shadow:0 22px 50px #0b0c0e55;border:1px solid #2a2e33}
+.v3-scene-panel .v3-kicker{color:#9fb3a5}
+.v3-scene-toolbar{position:absolute;z-index:2;top:0;left:0;right:0;border-bottom:0;background:linear-gradient(#17191ce6,#17191c00);pointer-events:none}
+.v3-scene-toolbar>*{pointer-events:auto}
+.v3-scene-footer{position:absolute;z-index:2;left:0;right:0;bottom:22px;border-top:0;background:linear-gradient(#17191c00,#17191cd9);pointer-events:none}
+.v3-scene-footer>*{pointer-events:auto}
+.v3-scene-canvas{height:640px}
+.v3-scene-disclosure{position:absolute;z-index:2;left:0;right:0;bottom:0;padding:0 22px 8px;color:#8b949c}
+.v3-scene-controls button,.v3-scene-footer>button{border-color:#ffffff1f;background:#ffffff0d;color:#cfd5da;backdrop-filter:blur(8px)}
+.v3-scene-controls button.active,.v3-scene-controls button:hover,.v3-scene-footer>button:hover{background:#e9ecef;color:#17191c}
+.v3-scene-callout{background:#1d2024b8;color:#eef1f3;border:1px solid #ffffff26;border-left:2px solid #9fd38a;border-radius:8px;box-shadow:0 6px 18px #00000066;backdrop-filter:blur(10px)}
+.v3-scene-callout small{color:#aab3ba}
+.v3-scene-callout.active{background:#2a3a2c;border-color:#c4f59f}
+.v3-scene-callout.unselected{border-left-color:#6d7c74}
+.v3-scene-callout.unresolved{border-left-color:#edba75}
+.v3-scene-loading,.v3-scene-fallback{color:#b9c1c7}
+@media(max-width:600px){.v3-scene-toolbar,.v3-scene-footer{position:static;background:none}.v3-scene-disclosure{position:static}.v3-scene-canvas{height:440px}}

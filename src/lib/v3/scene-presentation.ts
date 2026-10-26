@@ -10,9 +10,10 @@ export interface ScenePresentation {
 }
 
 const palette: Record<string, string> = {
-  black: "#66806a",
-  white: "#dce7da",
-  silver: "#aab7af",
+  // Material base colors for the studio scene (PBR lighting does the shading).
+  black: "#1f2124",
+  white: "#e9ebee",
+  silver: "#b9bfc5",
   green: "#76d56f",
   blue: "#78a7e2",
   red: "#e47f77",
@@ -43,7 +44,7 @@ export function scenePresentation(document: BuildDocumentV3): ScenePresentation 
   const count = fans?.match(/\b[1-6]\b/)?.[0];
   return {
     layout: /showcase|panoramic|dual.chamber/.test(caseStyle) ? "showcase" : "tower",
-    caseColor: swatch(caseColor, "#34483a"),
+    caseColor: swatch(caseColor, "#2a2d31"),
     accentColor: swatch(lighting, "#78bb86"),
     gpuVertical: !!placement && /vertical|upright/.test(placement.toLowerCase()),
     fanAccentCount: count ? Number(count) : 0,
