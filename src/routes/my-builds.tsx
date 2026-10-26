@@ -1,10 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { ArrowRight, FolderOpen } from "lucide-react";
+import { ArrowRight, FolderOpen, Trash2 } from "lucide-react";
 import { V3Shell } from "@/components/v3-shell";
-import { getSavedBuild, getSavedBuilds } from "@/lib/apiClient";
+import { deleteSavedBuild, getSavedBuild, getSavedBuilds } from "@/lib/apiClient";
 import { fromSavedBuild } from "@/lib/v3/build-document";
-import { writeDraft } from "@/lib/v3/draft-session";
+import { readDraft, writeDraft } from "@/lib/v3/draft-session";
 import type { SavedBuildSummary } from "@/types/build";
 
 export const Route = createFileRoute("/my-builds")({ component: MyBuildsPage });
@@ -15,6 +15,9 @@ function MyBuildsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [opening, setOpening] = useState<string | null>(null);
+  const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
   useEffect(() => {
     let active = true;
     void getSavedBuilds()
@@ -47,6 +50,24 @@ function MyBuildsPage() {
       setOpening(null);
     }
   }
+  async function removeBuild(id: string, name: string) {
+    setDeleting(id);
+    setError("");
+    try {
+      const result = await deleteSavedBuild(id);
+      setBuilds(result.builds);
+      // A draft open in this tab stops pointing at the deleted save, so saving it creates a new one.
+      const draft = readDraft();
+      if (draft?.savedBuildId === id)
+        writeDraft({ ...draft, savedBuildId: undefined, savedVersion: undefined });
+      setNotice(`Deleted “${name}”.`);
+    } catch (failure) {
+      setError(failure instanceof Error ? failure.message : "Could not delete this build.");
+    } finally {
+      setDeleting(null);
+      setConfirmingDelete(null);
+    }
+  }
   return (
     <V3Shell>
       <main className="v3-page">
@@ -59,6 +80,11 @@ function MyBuildsPage() {
           <p>Open a saved build in the new 2D Studio or continue in the current workspace.</p>
         </div>
         {loading && <p className="v3-inline-note">Loading saved builds…</p>}
+        {notice && (
+          <p className="v3-inline-note" role="status">
+            {notice}
+          </p>
+        )}
         {error && (
           <p className="v3-error" role="alert">
             {error}
@@ -95,6 +121,42 @@ function MyBuildsPage() {
                   >
                     {opening === build.id ? "Opening…" : "Open in Studio"} <ArrowRight size={16} />
                   </button>
+                  {confirmingDelete === build.id ? (
+                    <span className="v3-delete-confirm" role="group" aria-label="Confirm delete">
+                      <small>
+                        Deletes this build, its parts list and any saved photo findings. This
+                        can&apos;t be undone.
+                      </small>
+                      <button
+                        className="v3-danger"
+                        type="button"
+                        disabled={deleting === build.id}
+                        onClick={() => void removeBuild(build.id, build.name)}
+                      >
+                        {deleting === build.id ? "Deleting…" : "Delete permanently"}
+                      </button>
+                      <button
+                        className="v3-secondary"
+                        type="button"
+                        disabled={deleting === build.id}
+                        onClick={() => setConfirmingDelete(null)}
+                      >
+                        Cancel
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      className="v3-secondary"
+                      type="button"
+                      aria-label={`Delete ${build.name}`}
+                      onClick={() => {
+                        setNotice("");
+                        setConfirmingDelete(build.id);
+                      }}
+                    >
+                      <Trash2 size={16} /> Delete
+                    </button>
+                  )}
                 </div>
               </article>
             ))}

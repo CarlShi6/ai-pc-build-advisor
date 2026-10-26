@@ -153,3 +153,13 @@ Stated requirements are kept as notes. Corsair needs an iCUE LINK System Hub. NZ
 
 - In-memory and per process or isolate: restarts reset it, and on serverless each isolate counts separately. It also doesn't stop a client that drops cookies and rotates IPs. The global cap still bounds total cost. A durable limit is a deployment task.
 - The shared fallback bucket (no cookie, no IP header) mostly applies to local or test traffic.
+
+# R6 slice 7: exit-review gaps closed — 2026-10-25
+
+Closes the three small gaps from `R6_EXIT_REVIEW.md`.
+
+1. **Delete in v3 My Builds** (`src/routes/my-builds.tsx`, CSS). A two-step confirm ("Deletes this build, its parts list and any saved photo findings. This can't be undone.") calls the existing `DELETE /api/builds/:id`. If the active tab's draft pointed at the deleted save, its `savedBuildId`/`savedVersion` are cleared, so the next save creates a new build instead of silently recreating the old ID. Browser: blank build saved → My Builds → Delete → Delete permanently → "Deleted “Untitled build”", empty list, draft link cleared. The Supabase store also deletes the build's feedback rows. Whether `owned_parts` rows cascade depends on the schema's foreign key and is unverified here.
+2. **Look lock survives save** (`build-document-save.test.ts`). An image draft with two visual priorities, one locked, plus an unresolved GPU round-trips through the store: lock states, values, unresolved note, unselected PSU and revision are all kept.
+3. **Local deliverable and rollback** (`docs/engineering/LOCAL_DELIVERABLE_AND_ROLLBACK.md`). Covers running locally, data compatibility (the JSONB envelope, no SQL migration, pre-v3 pages ignore the envelope and drop it on re-save), and rollback steps without history rewrites: use legacy pages, `git revert` one slice, run the pre-v3 branch in a separate worktree, or a separately approved data cleanup.
+
+Gate: lint 0, typecheck passed, **164 tests in 23 files** passed, build passed.

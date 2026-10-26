@@ -8,6 +8,7 @@ import {
   fromLegacyBuild,
   fromSavedBuild,
   selectPart,
+  setVisualPriorityLock,
   slotOccupancy,
   toSavedBuildPayload,
   type ImageBuildContext,
@@ -231,5 +232,61 @@ describe("save revision check", () => {
       "2026-10-25T12:00:00.001Z",
     );
     expect(nextSaveTimestamp(undefined, Date.parse(previous))).toBe(previous);
+  });
+});
+
+describe("saved image-born build keeps the look lock", () => {
+  it("round-trips locked and unlocked visual priorities and unknown slots", async () => {
+    const { store, actor } = await signedInStore();
+    const imageContext: ImageBuildContext = {
+      referenceImageId: "ref-white",
+      analysisId: "analysis-white",
+      imageStored: false,
+      observations: [],
+      reviews: {},
+      visualPriorities: [
+        {
+          id: "priority-colorway",
+          category: "colorway",
+          value: "white exterior",
+          observationId: "obs-1",
+          sourceCategory: "case",
+          locked: false,
+        },
+        {
+          id: "priority-lighting",
+          category: "lighting",
+          value: "RGB fan rings",
+          observationId: "obs-2",
+          sourceCategory: "fan",
+          locked: false,
+        },
+      ],
+      plannedSelections: {},
+    };
+    const draft = setVisualPriorityLock(
+      createDraft("image", {
+        parts: [cpu],
+        unresolved: { gpu: "Visible GPU, identity unknown" },
+        imageContext,
+      }),
+      "priority-colorway",
+      true,
+    );
+    const saved = await store.saveBuild(actor, {
+      name: "White show build",
+      build: toSavedBuildPayload(draft),
+      buildNeeds: {},
+    });
+    const restored = fromSavedBuild((await store.getSavedBuild(actor, saved.savedBuild.id))!)!;
+
+    expect(restored.imageContext?.visualPriorities).toEqual([
+      expect.objectContaining({ id: "priority-colorway", value: "white exterior", locked: true }),
+      expect.objectContaining({ id: "priority-lighting", locked: false }),
+    ]);
+    expect(restored.unresolved).toEqual({ gpu: "Visible GPU, identity unknown" });
+    expect(slotOccupancy(restored, "gpu")).toBe("unresolved");
+    expect(slotOccupancy(restored, "psu")).toBe("unselected");
+    expect(restored.revision).toBe(draft.revision);
   });
 });

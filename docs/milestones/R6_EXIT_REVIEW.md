@@ -77,6 +77,10 @@ Optional within R6 scope: versioned rule findings (§12.1) and CSV export.
 
 **Deferred by decision:** a live image provider run (CLAUDE.md: deferred until deployment).
 
+## Follow-up (2026-10-25, R6 slice 7)
+
+The three small R6 gaps are closed: Delete in v3 My Builds, a locked visual priority round-trip test, and `docs/engineering/LOCAL_DELIVERABLE_AND_ROLLBACK.md`. Versioned rule findings and CSV export stay optional.
+
 ## Recommended order
 
 1. Close the three small R6 gaps (one short slice).
