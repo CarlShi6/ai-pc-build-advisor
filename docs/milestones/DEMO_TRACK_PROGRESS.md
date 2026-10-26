@@ -217,3 +217,21 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - In software rendering the switch takes ~15–25 s, because the monitor needs ten sampling windows of rendered frames; on real weak GPUs (10–25 fps) it takes about 3–5 s.
 - Gate: lint 0, typecheck passed, 208 tests passed, build passed, E2E 8/8. Screenshots: both tiers of the same view.
 
+### Slice 12: 2D fallback without WebGL — 2026-10-26
+
+- **Before** (checked in headless Edge with `--disable-webgl --disable-3d-apis`): no crash, no page errors, and no 3D code downloaded. But the fallback was a grid of eight buttons that only said "Selected", parts couldn't be swapped without 3D, the disabled 3D view still looked active, and the disclosure mentioned "dashed callouts" that weren't shown.
+- **Now**:
+  - `src/components/slot-grid-2d.tsx`: the Studio's 2D layout, used both with WebGL off and when the user picks 2D view.
+    - Each slot card shows the part name, its price, "Price unknown" or "Already owned", and "Reference reconstruction" where it applies.
+    - Clicking a card opens the **same replace card** the 3D focus uses, under the grid, so swaps go through the same preview/confirm path.
+  - Without WebGL:
+    - The 3D button is disabled, with the reason as a tooltip.
+    - The toolbar reads "2D layout" and the note says "3D needs WebGL, which is off in this browser. Every build action works here in 2D."
+    - The disclosure drops the dashed-callout sentence.
+  - The 2D path has its own styles (`.v3-scene-2d`) so the error-boundary fallback styles no longer leak into the replace card.
+- **Polish found on the way** (pre-existing): the Studio overflowed sideways by 137 px at 390 px wide, because long part names stretched the single-column grid. `.v3-studio-layout>*{min-width:0}` fixes it; overflow is now 0.
+- E2E: `e2e/no-webgl.e2e.ts` (2 tests):
+  - With WebGL off: sample → disabled 3D button, no canvas, eight cards with prices and reconstruction tags. A GPU swap to the ASUS PRIME through the 2D replace card gives 8/8, pass, $3,044.96, and **no 3D module request**.
+  - At 390 px wide: no horizontal overflow.
+- Gate: lint 0, typecheck passed, 208 tests passed, build passed, **E2E 10/10**. Screenshots: before/after with WebGL off, the 2D replace card, and phone width.
+

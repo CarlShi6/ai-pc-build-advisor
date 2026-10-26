@@ -40,6 +40,7 @@ import type { BuildSceneProps, SceneMode } from "@/features/build-3d/BuildScene"
 import { SceneBoundary } from "@/features/build-3d/SceneBoundary";
 import { ShoppingPlanPanel } from "@/components/shopping-plan-panel";
 import { PartReplaceCard } from "@/components/part-replace-card";
+import { SlotGrid2D } from "@/components/slot-grid-2d";
 import {
   confirmWithLockOverride,
   lockConflicts,
@@ -221,6 +222,18 @@ function StudioPage() {
   const previewStatus = preview ? completeness(preview) : null;
   const presentation = scenePresentation(document);
   const referenceSlots = referenceModelSlots(document);
+  const show3D = view === "3d" && sceneAvailable;
+  // One replace card for both views: beside the focused part in 3D, under the grid in 2D.
+  const replaceCard = focusSlot ? (
+    <PartReplaceCard
+      key={`${focusSlot}-${document.revision}`}
+      document={document}
+      slot={focusSlot}
+      link={partLinkFor(selectedPart(document, focusSlot))}
+      onCommit={commit}
+      onClose={clearFocus}
+    />
+  ) : null;
   const prices = priceCoverage(document.build.parts);
   const optimization =
     document.imageContext && current
@@ -300,26 +313,28 @@ function StudioPage() {
           <div className="v3-scene-toolbar">
             <div>
               <span className="v3-kicker">YOUR BUILD, IN SPACE</span>
-              <strong>Illustrative layout</strong>
+              <strong>{show3D ? "Illustrative layout" : "2D layout"}</strong>
             </div>
             <div className="v3-scene-controls">
               <button
                 type="button"
-                className={view === "3d" ? "active" : ""}
+                className={show3D ? "active" : ""}
                 onClick={() => setView("3d")}
+                disabled={!sceneAvailable}
+                title={sceneAvailable ? undefined : "3D needs WebGL, which is off in this browser"}
               >
                 3D view
               </button>
               <button
                 type="button"
-                className={view === "2d" ? "active" : ""}
+                className={show3D ? "" : "active"}
                 onClick={() => setView("2d")}
               >
                 2D view
               </button>
             </div>
           </div>
-          {view === "3d" && sceneAvailable ? (
+          {show3D ? (
             <>
               {Scene ? (
                 <SceneBoundary onFallback={() => setView("2d")}>
@@ -339,18 +354,7 @@ function StudioPage() {
                     onFocus={setFocusSlot}
                     onClearFocus={clearFocus}
                     partLink={(slot) => partLinkFor(selectedPart(document, slot))}
-                    focusCard={
-                      focusSlot ? (
-                        <PartReplaceCard
-                          key={`${focusSlot}-${document.revision}`}
-                          document={document}
-                          slot={focusSlot}
-                          link={partLinkFor(selectedPart(document, focusSlot))}
-                          onCommit={commit}
-                          onClose={clearFocus}
-                        />
-                      ) : null
-                    }
+                    focusCard={replaceCard}
                   />
                 </SceneBoundary>
               ) : (
@@ -388,30 +392,25 @@ function StudioPage() {
               </div>
             </>
           ) : (
-            <div className="v3-scene-fallback">
+            <div className="v3-scene-2d">
               <p>
-                {view === "2d"
-                  ? "Select any slot below to inspect or change its part."
-                  : "3D is unavailable here. All build actions remain available below."}
+                {sceneAvailable
+                  ? "Choose a slot to inspect or swap its part."
+                  : "3D needs WebGL, which is off in this browser. Every build action works here in 2D."}
               </p>
-              <div>
-                {primarySlots.map((slot) => (
-                  <button
-                    type="button"
-                    key={slot}
-                    className={selectedSlot === slot ? "active" : ""}
-                    onClick={() => {
-                      setSelectedSlot(slot);
-                      setCandidate(null);
-                      setOptimizationCandidate(null);
-                      setRemovalProposal(null);
-                    }}
-                  >
-                    {slotLabel[slot]}
-                    <small>{slotOccupancy(document, slot)}</small>
-                  </button>
-                ))}
-              </div>
+              <SlotGrid2D
+                document={document}
+                selectedSlot={selectedSlot}
+                focusSlot={focusSlot}
+                focusCard={replaceCard}
+                onPick={(slot) => {
+                  setSelectedSlot(slot);
+                  setCandidate(null);
+                  setOptimizationCandidate(null);
+                  setRemovalProposal(null);
+                  setFocusSlot((current) => (current === slot ? null : slot));
+                }}
+              />
             </div>
           )}
           <p className="v3-scene-disclosure">
@@ -419,7 +418,7 @@ function StudioPage() {
               `${referenceSlots.map((slot) => slotLabel[slot]).join(" and ")}: ${REFERENCE_MODEL_LABEL}. `}
             {presentation.layout === "showcase" ? "Showcase" : "Tower"} layout uses generic
             illustrative geometry{referenceSlots.length > 0 ? " for the other parts" : ""}. Neither
-            verifies physical clearance. Dashed callouts remain for empty slots.
+            verifies physical clearance.{show3D && " Dashed callouts remain for empty slots."}
           </p>
         </section>
         {document.imageContext && (
