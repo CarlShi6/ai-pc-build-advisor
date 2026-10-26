@@ -235,3 +235,20 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - At 390 px wide: no horizontal overflow.
 - Gate: lint 0, typecheck passed, 208 tests passed, build passed, **E2E 10/10**. Screenshots: before/after with WebGL off, the 2D replace card, and phone width.
 
+### Slice 13: demo-path polish and 3D E2E — 2026-10-26
+
+- Walked the demo path in headless Edge (home photo upload with the keyless fixture → observations → candidate review → draft preview → Studio 3D → focus GPU → exploded → shopping plan) and fixed what showed:
+  - **Home hero squeeze.** After a photo is analysed, the observations, review and draft preview were stuck in the right half of the hero with the left half empty. The hero now becomes one wide column (max 980 px) once results exist (CSS `:has(.v3-observations)`).
+  - **Console 404 on every page.** There was no favicon, so the browser's `/favicon.ico` request failed. Added `public/favicon.svg` (the header's "A" mark) and linked it in `__root.tsx`; the walk now logs no console errors.
+  - **Over-bright interior.** The interior fill light (6 → 4) blew the white O11 to flat white and made a bloom blob on the generic GPU's polished top plate. The light is lower and that plate is brushed (roughness 0.3 → 0.6); the O11 now shows panel shading and the blob is gone (RGB glow stays).
+- E2E: `e2e/demo-path-3d.e2e.ts`. Software WebGL is enabled for this file only. It covers sample → 3D scene canvas with a quality tier → reconstruction disclosure → click the GPU's 3D label → part isolated with "Show full build" → swap to the ASUS PRIME in the focus card → label updates → Esc → the shopping plan's GPU row shows the ASUS at $919.99.
+- Gate: lint 0, typecheck passed, 208 tests passed, build passed, **E2E 11/11**.
+
+### Week 4 summary
+
+- Performance: adaptive quality tier (slice 11). Software rendering 1.6 → ~9 fps; RTX 5080 keeps the full tier at 144 fps. The 3D chunk (393 KB gzip) loads only when 3D is shown.
+- 2D fallback without WebGL (slice 12): every part, price and reconstruction tag in 2D, swaps through the same replace card, no 3D download; phone-width overflow fixed.
+- Polish (slice 13): home hero layout after analysis, favicon/console error, scene lighting.
+- E2E grew from 8 to 11 flows: no-WebGL swap, phone width, 3D demo path.
+- Still open after the demo track (R7, per CLAUDE.md): E2E for lookalike correction (#2), old-format restore (#9), unauthorized access/deletion (#10); Focus/Isolate keyboard and mobile review; the curated image fixture set and visual regression; the user study. A real-GPU scene check on weaker hardware than the RTX 5080, and a hosted deployment, are not done.
+

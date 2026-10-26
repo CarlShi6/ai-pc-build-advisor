@@ -1659,3 +1659,5 @@
 .v3-scene-controls button:disabled{opacity:.45;cursor:not-allowed}
 @media(max-width:700px){.v3-slot-grid-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .v3-studio-layout>*{min-width:0}
+/* Once a photo has results, the home hero becomes one wide column so review isn't squeezed into the right half. */
+.v3-hero-upload:has(.v3-observations){grid-template-columns:minmax(0,1fr);max-width:980px;min-height:0}.v3-hero-upload:has(.v3-observations) .v3-hero-copy{padding-top:0}

@@ -303,7 +303,12 @@ function PartModel({
       return (
         <group>
           <Box size={[w, h * 0.72, d]} material={darkMetal} />
-          <Box size={[w, 0.03, d]} position={[0, h * 0.38, 0]} material={metal} />
+          <Box
+            size={[w, 0.03, d]}
+            position={[0, h * 0.38, 0]}
+            // Brushed rather than polished: a mirror top caught the interior light as a bloom blob.
+            material={{ ...metal, roughness: 0.6 }}
+          />
           {[-w * 0.31, 0, w * 0.31].map((x) => (
             <group key={x} position={[x, -h * 0.37, 0]}>
               <mesh>
@@ -640,7 +645,7 @@ export default function BuildScene({
           {/* Interior fill so parts read through the glass, plus a soft accent glow. */}
           <pointLight
             position={[0, 0.3, 0.1]}
-            intensity={focusSlot ? 2 : 6}
+            intensity={focusSlot ? 2 : 4}
             distance={4.5}
             decay={1.6}
           />
