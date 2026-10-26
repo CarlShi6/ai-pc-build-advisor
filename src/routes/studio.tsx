@@ -40,10 +40,26 @@ import type { BuildSceneProps, SceneMode } from "@/features/build-3d/BuildScene"
 import { SceneBoundary } from "@/features/build-3d/SceneBoundary";
 import { ShoppingPlanPanel } from "@/components/shopping-plan-panel";
 import {
-  optimizationOptions,
+  confirmWithLockOverride,
+  lockConflicts,
+  optimizationResult,
+  traitImpacts,
+  type BalanceWeight,
   type OptimizationIntent,
   type OptimizationOption,
 } from "@/lib/v3/visual-optimization";
+
+const intentLabels: Array<[OptimizationIntent, string]> = [
+  ["preserve_look", "Preserve the look"],
+  ["reduce_cost", "Reduce cost"],
+  ["improve_performance", "Improve performance"],
+  ["balanced", "Balanced"],
+];
+const balanceLabels: Array<[BalanceWeight, string]> = [
+  [0.25, "Favor savings"],
+  [0.5, "Even"],
+  [0.75, "Favor performance"],
+];
 import { scenePresentation } from "@/lib/v3/scene-presentation";
 
 export const Route = createFileRoute("/studio")({ component: StudioPage });
@@ -52,7 +68,9 @@ function StudioPage() {
   const [document, setDocument] = useState<BuildDocumentV3 | null>(null);
   const [selectedSlot, setSelectedSlot] = useState<SlotId>("case");
   const [candidate, setCandidate] = useState<Part | null>(null);
-  const [optimizationIntent, setOptimizationIntent] = useState<OptimizationIntent>("reduce_cost");
+  const [optimizationIntent, setOptimizationIntent] = useState<OptimizationIntent>("preserve_look");
+  const [balanceWeight, setBalanceWeight] = useState<BalanceWeight>(0.5);
+  const [overrideFor, setOverrideFor] = useState<string | null>(null);
   const [optimizationCandidate, setOptimizationCandidate] = useState<OptimizationOption | null>(
     null,
   );
@@ -178,9 +196,14 @@ function StudioPage() {
   const preview = proposal?.candidate ?? null;
   const previewStatus = preview ? completeness(preview) : null;
   const presentation = scenePresentation(document);
-  const options = document.imageContext
-    ? optimizationOptions(document, selectedSlot, optimizationIntent)
-    : [];
+  const optimization =
+    document.imageContext && current
+      ? optimizationResult(document, selectedSlot, optimizationIntent, balanceWeight)
+      : null;
+  const options = optimization?.options ?? [];
+  const candidateImpacts = candidate ? traitImpacts(document, selectedSlot, candidate) : [];
+  const candidateConflicts = candidate ? lockConflicts(document, selectedSlot, candidate) : [];
+  const overrideAccepted = !!candidate && overrideFor === candidate.id;
   return (
     <V3Shell>
       <main className="v3-page v3-studio">
@@ -511,30 +534,46 @@ function StudioPage() {
               <section className="v3-optimization" aria-label="Style-preserving alternatives">
                 <span className="v3-kicker">STYLE-AWARE OPTIONS</span>
                 <h3>Explore a replacement</h3>
-                <div className="v3-optimization-intents">
-                  <button
-                    type="button"
-                    className={optimizationIntent === "reduce_cost" ? "active" : ""}
-                    onClick={() => {
-                      setOptimizationIntent("reduce_cost");
-                      setOptimizationCandidate(null);
-                      setCandidate(null);
-                    }}
-                  >
-                    Reduce cost
-                  </button>
-                  <button
-                    type="button"
-                    className={optimizationIntent === "improve_performance" ? "active" : ""}
-                    onClick={() => {
-                      setOptimizationIntent("improve_performance");
-                      setOptimizationCandidate(null);
-                      setCandidate(null);
-                    }}
-                  >
-                    Improve performance
-                  </button>
+                <div className="v3-optimization-intents" role="group" aria-label="Goal">
+                  {intentLabels.map(([intent, label]) => (
+                    <button
+                      key={intent}
+                      type="button"
+                      aria-pressed={optimizationIntent === intent}
+                      className={optimizationIntent === intent ? "active" : ""}
+                      onClick={() => {
+                        setOptimizationIntent(intent);
+                        setOptimizationCandidate(null);
+                        setCandidate(null);
+                      }}
+                    >
+                      {label}
+                    </button>
+                  ))}
                 </div>
+                {optimizationIntent === "balanced" && (
+                  <div
+                    className="v3-optimization-intents v3-balance"
+                    role="group"
+                    aria-label="Balance between savings and performance"
+                  >
+                    {balanceLabels.map(([weight, label]) => (
+                      <button
+                        key={weight}
+                        type="button"
+                        aria-pressed={balanceWeight === weight}
+                        className={balanceWeight === weight ? "active" : ""}
+                        onClick={() => {
+                          setBalanceWeight(weight);
+                          setOptimizationCandidate(null);
+                          setCandidate(null);
+                        }}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
+                )}
                 {options.length ? (
                   options.map((option) => (
                     <button
@@ -553,13 +592,17 @@ function StudioPage() {
                         {option.proposal.priceDelta.toLocaleString()} seed price ·{" "}
                         {option.proposal.compatibilityAfter} rule status
                       </small>
+                      {option.traitImpacts.length > 0 && (
+                        <small>
+                          {option.traitImpacts
+                            .map((impact) => `${impact.label}: ${impact.outcome}`)
+                            .join(" · ")}
+                        </small>
+                      )}
                     </button>
                   ))
                 ) : (
-                  <p>
-                    No catalog alternative meets this goal while the current visual locks and
-                    available performance data are respected.
-                  </p>
+                  <p>{optimization?.emptyReason}</p>
                 )}
               </section>
             )}
@@ -639,6 +682,39 @@ function StudioPage() {
                   Preview uses available catalog specs. Missing parts and dimensions still need
                   review.
                 </p>
+                {candidateImpacts.length > 0 && optimizationCandidate?.part.id !== candidate.id && (
+                  <div className="v3-optimization-impact">
+                    <p>
+                      <strong>Visual:</strong>{" "}
+                      {candidateImpacts
+                        .map(
+                          (impact) =>
+                            `${impact.label} ${impact.outcome}${impact.locked ? " (locked)" : ""}`,
+                        )
+                        .join("; ")}
+                      . Based on catalog color and style fields, not a visual comparison.
+                    </p>
+                  </div>
+                )}
+                {candidateConflicts.length > 0 && (
+                  <div className="v3-lock-override" role="alert">
+                    <p>
+                      <strong>This changes your locked look:</strong>{" "}
+                      {candidateConflicts.map((impact) => impact.label).join(", ")}.
+                    </p>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={overrideAccepted}
+                        onChange={(event) =>
+                          setOverrideFor(event.target.checked ? candidate.id : null)
+                        }
+                      />
+                      Change the locked look anyway. This unlocks{" "}
+                      {candidateConflicts.length === 1 ? "that trait" : "those traits"}.
+                    </label>
+                  </div>
+                )}
                 {optimizationCandidate?.part.id === candidate.id && (
                   <div className="v3-optimization-impact">
                     <p>
@@ -655,9 +731,21 @@ function StudioPage() {
                 <button
                   className="v3-primary"
                   type="button"
-                  onClick={() => commit(confirmPartSelection(document, proposal))}
+                  disabled={candidateConflicts.length > 0 && !overrideAccepted}
+                  onClick={() =>
+                    commit(
+                      candidateConflicts.length
+                        ? confirmWithLockOverride(
+                            document,
+                            proposal,
+                            candidateConflicts.map((impact) => impact.priorityId),
+                          )
+                        : confirmPartSelection(document, proposal),
+                    )
+                  }
                 >
-                  <Check size={17} /> Confirm selection
+                  <Check size={17} />{" "}
+                  {candidateConflicts.length ? "Confirm and unlock" : "Confirm selection"}
                 </button>
                 <button className="v3-text-button" type="button" onClick={() => setCandidate(null)}>
                   Cancel preview

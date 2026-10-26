@@ -163,3 +163,37 @@ Closes the three small gaps from `R6_EXIT_REVIEW.md`.
 3. **Local deliverable and rollback** (`docs/engineering/LOCAL_DELIVERABLE_AND_ROLLBACK.md`). Covers running locally, data compatibility (the JSONB envelope, no SQL migration, pre-v3 pages ignore the envelope and drop it on re-save), and rollback steps without history rewrites: use legacy pages, `git revert` one slice, run the pre-v3 branch in a separate worktree, or a separately approved data cleanup.
 
 Gate: lint 0, typecheck passed, **164 tests in 23 files** passed, build passed.
+
+# R6 slice 8: EP-05 Preserve the Look and Balanced, look-lock override — 2026-10-25
+
+P0 before R7 (PRD §10, `R6_EXIT_REVIEW.md`).
+
+## Implemented
+
+- `src/lib/v3/visual-optimization.ts`: all four §10.1 intents.
+  - **Preserve the look** ranks parts by retained traits, then exact current color and style, then closest seed price.
+  - **Reduce cost** and **Improve performance** are unchanged in spirit.
+  - **Balanced** has a user control (Favor savings / Even / Favor performance). It weighs relative catalog-score change against relative seed-price change, never offers a part that is both slower and pricier, and needs a known score (otherwise it explains why there are no options).
+- Each option lists **trait outcomes** (retained / changed / unknown, with locked marked), based only on catalog color and style fields and labeled "not a visual comparison". Suggestions require every locked trait to be retained, so unknown catalog data is never offered under a lock.
+- `optimizationResult` returns an `emptyReason` naming the blocking lock, e.g. "No catalog part keeps the locked look (Color: white). Unlock it under Photo inspiration…", per §10.3 "impossible combinations must be explained".
+- **Explicit override** (§10 acceptance): picking a part from "Compare with another part" that changes a locked trait shows "This changes your locked look: …". **Confirm** stays disabled until the user ticks "Change the locked look anyway". `confirmWithLockOverride` then confirms the selection and unlocks those traits in one step, so the Build never claims a lock it no longer honors. Stale previews are still rejected. Unknown is neither a match nor a conflict for manual picks.
+- `src/routes/studio.tsx` (+CSS): four goal buttons (`aria-pressed`), the Balanced control, trait lines on options, a visual line on manual previews, and the override box.
+
+## Verification
+
+- `src/lib/v3/visual-optimization.test.ts` (6 tests):
+  - White lock with the all-black seed case catalog: no suggestion under any intent, and the reason names the lock.
+  - The override path selects the black case, unlocks the trait and still rejects a stale preview.
+  - Unknown trait data is neither a conflict nor a suggestion.
+  - Preserve the look ordering.
+  - Balanced weights never offer slower-and-pricier parts and stay labeled "not an FPS estimate".
+  - Unknown performance gives an explanation.
+
+  Existing `image-build.test.ts` optimization tests still pass.
+- Gate: lint 0, typecheck passed, **170 tests in 24 files** passed, build passed.
+- Browser (fixture image draft → Studio → GPU slot): four goals render. Preserve the look lists three black GPUs as "Color: black: retained". Reduce cost shows an RTX 5070 FE with "Color: black: unknown" because that trait was unlocked. Balanced shows the weight control. **The override box was not exercised in the browser**: every seed case and GPU is black, so the fixture's black traits can't be broken. Unit tests cover it.
+
+## Limitations
+
+- Trait matching uses catalog `color`/`style` text only. Lighting, fan layout and placement show "unknown" because catalog parts don't describe them.
+- Performance comparisons use the catalog's gaming score, only where present (mostly GPUs).
