@@ -87,3 +87,45 @@ Reuses the existing pipeline (`trackAnalyticsEvent` → `POST /api/analytics/eve
 
 - Events go to the server log only. There is no analytics store or dashboard yet, so funnel rates must be computed from logs.
 - The legacy routes' `shopping_plan_*` and `affiliate_link_opened` events are unchanged. v3 events use their own `v3_` names, so the two funnels don't mix.
+
+# R6 slice 5: hand-curated case fans for style matching — 2026-10-25
+
+Closes the R4 fan-coverage gap for UC-01 (white or black show builds) without third-party data. BuildCores OpenDB was rejected (see `docs/engineering/REUSE_DECISIONS.md`).
+
+## Data
+
+`src/data/curatedFans.ts`: **14 lit case fans** from 5 manufacturers, white and black, 120 and 140 mm. Every value was read on 2026-10-25 from the manufacturer's own product page, linked per entry (`sourceUrl`, `verifiedAt`). No prices. No values were taken from search snippets or third-party sites.
+
+| Manufacturer | Entries (part number) | Page |
+|---|---|---|
+| Lian Li | UNI FAN SL-INF 120 White/Black single (UF-SLIN120-1W / -1B), SL-INF 140 White/Black single (UF-SLIN140-1W / -1B) | lian-li.com/product/uni-fan-sl-infinity/ |
+| Corsair | iCUE LINK RX120 RGB White/Black single (CO-9051021-WW / CO-9051017-WW) | corsair.com product pages |
+| NZXT | F120 RGB Core White/Black (RF-C12SF-W1 / -B1) | nzxt.com/products/f120-core-rgb-1 |
+| ARCTIC | P12 PWM PST A-RGB White/Black single (ACFAN00254A / ACFAN00231A) | arctic.de product pages |
+| be quiet! | Light Wings 120mm PWM White/Black 3-pack (BL100 / BL076), 140mm PWM White/Black 3-pack (BL102 / BL078) | bequiet.com/en/casefans/4132, 3452, 4133, 3453 |
+
+Fields: size, dimensions exactly as published, thickness (mm), color, lighting type and connector, fan connector, fans per package, max rpm, max airflow (CFM), max noise (dB(A)), and stated requirements. **Left unknown (`null`) on purpose:**
+- Corsair max airflow: the same page lists both 74.2 and 73.5 CFM. Static pressure and weight ("0kg") are inconsistent too, so they aren't recorded.
+- ARCTIC noise in dB(A): the page gives only 0.3 sone.
+- NZXT fans per package: not stated on the page.
+- Weights in general are not recorded (be quiet!'s "weight incl. fixed cables" doesn't say whether it's per fan or per pack).
+
+Stated requirements are kept as notes. Corsair needs an iCUE LINK System Hub. NZXT lighting uses a 4-pin NZXT RGB connector and needs an NZXT RGB lighting connector.
+
+## Code
+
+- `src/lib/v3/appearance-catalog.ts`: `AppearanceProfile` no longer wraps a `Part`. Seed parts and curated fans both become profiles with their own `catalogSourceId` (`seedParts:` / `curatedFans:`), provenance (`local_seed_catalog` / `manufacturer_page`), `sourceUrl` and `verifiedAt`. Fans are **not** `Part`s: `Part.price` is required and fans would otherwise need a fake $0, and fans aren't one of the eight Build slots.
+- `src/lib/v3/candidate-matcher.ts`: a lighting signal (lit, RGB, ARGB, LED…; "unlit" or "no lighting" don't match). A photo can't tell RGB from ARGB, so any lit catalog fan matches. Candidates carry `catalogSourceUrl` and `catalogVerifiedAt`. The fan explanation says a photo can't tell these models apart and that a chosen fan stays a style note with no Build total.
+- `src/components/image-candidate-review.tsx`: fan cards show "manufacturer page", a "Specs from manufacturer page" link with the verification date, and "Not a Build slot; no compatibility check".
+- `image-build.ts` is unchanged. Fans were already skipped when building slots, so a chosen fan is kept only in the photo review and never changes parts, price or compatibility.
+
+## Verification
+
+- Tests: `src/data/curatedFans.test.ts` (5) covers manufacturer-domain URL and date on every entry, unique IDs and part numbers, sizes match the published dimensions, no price field, conflicting values stay null, white/black × 120/140 coverage, a white lit photo matches white fans only as appearance-only candidates with source links, and unlit fans don't match. `candidate-matcher.test.ts` was updated (fans now have coverage, and the source link and "not a Build slot" text render).
+- Gate: lint 0, typecheck passed, **158 tests in 22 files** passed, build passed.
+- Browser: the `og.png` local fixture path still renders case and GPU candidates with "Local Catalog" sources. **Fan cards were not checked in the browser**, because the fixture contains no fan observation and adding one would invent image content. The server-rendered review test covers them until a real image provider is connected.
+
+## Limitations
+
+- 14 entries is a style-matching sample, not broad coverage. Manufacturer pages change, so `verifiedAt` marks when each value was last true.
+- Fans don't enter the Build, the shopping plan or compatibility rules. Showing a chosen fan in Studio is not built.

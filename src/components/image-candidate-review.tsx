@@ -97,7 +97,7 @@ export function ImageCandidateReview({
                       {candidate.identityEvidence === "visible_marking"
                         ? "visible marking"
                         : "appearance only"}{" "}
-                      · local catalog
+                      · {candidate.catalogSourceUrl ? "manufacturer page" : "local catalog"}
                     </small>
                   </div>
                   <ul>
@@ -112,8 +112,24 @@ export function ImageCandidateReview({
                     ))}
                   </ul>
                   <p className="v3-candidate-meta">
-                    Catalog specs: {candidate.catalogSpecFields} fields · Compatibility: not checked
-                    until added to a Build
+                    Catalog specs: {candidate.catalogSpecFields} fields ·{" "}
+                    {set.category === "fan"
+                      ? "Not a Build slot; no compatibility check"
+                      : "Compatibility: not checked until added to a Build"}
+                    {candidate.catalogSourceUrl && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <a
+                          href={candidate.catalogSourceUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          Specs from manufacturer page
+                        </a>
+                        , verified {candidate.catalogVerifiedAt}
+                      </>
+                    )}
                   </p>
                   <div className="v3-candidate-actions">
                     <button

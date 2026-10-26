@@ -20,6 +20,9 @@ export interface AppearanceCandidate {
   catalogSpecFields: number;
   compatibilityStatus: "not_checked";
   catalogSourceId: string;
+  /** Manufacturer page and verification date for hand-curated entries; null for seed parts. */
+  catalogSourceUrl: string | null;
+  catalogVerifiedAt: string | null;
 }
 
 export interface CandidateSet {
@@ -71,6 +74,14 @@ function colorWords(value: string): string[] {
   );
 }
 
+/** A photo can show that a fan is lit, not which lighting standard (RGB vs ARGB) it uses. */
+function describesLighting(value: string) {
+  return (
+    /\b(a-?rgb|rgb|led|leds|lit|illuminated|glowing|lighting)\b/i.test(value) &&
+    !/\b(no|unlit|none|without|off)\b/i.test(value)
+  );
+}
+
 function scoreProfile(profile: AppearanceProfile, observations: VisualObservation[]) {
   const matchedObservationIds: string[] = [];
   const matchedSignals: string[] = [];
@@ -109,6 +120,15 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
       score += weight;
       matchedObservationIds.push(item.id);
       matchedSignals.push(`Cooler type: ${profile.coolerType}`);
+      observationEvidence.push(item.evidence);
+    } else if (
+      /lighting|led|rgb|glow/.test(attribute) &&
+      profile.lighting &&
+      describesLighting(item.value)
+    ) {
+      score += weight;
+      matchedObservationIds.push(item.id);
+      matchedSignals.push(`Lighting: ${item.value} (catalog: ${profile.lighting})`);
       observationEvidence.push(item.evidence);
     } else if (
       /brand|logo|model|marking|visible.text|label/.test(attribute) &&
@@ -153,13 +173,13 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
         .sort(
           (a, b) =>
             b.evidence.score - a.evidence.score ||
-            a.profile.part.displayName.localeCompare(b.profile.part.displayName),
+            a.profile.displayName.localeCompare(b.profile.displayName),
         )
         .slice(0, 5)
         .map(
           ({ profile, evidence }, index): AppearanceCandidate => ({
-            partId: profile.part.id,
-            displayName: profile.part.displayName,
+            partId: profile.id,
+            displayName: profile.displayName,
             category,
             rank: index + 1,
             visualMatchBand:
@@ -173,9 +193,11 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
             matchedSignals: evidence.matchedSignals,
             observationEvidence: evidence.observationEvidence,
             missingEvidence: ["Photo similarity does not verify exact SKU or dimensions."],
-            catalogSpecFields: Object.keys(profile.part.specs).length,
+            catalogSpecFields: profile.specFieldCount,
             compatibilityStatus: "not_checked",
-            catalogSourceId: `seedParts:${profile.part.id}`,
+            catalogSourceId: profile.catalogSourceId,
+            catalogSourceUrl: profile.sourceUrl,
+            catalogVerifiedAt: profile.verifiedAt,
           }),
         );
       return {
@@ -183,9 +205,11 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
         status: candidates.length ? ("candidates" as const) : ("unresolved" as const),
         observationIds: observations.map((item) => item.id),
         candidates,
-        explanation: candidates.length
-          ? "Catalog alternatives are ranked by stated visual evidence, not verified identity or purchase value."
-          : "The visible details do not support a match in the current local catalog.",
+        explanation: !candidates.length
+          ? "The visible details do not support a match in the current local catalog."
+          : category === "fan"
+            ? "Fans are ranked by visible color and lighting only; a photo cannot tell these models apart. Fans are not one of the eight Build slots, so a chosen fan stays a style note and adds nothing to the Build total."
+            : "Catalog alternatives are ranked by stated visual evidence, not verified identity or purchase value.",
       };
     });
 }

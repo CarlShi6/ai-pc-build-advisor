@@ -24,7 +24,7 @@ Read these before starting work. They record where the rebuild stands:
 - Unknown is never zero. Unknown prices are `null`; tax and shipping are unknown, not $0. Seed catalog prices are labeled as seed prices, not live quotes.
 - 3D geometry is illustrative and never proves physical fit.
 - Manual and 2D flows must keep working without AI or WebGL.
-- Do not invent product identities, specs or prices. For example, the catalog has no fan products; add them only from verified sources.
+- Do not invent product identities, specs or prices. For example, catalog fans (`src/data/curatedFans.ts`) come only from manufacturer pages, with a URL and verification date per entry; unclear fields stay `null`.
 - Secrets stay server-only. Never use a `VITE_` prefix for keys.
 - Real image AI is intentionally not connected yet (deferred until deployment). Use the dev fixture on the Image page. Do not claim the live provider path is verified.
 - Never report a planned or mocked capability as implemented.
@@ -48,7 +48,7 @@ npm.cmd run lint; if ($?) { npm.cmd run typecheck }; if ($?) { npm.cmd test }; i
 - Dev server: `npm.cmd run dev`. Earlier sessions ran it at `http://127.0.0.1:5175/`.
 - If Vitest fails with `EPERM` renaming files in the system temp folder, set a writable temp first: `$env:TEMP="$PWD\.audit-tmp"; $env:TMP="$PWD\.audit-tmp"`. Don't commit `.audit-tmp`.
 - Build warnings about chunks over 500 kB, ignored `"use client"` directives and Wrangler `main`/`assets` overrides already existed. They are not failures.
-- Last known gate (end of R6 slice 4): lint 0, typecheck passed, 153 tests in 21 files passed, build passed.
+- Last known gate (end of R6 slice 5): lint 0, typecheck passed, 158 tests in 22 files passed, build passed.
 
 ## Stack and conventions
 
@@ -79,11 +79,10 @@ For each batch: inspect → plan → implement → test → run the full gate �
 
 ## Current status and next steps (R6 Integration, Trust & Save/Export)
 
-Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 draft save and restore); R6 slice 2 (Studio shopping plan with Markdown and JSON report); R6 slice 3 (save revision check: `expectedUpdatedAt` → 409 `SAVE_CONFLICT`, with Studio "Open saved version" / "Overwrite with this tab"); R6 slice 4 (v3 funnel analytics via `src/lib/v3/funnel-analytics.ts`, counts and enums only).
+Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 draft save and restore); R6 slice 2 (Studio shopping plan with Markdown and JSON report); R6 slice 3 (save revision check: `expectedUpdatedAt` → 409 `SAVE_CONFLICT`, with Studio "Open saved version" / "Overwrite with this tab"); R6 slice 4 (v3 funnel analytics via `src/lib/v3/funnel-analytics.ts`, counts and enums only); R6 slice 5 (14 hand-curated white/black 120/140 mm lit case fans for style matching; appearance-only, not a Build slot).
 
 Next, in order:
-1. Hand-curate a small catalog addition from manufacturer pages, starting with 10–20 common case fans. Each entry records the manufacturer URL, the verification date and dimensions in mm. Don't invent models, specs or prices (BuildCores OpenDB was rejected; see `docs/engineering/REUSE_DECISIONS.md`).
-2. Per-session rate limit for image analysis (the current limit is process-wide) and a retention note on the Image page.
-3. "Preserve the Look" and "Balanced" optimization intents. Today only reduce-cost and improve-performance exist (PRD §10.1).
-4. Describe entry: reuse the existing `build-advisor` recommendation logic instead of leaving all part choices to the user.
-5. R7: Focus/Isolate mode, reduced motion and keyboard support, Playwright end-to-end tests, the PRD §19.3 fixture set, and an 8–12 person user study.
+1. Per-session rate limit for image analysis (the current limit is process-wide) and a retention note on the Image page.
+2. "Preserve the Look" and "Balanced" optimization intents. Today only reduce-cost and improve-performance exist (PRD §10.1).
+3. Describe entry: reuse the existing `build-advisor` recommendation logic instead of leaving all part choices to the user.
+4. R7: Focus/Isolate mode, reduced motion and keyboard support, Playwright end-to-end tests, the PRD §19.3 fixture set, and an 8–12 person user study.

@@ -43,7 +43,7 @@ function observation(
 }
 
 describe("R4 visual catalog review", () => {
-  it("renders candidate evidence, uncertainty, review actions, and catalog gaps", () => {
+  it("renders candidate evidence, uncertainty, review actions, and fan sources", () => {
     const html = renderToStaticMarkup(
       createElement(ImageCandidateReview, {
         analysis: analysis([
@@ -56,7 +56,8 @@ describe("R4 visual catalog review", () => {
     expect(html).toContain("Compatibility: not checked");
     expect(html).toContain("Confirm planned option");
     expect(html).toContain("Keep unknown");
-    expect(html).toContain("No catalog coverage");
+    expect(html).toContain("Specs from manufacturer page");
+    expect(html).toContain("Not a Build slot; no compatibility check");
   });
 
   it("ranks only canonical catalog IDs with separate evidence signals", () => {
@@ -75,7 +76,7 @@ describe("R4 visual catalog review", () => {
     expect(cases.candidates.length).toBeLessThanOrEqual(5);
   });
 
-  it("keeps unsupported colors and fan category unresolved", () => {
+  it("keeps unsupported colors unresolved", () => {
     const sets = matchVisualCandidates(
       analysis([
         observation("case", "color", "white"),
@@ -83,7 +84,6 @@ describe("R4 visual catalog review", () => {
       ]),
     );
     expect(sets.find((set) => set.category === "case")?.status).toBe("unresolved");
-    expect(sets.find((set) => set.category === "fan")?.status).toBe("no_catalog_coverage");
   });
 
   it("treats a visible GPU marking as alternatives, not a verified SKU", () => {
