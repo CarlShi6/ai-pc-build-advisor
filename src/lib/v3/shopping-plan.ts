@@ -1,4 +1,5 @@
-import { isSafeExternalUrl, trustForPart } from "@/lib/product-trust";
+import { isSafeExternalUrl } from "@/lib/product-trust";
+import { priceBasisLabel, priceUnknown } from "@/lib/v3/catalog";
 import {
   completeness,
   primarySlots,
@@ -47,6 +48,8 @@ export interface ShoppingPlan {
   knownSubtotal: number;
   pricedCount: number;
   openCount: number;
+  /** Chosen parts whose price no source gives (not counted in the subtotal). */
+  unknownPriceCount: number;
   complete: boolean;
   compatibility: "incomplete" | CompatibilitySeverity;
   findings: PlanFinding[];
@@ -57,7 +60,7 @@ export interface ShoppingPlan {
 }
 
 export const PLAN_DISCLOSURES = [
-  "Prices are seed catalog values, not live retailer quotes. Check the retailer before buying.",
+  "Prices are seed catalog values or manufacturer store prices with the date they were checked, not live retailer quotes. Unknown prices are not counted. Check the retailer before buying.",
   "Tax, shipping and stock are not included or checked.",
   "Links open an official product page or a retailer search; they are references, not verified listings.",
   "Compatibility covers the rules this app checks with catalog specs. It does not confirm physical fit, and empty or unresolved slots are not checked.",
@@ -109,8 +112,7 @@ export function buildShoppingPlan(document: BuildDocumentV3): ShoppingPlan {
         priceBasis: "Already owned",
         links: [],
       };
-    const known = Number.isFinite(part.price) && part.price >= 0;
-    const trust = trustForPart(part);
+    const known = !priceUnknown(part);
     return {
       slot,
       label,
@@ -118,11 +120,7 @@ export function buildShoppingPlan(document: BuildDocumentV3): ShoppingPlan {
       partId: part.id,
       name: part.displayName,
       price: known ? part.price : null,
-      priceBasis: known
-        ? trust.source === "seed"
-          ? "Seed price, not a live quote"
-          : "Mock catalog price"
-        : "Price unknown",
+      priceBasis: priceBasisLabel(part),
       links: linksFor(part),
     };
   });
@@ -156,6 +154,8 @@ export function buildShoppingPlan(document: BuildDocumentV3): ShoppingPlan {
     lines,
     knownSubtotal: priced.reduce((sum, line) => sum + (line.price ?? 0), 0),
     pricedCount: priced.length,
+    unknownPriceCount: lines.filter((line) => line.status === "planned" && line.price === null)
+      .length,
     openCount: lines.filter((line) => line.status === "unresolved" || line.status === "empty")
       .length,
     complete: status.complete,
@@ -184,9 +184,10 @@ export function shoppingPlanMarkdown(plan: ShoppingPlan, generatedAt = new Date(
     const links = line.links.map((link) => `[${link.label}](${link.url})`).join(" · ") || "—";
     return `| ${line.label} | ${statusText[line.status]} | ${item.replaceAll("|", "\\|")} | ${price} | ${line.priceBasis} | ${links} |`;
   });
-  const subtotalNote = plan.openCount
-    ? `known subtotal for ${plan.pricedCount} of 8 slots; ${plan.openCount} slot(s) not priced`
-    : "all 8 slots priced from catalog data";
+  const subtotalNote =
+    plan.pricedCount === 8
+      ? "all 8 slots priced from catalog data"
+      : `known subtotal for ${plan.pricedCount} of 8 slots; ${8 - plan.pricedCount} slot(s) not priced`;
   const compatibility =
     plan.compatibility === "incomplete"
       ? `Incomplete — ${plan.openCount} slot(s) still need a decision, so the build is not fully checked.`

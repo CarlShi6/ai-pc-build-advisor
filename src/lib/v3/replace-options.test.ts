@@ -27,7 +27,7 @@ describe("replace card options", () => {
         expect(option.newFindings.length).toBeGreaterThan(0);
     }
     // Closest seed price first.
-    const gaps = options.map((option) => Math.abs(option.priceDelta));
+    const gaps = options.map((option) => Math.abs(option.priceDelta ?? Number.POSITIVE_INFINITY));
     expect(gaps).toEqual([...gaps].sort((a, b) => a - b));
     expect(draft.build.parts.find((item) => item.category === "gpu")?.id).toBe(current.id);
   });

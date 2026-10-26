@@ -78,11 +78,9 @@ describe("R4 visual catalog review", () => {
 
   it("keeps unsupported colors unresolved", () => {
     const sets = matchVisualCandidates(
-      analysis([
-        observation("case", "color", "white"),
-        observation("fan", "lighting", "RGB rings"),
-      ]),
+      analysis([observation("case", "color", "pink"), observation("fan", "lighting", "RGB rings")]),
     );
+    // No pink case in the catalog (white showcase cases now exist, so white would match).
     expect(sets.find((set) => set.category === "case")?.status).toBe("unresolved");
   });
 

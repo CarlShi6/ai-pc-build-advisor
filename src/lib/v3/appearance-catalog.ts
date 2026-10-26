@@ -1,5 +1,5 @@
 import { curatedFans } from "@/data/curatedFans";
-import { seedParts } from "@/data/seedParts";
+import { v3Catalog } from "@/lib/v3/catalog";
 import type { PartCategory } from "@/types/parts";
 
 export const visibleCatalogCategories = ["case", "gpu", "cooler", "fan", "motherboard"] as const;
@@ -24,23 +24,27 @@ export interface AppearanceProfile {
 
 const allowed = new Set<PartCategory>(visibleCatalogCategories);
 
-const seedProfiles: AppearanceProfile[] = seedParts
+const seedProfiles: AppearanceProfile[] = v3Catalog
   .filter((part) => allowed.has(part.category))
-  .map((part) => ({
-    id: part.id,
-    displayName: part.displayName,
-    category: part.category as VisibleCatalogCategory,
-    color: part.color ?? (typeof part.specs.color === "string" ? part.specs.color : null),
-    style: typeof part.specs.style === "string" ? part.specs.style : null,
-    coolerType: typeof part.specs.coolerType === "string" ? part.specs.coolerType : null,
-    lighting: null,
-    identityText: `${part.brand} ${part.model}`,
-    specFieldCount: Object.keys(part.specs).length,
-    catalogSourceId: `seedParts:${part.id}`,
-    provenance: "local_seed_catalog" as const,
-    sourceUrl: null,
-    verifiedAt: null,
-  }));
+  .map((part) => {
+    // White showcase parts come from manufacturer pages (src/data/showcaseParts.ts).
+    const showcase = part.compatibilityTags.includes("white-showcase");
+    return {
+      id: part.id,
+      displayName: part.displayName,
+      category: part.category as VisibleCatalogCategory,
+      color: part.color ?? (typeof part.specs.color === "string" ? part.specs.color : null),
+      style: typeof part.specs.style === "string" ? part.specs.style : null,
+      coolerType: typeof part.specs.coolerType === "string" ? part.specs.coolerType : null,
+      lighting: null,
+      identityText: `${part.brand} ${part.model}`,
+      specFieldCount: Object.keys(part.specs).length,
+      catalogSourceId: `${showcase ? "showcaseParts" : "seedParts"}:${part.id}`,
+      provenance: showcase ? ("manufacturer_page" as const) : ("local_seed_catalog" as const),
+      sourceUrl: showcase ? (part.productUrl ?? null) : null,
+      verifiedAt: showcase ? (part.lastUpdated ?? null) : null,
+    };
+  });
 
 const fanSpecFields = [
   "thicknessMm",

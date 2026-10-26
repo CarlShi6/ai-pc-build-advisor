@@ -51,12 +51,23 @@ function imageDraft(parts = [o11], visualPriorities: VisualPriority[] = [priorit
 }
 
 describe("EP-05 look lock (PRD §10)", () => {
-  it("never suggests a black case while a white exterior is locked, and says why", () => {
+  it("never suggests a black case while a white exterior is locked", () => {
     const draft = imageDraft();
+    for (const intent of intents) {
+      const { options } = optimizationResult(draft, "case", intent);
+      expect(options.every((option) => option.part.color === "White")).toBe(true);
+    }
+    // Of the white showcase cases, only the one with a known lower price is a cheaper option.
+    const cheaper = optimizationResult(draft, "case", "reduce_cost").options;
+    expect(cheaper.map((option) => option.part.partNumber)).toEqual(["CC-H52FW-01"]);
+  });
+
+  it("explains an impossible lock instead of breaking it", () => {
+    const draft = imageDraft([o11], [priority({ value: "pink" })]);
     for (const intent of intents) {
       const result = optimizationResult(draft, "case", intent);
       expect(result.options).toEqual([]);
-      expect(result.emptyReason).toMatch(/locked look \(Color: white\)/);
+      expect(result.emptyReason).toMatch(/locked look \(Color: pink\)/);
     }
   });
 

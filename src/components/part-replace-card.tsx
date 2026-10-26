@@ -14,6 +14,11 @@ import {
   type ReplaceOption,
 } from "@/lib/v3/replace-options";
 import { confirmWithLockOverride } from "@/lib/v3/visual-optimization";
+import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
+
+function totalText(total: { known: number; unknown: number }) {
+  return `${total.known.toLocaleString()}${total.unknown ? ` + ${total.unknown} unknown` : ""}`;
+}
 
 function money(value: number) {
   return `${value < 0 ? "−" : "+"}$${Math.abs(value).toLocaleString()}`;
@@ -108,8 +113,14 @@ export function PartReplaceCard({
                 >
                   <span>{option.part.displayName}</span>
                   <small>
-                    {current ? money(option.priceDelta) : `$${option.part.price.toLocaleString()}`}{" "}
-                    seed · {compatText(option.after)}
+                    {priceUnknown(option.part)
+                      ? "price unknown"
+                      : current
+                        ? option.priceDelta === null
+                          ? "price change unknown"
+                          : money(option.priceDelta)
+                        : `${option.part.price.toLocaleString()}`}{" "}
+                    · {compatText(option.after)}
                     {option.lockConflicts.length > 0 && " · changes locked look"}
                   </small>
                 </button>
@@ -127,11 +138,16 @@ export function PartReplaceCard({
           <span className="v3-kicker">PREVIEW · NOT APPLIED</span>
           <strong>{chosen.part.displayName}</strong>
           <dl>
-            <dt>Seed total</dt>
+            <dt>Known total</dt>
             <dd>
-              ${document.build.totalPrice.toLocaleString()} → $
-              {chosen.proposal.candidate.build.totalPrice.toLocaleString()}
+              {totalText(priceCoverage(document.build.parts))} → {totalText(chosen.totalAfter)}
             </dd>
+            {chosen.part.priceSource && (
+              <>
+                <dt>Price source</dt>
+                <dd>{chosen.part.priceSource.label}</dd>
+              </>
+            )}
             <dt>Compatibility</dt>
             <dd>
               {compatText(chosen.before)} → {compatText(chosen.after)}
@@ -186,7 +202,8 @@ export function PartReplaceCard({
         </p>
       )}
       <p className="v3-replace-foot">
-        Seed prices, not live offers. Rule checks use catalog specs; physical fit isn't verified.
+        Seed or manufacturer store prices, not live offers; unknown prices aren't counted. Rule
+        checks use catalog specs; physical fit isn't verified.
       </p>
     </section>
   );

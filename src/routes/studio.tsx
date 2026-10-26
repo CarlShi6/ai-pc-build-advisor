@@ -63,6 +63,7 @@ const balanceLabels: Array<[BalanceWeight, string]> = [
 ];
 import { scenePresentation } from "@/lib/v3/scene-presentation";
 import { getValidatedOfficialUrl } from "@/lib/product-trust";
+import { priceCoverage } from "@/lib/v3/catalog";
 
 /** A manufacturer page when the catalog has one; otherwise the existing retailer search, labeled as such. */
 function partLinkFor(part: Part | undefined) {
@@ -212,6 +213,7 @@ function StudioPage() {
   const preview = proposal?.candidate ?? null;
   const previewStatus = preview ? completeness(preview) : null;
   const presentation = scenePresentation(document);
+  const prices = priceCoverage(document.build.parts);
   const optimization =
     document.imageContext && current
       ? optimizationResult(document, selectedSlot, optimizationIntent, balanceWeight)
@@ -454,8 +456,12 @@ function StudioPage() {
           </div>
           <div>
             <small>CATALOG TOTAL</small>
-            <strong>${document.build.totalPrice.toLocaleString()}</strong>
-            <em>Seed prices, not live offers</em>
+            <strong>${prices.known.toLocaleString()}</strong>
+            <em>
+              {prices.unknown
+                ? `+ ${prices.unknown} unknown price${prices.unknown === 1 ? "" : "s"}, not counted`
+                : "Seed or manufacturer prices, not live offers"}
+            </em>
           </div>
           <div>
             <small>COMPATIBILITY</small>

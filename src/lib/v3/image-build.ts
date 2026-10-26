@@ -1,4 +1,4 @@
-import { seedParts } from "@/data/seedParts";
+import { catalogPartById } from "@/lib/v3/catalog";
 import {
   createDraft,
   primarySlots,
@@ -83,9 +83,8 @@ export function proposeImageBuild(
     if (review?.status === "chosen" && !picked)
       throw new Error("A reviewed candidate is no longer available. Review it again.");
     if (picked) {
-      const part = seedParts.find(
-        (item) => item.id === picked.partId && item.category === slotCategory[slot],
-      );
+      const found = catalogPartById(picked.partId);
+      const part = found?.category === slotCategory[slot] ? found : undefined;
       if (!part)
         throw new Error("A reviewed candidate is missing from the catalog. Review it again.");
       parts.push(part);

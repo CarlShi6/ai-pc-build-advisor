@@ -12,6 +12,7 @@ import {
   type PartSelectionProposal,
 } from "@/lib/v3/build-proposal";
 import type { Part } from "@/types/parts";
+import { priceUnknown } from "@/lib/v3/catalog";
 
 /** PRD §10.1 optimization intents. */
 export type OptimizationIntent =
@@ -117,6 +118,13 @@ export function confirmWithLockOverride(
   );
 }
 
+/** Price distance for ordering; unknown prices sort last instead of looking free. */
+function priceGap(part: Part, current: Part) {
+  return priceUnknown(part) || priceUnknown(current)
+    ? Number.POSITIVE_INFINITY
+    : Math.abs(part.price - current.price);
+}
+
 function knownPerformance(part: Part): number | null {
   const score = part.specs.gaming1440pScore ?? part.specs.gamingScore ?? part.performanceScore;
   return typeof score === "number" && Number.isFinite(score) ? score : null;
@@ -184,19 +192,17 @@ export function optimizationResult(
         return { part, score: retained * 2 + sameAsCurrent(part) };
       })
       .filter((item) => item.score > 0)
-      .sort(
-        (a, b) =>
-          b.score - a.score ||
-          Math.abs(a.part.price - current.price) - Math.abs(b.part.price - current.price),
-      )
+      .sort((a, b) => b.score - a.score || priceGap(a.part, current) - priceGap(b.part, current))
       .map((item) => item.part);
     emptyReason =
       "No catalog part shares this slot's recorded color or style, so a look-preserving alternative can't be shown.";
   } else if (intent === "reduce_cost") {
     ranked = lockSafe
-      .filter((part) => part.price < current.price)
+      .filter((part) => !priceUnknown(part) && !priceUnknown(current) && part.price < current.price)
       .sort((a, b) => a.price - b.price);
-    emptyReason = "No cheaper catalog part keeps the locked look for this slot.";
+    emptyReason = priceUnknown(current)
+      ? "The current part's price is unknown, so cheaper options can't be compared."
+      : "No cheaper catalog part keeps the locked look for this slot.";
   } else if (intent === "improve_performance") {
     ranked =
       currentPerformance === null
@@ -211,10 +217,13 @@ export function optimizationResult(
   } else {
     // Balanced: weigh relative catalog-score change against relative seed-price change.
     ranked =
-      currentPerformance === null || currentPerformance <= 0 || current.price <= 0
+      currentPerformance === null ||
+      currentPerformance <= 0 ||
+      priceUnknown(current) ||
+      current.price <= 0
         ? []
         : lockSafe
-            .filter((part) => knownPerformance(part) !== null)
+            .filter((part) => knownPerformance(part) !== null && !priceUnknown(part))
             .map((part) => {
               const perfChange =
                 (knownPerformance(part)! - currentPerformance) / currentPerformance;

@@ -156,9 +156,17 @@ export function ShoppingPlanPanel({
           <small>KNOWN SUBTOTAL</small>
           <strong>${plan.knownSubtotal.toLocaleString()}</strong>
           <em>
-            {plan.openCount
-              ? `${plan.pricedCount} of 8 slots priced · ${plan.openCount} still open`
-              : "All 8 slots priced from catalog data"}
+            {plan.pricedCount === 8
+              ? "All 8 slots priced from catalog data"
+              : [
+                  `${plan.pricedCount} of 8 slots priced`,
+                  plan.openCount ? `${plan.openCount} still open` : null,
+                  plan.unknownPriceCount
+                    ? `${plan.unknownPriceCount} price${plan.unknownPriceCount === 1 ? "" : "s"} unknown`
+                    : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
             {" · tax and shipping not included"}
           </em>
         </div>
@@ -170,7 +178,9 @@ export function ShoppingPlanPanel({
               ? `Known parts already exceed budget by $${(plan.knownSubtotal - plan.budget).toLocaleString()}`
               : plan.openCount
                 ? `$${(plan.budget - plan.knownSubtotal).toLocaleString()} left for ${plan.openCount} open slot(s)`
-                : `$${(plan.budget - plan.knownSubtotal).toLocaleString()} under budget`}
+                : plan.unknownPriceCount
+                  ? `${(plan.budget - plan.knownSubtotal).toLocaleString()} left before ${plan.unknownPriceCount} unknown price(s)`
+                  : `${(plan.budget - plan.knownSubtotal).toLocaleString()} under budget`}
           </em>
         </div>
         <div>

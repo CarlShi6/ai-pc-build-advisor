@@ -22,6 +22,10 @@ export interface Part {
   model: string;
   displayName: string;
   price: number;
+  /** "unknown" when no source gives a price; the part is then excluded from totals. */
+  priceStatus?: "unknown";
+  /** Where a non-seed price comes from (e.g. the manufacturer's store) and when it was checked. */
+  priceSource?: { label: string; url: string; verifiedAt: string };
   source?: "catalog" | "user_owned" | "manual" | "mock_retailer" | "external_placeholder";
   owned?: boolean;
   userProvided?: boolean;

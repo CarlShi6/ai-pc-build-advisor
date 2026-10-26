@@ -8,6 +8,7 @@ import {
 import { proposePartSelection, type PartSelectionProposal } from "@/lib/v3/build-proposal";
 import { lockConflicts, traitImpacts, type TraitImpact } from "@/lib/v3/visual-optimization";
 import type { Part } from "@/types/parts";
+import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
 
 /**
  * Data for the in-scene replace card (demo track week 2). Every option is a normal
@@ -22,8 +23,10 @@ export interface CompatibilitySummary {
 export interface ReplaceOption {
   part: Part;
   proposal: PartSelectionProposal;
-  /** Seed-catalog price difference; seed prices are not live offers. */
-  priceDelta: number;
+  /** Known price difference, or null when either price is unknown (never treated as $0). */
+  priceDelta: number | null;
+  /** Known total after the swap and how many prices it leaves unknown. */
+  totalAfter: { known: number; unknown: number };
   before: CompatibilitySummary;
   after: CompatibilitySummary;
   traitImpacts: TraitImpact[];
@@ -56,7 +59,11 @@ export function replaceOptions(
       return {
         part,
         proposal,
-        priceDelta: proposal.priceDelta,
+        priceDelta:
+          priceUnknown(part) || (current && priceUnknown(current))
+            ? null
+            : part.price - (current?.price ?? 0),
+        totalAfter: priceCoverage(proposal.candidate.build.parts),
         before,
         after: compatibilitySummary(proposal.candidate),
         traitImpacts: traitImpacts(document, slot, part),
@@ -69,7 +76,8 @@ export function replaceOptions(
     .sort(
       (a, b) =>
         a.lockConflicts.length - b.lockConflicts.length ||
-        Math.abs(a.priceDelta) - Math.abs(b.priceDelta) ||
+        Math.abs(a.priceDelta ?? Number.POSITIVE_INFINITY) -
+          Math.abs(b.priceDelta ?? Number.POSITIVE_INFINITY) ||
         a.part.displayName.localeCompare(b.part.displayName),
     );
   return { options: all.slice(0, limit), total: all.length };

@@ -57,3 +57,35 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - `src/routes/studio.tsx`: passes the card as `focusCard`, keyed by slot and revision so it resets after each change. The existing 2D parts panel is unchanged and remains the keyboard and no-WebGL path.
 - Browser (full 1440p build → click the GPU label): the card listed "NVIDIA GeForce RTX 5070 Ti (reference specifications) · −$50 seed · warning · 1 finding". The preview showed $2,492 → $2,442, "pass · 0 findings → warning · 1 finding" and the finding "GPU length or case clearance data is missing." The 3D label still read RTX 4070 Ti Super (not applied). After **Confirm** the label became RTX 5070 Ti and the stats total $2,442.
 - Gate: lint 0, typecheck passed, **181 tests in 27 files** passed, build passed. E2E 7/7. The in-scene card has no E2E yet (it needs WebGL in the E2E browser); planned for week 4.
+
+## Week 3
+
+### Slice 5: white showcase parts from manufacturer pages — 2026-10-25
+
+- `src/data/showcaseParts.ts`: **8 white parts**, every value read on 2026-10-25 from the manufacturer's own product page, with prices from the manufacturer's own store. No third-party data, no BuildCores.
+
+| Slot | Part (part number) | Key published specs | Price |
+|---|---|---|---|
+| Case | Lian Li O11 Dynamic EVO White (O11DEW) | 465 D × 285 W × 459 H mm; GPU 426, cooler 167, PSU 220 mm; 360 mm radiator | **Unknown** (no price on lian-li.com) |
+| Case | NZXT H5 Flow White (CC-H52FW-01) | 465 H × 225 W × 430 D mm; GPU 410, cooler 170, PSU 200 mm | $94.99 (nzxt.com) |
+| Case | Corsair 4000D Airflow White (CC-9011201-WW) | 466 × 453 × 230 mm; GPU 360 (340 with front AIO), cooler 170, PSU 220 mm; 360 mm front radiator | **Unknown** (no case price on corsair.com) |
+| GPU | MSI RTX 5070 Ti 16G GAMING TRIO OC WHITE (G507T-16GTCW) | 338 × 140 × 50 mm; 300 W; 16-pin; 750 W PSU | $1,249.99 (us-store.msi.com) |
+| GPU | ASUS PRIME RTX 5070 White OC (PRIME-RTX5070-O12G-WHITE) | 304 × 126 × 50 mm; 2.5 slot; 16-pin; 750 W PSU; board power not listed | $919.99 (eshop.asus.com) |
+| Cooler | Corsair iCUE LINK TITAN 360 RX RGB White (CW-9061021-WW) | 360 mm radiator; 450 mm tubing; LGA1851/1700, AM5/AM4; size printed without units | $199.99 (corsair.com) |
+| Memory | Corsair VENGEANCE RGB 32GB DDR5-6000 CL30 White (CMH32GX5M2B6000C30W) | 2 × 16 GB, XMP; no module dimensions | $657.99 (corsair.com) |
+| PSU | Corsair RM850x SHIFT White (CP-9020274-NA) | 850 W, 80+ Gold, ATX 3.1, 140 mm fan; no PSU length | $189.99 (corsair.com) |
+
+  Prices are labeled **"Manufacturer store price, verified 2026-10-25"**, not "MSRP". No page calls its price an MSRP; these are the list prices shown on each manufacturer's own store (none showed a strikethrough sale). Fields a page didn't state clearly are left out: ASUS board power, NZXT radiator support, unitless cooler size, RAM module size, PSU length. The rules then report "not enough data".
+- **Unknown prices** (`Part.priceStatus: "unknown"` plus `priceSource`): excluded from totals (`calculateBuildTotal`, `priceCoverage`). Studio shows "+ N unknown prices, not counted". The shopping plan shows "Unknown / Price unknown" and "7 of 8 slots priced · 1 price unknown". The replace card shows "price unknown" instead of a $0 difference. The optimizer never ranks or diffs against an unknown price.
+- `src/lib/v3/catalog.ts`: `v3Catalog` = `seedParts` + showcase parts, used by the Studio part lists, import matching, photo review and image drafts. **The pre-v3 pages still use `seedParts` only**, so legacy totals are unaffected.
+- Photo review: a white case in a photo now matches the white showcase cases as appearance-only candidates, with their manufacturer page as the source.
+- Tests: `src/data/showcaseParts.test.ts` (10) covers:
+  - manufacturer domains for product and price URLs, verification date, unique part numbers, no BuildCores
+  - unknown price excluded from totals, published mm values matching the printed text, unitless sizes kept without mm
+  - v3-only catalog, the GPU clearance rule passing from published figures, the missing NZXT radiator figure not passing
+  - shopping plan prices, sources and the "7 of 8 priced" summary, no ranking on unknown prices, white photo matching
+
+  Three older tests were updated because white parts now exist: the "unsupported color" test uses pink, the white lock now offers only white cases (H5 Flow White is the only cheaper one), and an impossible pink lock is explained.
+- Browser (Import of 8 exact names → Studio): 8/8, **Pass**, "$3,374.96 + 1 unknown price, not counted". The white case renders in the studio scene, and labels for the showcase parts read "Manufacturer page ↗". The shopping plan shows each source and "7 of 8 slots priced · 1 price unknown". The fix for "All 8 slots priced" (it was wrongly shown with an unknown price) is in this slice.
+- Gate: lint 0, typecheck passed, **191 tests in 28 files** passed, build passed. E2E 7/7.
+- Not done yet in week 3: 1:1 millimetre part models (waiting on the img2threejs approval and Python), the white showcase demo configuration as a one-click sample, and real image recognition (needs `OPENAI_API_KEY`, to be requested from the user).

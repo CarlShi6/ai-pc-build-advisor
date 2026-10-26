@@ -1,4 +1,4 @@
-import { seedParts } from "@/data/seedParts";
+import { v3Catalog } from "@/lib/v3/catalog";
 import { recalculateBuild } from "@/lib/product-trust";
 import type { Build, SavedBuild } from "@/types/build";
 import type { Part, PartCategory } from "@/types/parts";
@@ -352,7 +352,7 @@ export function setVisualPriorityLock(
 }
 
 export function catalogForSlot(slot: SlotId) {
-  return seedParts.filter((part) => part.category === slotCategory[slot]);
+  return v3Catalog.filter((part) => part.category === slotCategory[slot]);
 }
 
 export interface ImportMatch {
@@ -368,7 +368,7 @@ export function previewPartsList(input: string): ImportMatch[] {
     .filter(Boolean)
     .map((line) => {
       const normalized = line.replace(/^\s*(?:[-*]|\d+[.)])\s*/, "").toLowerCase();
-      const matches = seedParts.filter((part) =>
+      const matches = v3Catalog.filter((part) =>
         [part.id, part.displayName, `${part.brand} ${part.model}`, part.model].some(
           (name) => normalized === name.toLowerCase(),
         ),
