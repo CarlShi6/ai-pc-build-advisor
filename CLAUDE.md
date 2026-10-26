@@ -45,10 +45,11 @@ Do not replace the Build domain, proposal/confirm flow, or trust/provenance rule
 npm.cmd run lint; if ($?) { npm.cmd run typecheck }; if ($?) { npm.cmd test }; if ($?) { npm.cmd run build }
 ```
 
+- E2E: `npm.cmd run test:e2e` (Playwright 1.64.0 in local Edge, its own dev server on port 5181, files `e2e/*.e2e.ts`). Each flow signs in a generated mock user because mock guests share one session.
 - Dev server: `npm.cmd run dev`. Earlier sessions ran it at `http://127.0.0.1:5175/`.
 - If Vitest fails with `EPERM` renaming files in the system temp folder, set a writable temp first: `$env:TEMP="$PWD\.audit-tmp"; $env:TMP="$PWD\.audit-tmp"`. Don't commit `.audit-tmp`.
 - Build warnings about chunks over 500 kB, ignored `"use client"` directives and Wrangler `main`/`assets` overrides already existed. They are not failures.
-- Last known gate (end of R6 slice 9): lint 0, typecheck passed, 174 tests in 25 files passed, build passed.
+- Last known gate (R7 slice 1): lint 0, typecheck passed, 174 tests in 25 files passed, build passed, E2E 6/6 passed.
 
 ## Stack and conventions
 
@@ -77,9 +78,12 @@ npm.cmd run lint; if ($?) { npm.cmd run typecheck }; if ($?) { npm.cmd test }; i
 
 For each batch: inspect → plan → implement → test → run the full gate → verify in the browser → record results in `docs/milestones/R*_PROGRESS.md`. Report files changed, what was verified, limitations and the next step.
 
-## Current status and next steps (R6 Integration, Trust & Save/Export)
+## Current status and next steps (R7 Pre-Release Validation)
 
-Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 draft save and restore); R6 slice 2 (Studio shopping plan with Markdown and JSON report); R6 slice 3 (save revision check: `expectedUpdatedAt` → 409 `SAVE_CONFLICT`, with Studio "Open saved version" / "Overwrite with this tab"); R6 slice 4 (v3 funnel analytics via `src/lib/v3/funnel-analytics.ts`, counts and enums only); R6 slice 5 (14 hand-curated white/black 120/140 mm lit case fans for style matching; appearance-only, not a Build slot); R6 slice 6 (per-session image analysis limit, 3/min and 15/day, plus a retention note on the Image page); R6 slice 7 (exit-review gaps: Delete in My Builds, look-lock save test, `docs/engineering/LOCAL_DELIVERABLE_AND_ROLLBACK.md`). R6 slice 8 (EP-05: Preserve the Look and Balanced intents, trait outcomes, explicit look-lock override). R6 slice 9 (EP-06: Describe requirements wizard → existing recommender → preview with honest notes → confirm). R6 exit review: `docs/milestones/R6_EXIT_REVIEW.md`.
+Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 draft save and restore); R6 slice 2 (Studio shopping plan with Markdown and JSON report); R6 slice 3 (save revision check: `expectedUpdatedAt` → 409 `SAVE_CONFLICT`, with Studio "Open saved version" / "Overwrite with this tab"); R6 slice 4 (v3 funnel analytics via `src/lib/v3/funnel-analytics.ts`, counts and enums only); R6 slice 5 (14 hand-curated white/black 120/140 mm lit case fans for style matching; appearance-only, not a Build slot); R6 slice 6 (per-session image analysis limit, 3/min and 15/day, plus a retention note on the Image page); R6 slice 7 (exit-review gaps: Delete in My Builds, look-lock save test, `docs/engineering/LOCAL_DELIVERABLE_AND_ROLLBACK.md`). R6 slice 8 (EP-05: Preserve the Look and Balanced intents, trait outcomes, explicit look-lock override). R6 slice 9 (EP-06: Describe requirements wizard → existing recommender → preview with honest notes → confirm). R6 exit review: `docs/milestones/R6_EXIT_REVIEW.md`. R7 slice 1 (Playwright E2E foundation, 6 flows; `docs/milestones/R7_PROGRESS.md`).
 
 Next, in order:
-1. R7: Focus/Isolate mode, reduced motion and keyboard support, Playwright end-to-end tests, the PRD §19.3 fixture set, and an 8–12 person user study.
+1. R7 E2E: the remaining §19.3 flows (#2 lookalike correction, #4 replace from the 3D scene, #9 old-format restore, #10 unauthorized access/deletion, an explicit no-WebGL launch).
+2. R7: Focus/Isolate mode, reduced motion, keyboard and mobile support.
+3. R7: the PRD §19.3 curated image fixture set, performance profile and visual regression.
+4. R7: the 8–12 person user study and the local release checklist (§25).

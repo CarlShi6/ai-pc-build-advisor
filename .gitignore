@@ -9,6 +9,8 @@ lerna-debug.log*
 
 node_modules
 .audit-tmp/
+test-results/
+playwright-report/
 .npm-cache
 dist
 dist-ssr
