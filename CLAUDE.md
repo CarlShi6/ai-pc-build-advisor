@@ -29,6 +29,16 @@ Read these before starting work. They record where the rebuild stands:
 - Real image AI is intentionally not connected yet (deferred until deployment). Use the dev fixture on the Image page. Do not claim the live provider path is verified.
 - Never report a planned or mocked capability as implemented.
 
+## Reuse before building
+
+For generic capabilities (data sets, 3D/rendering, vision models, testing, analytics, rate limiting, file handling), first check for a mature open-source library or dataset and adapt it. Accept it only if:
+
+- the license allows commercial use (prefer MIT/Apache/BSD, ODC-By/CC-BY with attribution; flag GPL/AGPL and unclear data licenses);
+- data was not obtained by scraping against a site's terms (e.g. PCPartPicker-scraped datasets such as docyx/pc-part-dataset are out);
+- it is maintained and fits the existing stack without duplicating domain services.
+
+Do not replace the Build domain, proposal/confirm flow, or trust/provenance rules with third-party logic. Record each reuse decision (source, license, why) in `docs/engineering/REUSE_DECISIONS.md`.
+
 ## Commands (Windows PowerShell 5: no `&&`)
 
 ```powershell
@@ -38,7 +48,7 @@ npm.cmd run lint; if ($?) { npm.cmd run typecheck }; if ($?) { npm.cmd test }; i
 - Dev server: `npm.cmd run dev`. Earlier sessions ran it at `http://127.0.0.1:5175/`.
 - If Vitest fails with `EPERM` renaming files in the system temp folder, set a writable temp first: `$env:TEMP="$PWD\.audit-tmp"; $env:TMP="$PWD\.audit-tmp"`. Don't commit `.audit-tmp`.
 - Build warnings about chunks over 500 kB, ignored `"use client"` directives and Wrangler `main`/`assets` overrides already existed. They are not failures.
-- Last known gate (end of R6 slice 2): lint 0, typecheck passed, 144 tests in 20 files passed, build passed.
+- Last known gate (end of R6 slice 3): lint 0, typecheck passed, 149 tests in 20 files passed, build passed.
 
 ## Stack and conventions
 
@@ -61,6 +71,7 @@ npm.cmd run lint; if ($?) { npm.cmd run typecheck }; if ($?) { npm.cmd test }; i
 - Mock persistence is in memory, so a dev-server hot reload of persistence modules clears saved builds.
 - On a freshly loaded page, the first click can be lost before hydration finishes (seen in R6). This is an open R7 item.
 - When a slot is missing, compatibility rules return results that mean "not enough data". The shopping plan treats rules whose required category is absent as `notChecked`, not as warnings.
+- A saved Build's `updatedAt` is its save version (`src/lib/persistence/save-version.ts`). Adding post-build feedback elsewhere also bumps it, so the next Studio save reports a conflict. Choosing "Overwrite with this tab" is safe then, because feedback is stored separately.
 
 ## Working method
 
@@ -68,12 +79,12 @@ For each batch: inspect → plan → implement → test → run the full gate �
 
 ## Current status and next steps (R6 Integration, Trust & Save/Export)
 
-Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 draft save and restore); R6 slice 2 (Studio shopping plan with Markdown and JSON report).
+Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 draft save and restore); R6 slice 2 (Studio shopping plan with Markdown and JSON report); R6 slice 3 (save revision check: `expectedUpdatedAt` → 409 `SAVE_CONFLICT`, with Studio "Open saved version" / "Overwrite with this tab").
 
 Next, in order:
-1. Revision check on save, so a stale tab cannot overwrite a newer save.
-2. v3 funnel analytics events: image submitted → candidate reviewed → draft created → saved/exported.
-3. Per-session rate limit for image analysis (the current limit is process-wide) and a retention note on the Image page.
-4. "Preserve the Look" and "Balanced" optimization intents. Today only reduce-cost and improve-performance exist (PRD §10.1).
-5. Describe entry: reuse the existing `build-advisor` recommendation logic instead of leaving all part choices to the user.
-6. R7: Focus/Isolate mode, reduced motion and keyboard support, Playwright end-to-end tests, the PRD §19.3 fixture set, and an 8–12 person user study.
+0. Spike: BuildCores OpenDB (github.com/buildcores/buildcores-open-db, ODC-By 1.0, attribution required, no prices). Goal: close the R4 fan-coverage gap and UC-01, and get real dimensions for fit rules. Confirm which categories exist (especially case fans), field units and the attribution wording. Then map a small set of cases, GPUs, coolers and fans into the existing `Part` shape behind an adapter. Keep MPNs as identity evidence and keep catalog provenance (`last_manually_spec_verified_at`). Don't replace `seedParts` yet, and don't import prices. Record findings in `docs/engineering/REUSE_DECISIONS.md` (the candidate table is already there) and a milestone note.
+1. v3 funnel analytics events: image submitted → candidate reviewed → draft created → saved/exported.
+2. Per-session rate limit for image analysis (the current limit is process-wide) and a retention note on the Image page.
+3. "Preserve the Look" and "Balanced" optimization intents. Today only reduce-cost and improve-performance exist (PRD §10.1).
+4. Describe entry: reuse the existing `build-advisor` recommendation logic instead of leaving all part choices to the user.
+5. R7: Focus/Isolate mode, reduced motion and keyboard support, Playwright end-to-end tests, the PRD §19.3 fixture set, and an 8–12 person user study.

@@ -20,6 +20,16 @@ Decisions are provisional until each R1/R2 vertical slice passes its contract te
 | 3D scene and image-analysis modules | Build new | No implementation/dependency found. Defer specific rendering package/version until R2 compatibility check. |
 | Checkout/monetization routes and `src/lib/stripe.server.ts` | Defer | Keep existing paths working; redesign purchase gating only after the flagship decision flow and truthful trust states work. |
 
+## External open-source candidates (2026-10-25)
+
+| Source | License | Decision | Notes |
+|---|---|---|---|
+| [BuildCores OpenDB](https://github.com/buildcores/buildcores-open-db) | ODC-By 1.0 (attribution) | **Evaluate (spike next)** | Structured part specs, including case GPU/cooler/PSU clearance, supported form factors, color, side panel, lighting, MPNs, manufacturer URL, verification date, retailer listings with a `verified` flag. No prices. Candidate source for catalog breadth, appearance metadata and fit rules. Category coverage (fans) and units still to confirm. |
+| [docyx/pc-part-dataset](https://github.com/docyx/pc-part-dataset) | MIT (code); data scraped from PCPartPicker | **Reject** | Data provenance conflicts with the no-unauthorized-scraping principle (PRD 13.2, legacy PRD 3.3). |
+| Grounding DINO / OWLv2, CLIP/SigLIP + pgvector | Apache-2.0 / MIT (verify per checkpoint) | **Defer** | Region detection and appearance embeddings need hosted GPU inference. Revisit after the real image provider is connected and attribute matching proves insufficient (PRD Appendix B). |
+| Playwright | Apache-2.0 | **Adopt in R7** | E2E browser tests. |
+| Open LLM VRAM calculators (e.g. gguf-llm-vram-calculator) | Check per repo | **Defer to P1** | Reference formulas for the Local AI Workstation Lab only. |
+
 ## Guardrails
 
 1. One Build document and one revision govern 2D, 3D, AI suggestions, saves and export.
