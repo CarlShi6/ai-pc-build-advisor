@@ -246,7 +246,9 @@ function StudioPage() {
                     ? "Description draft · choose hardware below"
                     : document.source === "legacy"
                       ? "Opened from an existing saved build"
-                      : "Blank build draft"}
+                      : document.source === "sample"
+                        ? "Sample build · white parts from manufacturer pages; motherboard, CPU and SSD are seed parts. Swap anything; nothing is saved until you save."
+                        : "Blank build draft"}
             </p>
           </div>
           <div className="v3-studio-actions">

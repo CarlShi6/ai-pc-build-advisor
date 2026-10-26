@@ -132,4 +132,22 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - Gate: lint 0, typecheck passed, **198 tests in 29 files** passed, build passed, **E2E 7/7**.
 - Browser: before/after screenshots of the eight-part white build (scene, focused GPU, focused case) and the H5 Flow + ASUS PRIME variant. Headless Edge with SwiftShader.
 - Tooling in `tools/reference-models/harness/` (excluded from ESLint): review page, renderer, pass runner, advisory Tier 1, orchestrator wrapper, WebP→PNG. Manufacturer reference images are **not** committed.
-- Still open in week 3: the white showcase one-click sample; real image recognition (ask before `OPENAI_API_KEY`).
+- Still open in week 3 after slice 6: the white showcase one-click sample (slice 7, below); real image recognition (ask before `OPENAI_API_KEY`).
+
+### Slice 7: white showcase one-click sample — 2026-10-26
+
+- Home page "No photo?" row: **Try the white showcase sample**. One click creates a fresh local draft and opens the Studio. Nothing is saved until the user presses Save; the funnel records `v3_draft_created` with source `sample`.
+- `src/lib/v3/showcase-sample.ts`: eight parts.
+  - Five white showcase parts from manufacturer pages: O11 Dynamic EVO White, iCUE LINK TITAN 360 RX White, MSI RTX 5070 Ti Gaming Trio OC White, VENGEANCE RGB DDR5-6000 White, RM850x SHIFT White.
+  - Three seed parts: ROG Maximus Z790 Hero WiFi, Core i7-14700K, 990 PRO 2TB. The catalog has no white motherboard, CPU or SSD, and the Studio subtitle says so: "Sample build · white parts from manufacturer pages; motherboard, CPU and SSD are seed parts. Swap anything; nothing is saved until you save."
+- New draft source `sample` (`DraftSource`); it survives the save/restore envelope.
+- Result in the Studio: 8/8 slots, rules **Pass**, and "$3,374.96 + 1 unknown price, not counted" (the O11 has no manufacturer price). The case and GPU show as reference reconstructions.
+- Tests: `src/lib/v3/showcase-sample.test.ts` (4):
+  - all slots and categories, rules pass
+  - five white parts, unknown price kept unknown
+  - case and GPU reconstructed
+  - fresh draft each time, and the source survives a save round trip
+
+  E2E: `e2e/showcase-sample.e2e.ts` covers home → Studio, with the heading, seed-parts note, 8/8, pass, unknown price and reconstruction label.
+- Gate: lint 0, typecheck passed, **202 tests in 30 files** passed, build passed, **E2E 8/8**. Before/after screenshots of the home page and the sample Studio were shared.
+- Still open in week 3: real image recognition (ask before `OPENAI_API_KEY`).

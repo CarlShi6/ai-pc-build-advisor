@@ -1649,3 +1649,4 @@
 .v3-replace-card .v3-text-button{color:#cfd5da}
 .v3-replace-findings{margin:0;padding:8px 10px 8px 24px;border-radius:8px;background:#edba7514;color:#f0c58b;font-size:11px;line-height:1.45}
 .v3-replace-card .v3-replace-model{font-size:10px;color:#9fb3a5;line-height:1.4}
+.v3-other-starts .v3-sample-start{display:inline-flex;align-items:center;gap:6px;border:0;background:none;padding:0;font:inherit;color:#2f6b43;font-weight:650;cursor:pointer}.v3-other-starts .v3-sample-start:hover{text-decoration:underline}

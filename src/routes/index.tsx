@@ -1,7 +1,10 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
-import { FileText, ListChecks, Plus } from "lucide-react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { FileText, ListChecks, Plus, Sparkles } from "lucide-react";
 import { V3Shell } from "@/components/v3-shell";
 import { ImageStartFlow } from "@/components/image-start-flow";
+import { writeDraft } from "@/lib/v3/draft-session";
+import { funnel } from "@/lib/v3/funnel-analytics";
+import { createWhiteShowcaseSample } from "@/lib/v3/showcase-sample";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -21,6 +24,13 @@ const otherStarts = [
 ] as const;
 
 function HomePage() {
+  const navigate = useNavigate();
+  function openSample() {
+    const draft = createWhiteShowcaseSample();
+    writeDraft(draft);
+    funnel.draftCreated(draft);
+    void navigate({ to: "/studio" });
+  }
   return (
     <V3Shell>
       <main>
@@ -48,6 +58,9 @@ function HomePage() {
                   <Icon size={15} /> {label}
                 </Link>
               ))}
+              <button type="button" className="v3-sample-start" onClick={openSample}>
+                <Sparkles size={15} /> Try the white showcase sample
+              </button>
             </nav>
           </div>
         </section>

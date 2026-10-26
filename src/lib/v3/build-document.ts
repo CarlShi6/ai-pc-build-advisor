@@ -17,7 +17,7 @@ export const primarySlots = [
   "psu",
 ] as const;
 export type SlotId = (typeof primarySlots)[number];
-export type DraftSource = "image" | "describe" | "import" | "blank" | "legacy";
+export type DraftSource = "image" | "describe" | "import" | "blank" | "sample" | "legacy";
 export type Occupancy = "selected" | "unselected" | "unresolved";
 
 export interface VisualPriority {
@@ -148,7 +148,14 @@ export interface StoredDraftEnvelope {
 
 type BuildWithDraft = Build & { v3Draft?: unknown };
 
-const draftSources: readonly DraftSource[] = ["image", "describe", "import", "blank", "legacy"];
+const draftSources: readonly DraftSource[] = [
+  "image",
+  "describe",
+  "import",
+  "blank",
+  "sample",
+  "legacy",
+];
 const MAX_SOURCE_INPUT = 20_000;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
