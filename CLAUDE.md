@@ -84,7 +84,7 @@ Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 
 
 **Decision (2026-10-25): the 4-week demo track comes first.** The user needs a demonstrable visual result within a month, so the demo track below runs before the rest of R7. The R7 user study moves to after the demo track.
 
-Next: the demo track (see "Demo track (4 weeks)" below), starting with week 1.
+Next: the rest of demo track week 3 (see "Demo track (4 weeks)" below and `docs/milestones/DEMO_TRACK_PROGRESS.md`). Weeks 1–2 are done. Week 3 has white showcase parts (slice 5) and reference-reconstructed models in the scene (slice 6: img2threejs for the O11 and the MSI GPU, spec-envelope models for the other cases and GPU; pipeline specs in `reference-models/`, tooling in `tools/reference-models/`). Still open: the white showcase one-click sample, then real image recognition (ask before `OPENAI_API_KEY`), then week 4.
 
 R7, after the demo track (in order):
 1. R7 E2E: the remaining §19.3 flows (#2 lookalike correction, #4 replace from the 3D scene, #9 old-format restore, #10 unauthorized access/deletion, an explicit no-WebGL launch).

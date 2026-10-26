@@ -18,7 +18,7 @@ import {
 } from "@react-three/drei";
 import { Bloom, DepthOfField, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
 import type { ThreeEvent } from "@react-three/fiber";
-import { Vector3, type Group } from "three";
+import { Euler, Matrix4, Quaternion, Vector3, type Group } from "three";
 import {
   primarySlots,
   selectedPart,
@@ -35,6 +35,12 @@ import {
   type Point,
   type SceneMode,
 } from "@/lib/v3/scene-focus";
+import {
+  MM_PER_SCENE_UNIT,
+  referenceModelFor,
+  sceneSize,
+  type ReferenceModel,
+} from "@/lib/v3/reference-models";
 
 export type { SceneMode } from "@/lib/v3/scene-focus";
 export interface BuildSceneProps {
@@ -56,7 +62,7 @@ export interface BuildSceneProps {
 
 const FLOOR_Y = -1.7;
 
-// PBR material presets (illustrative; exact per-SKU models arrive with the demo track week 3).
+// PBR material presets for the illustrative parts; per-SKU reference models bring their own.
 const metal = { color: "#c3c8cf", metalness: 1, roughness: 0.3 };
 const darkMetal = { color: "#2a2d32", metalness: 0.75, roughness: 0.36 };
 const pcb = { color: "#15201a", metalness: 0.2, roughness: 0.78 };
@@ -185,6 +191,59 @@ function CaseModel({ size, presentation }: { size: Point; presentation: ScenePre
           <RgbRing radius={0.28} position={[0, 0, 0.03]} color={presentation.accentColor} />
         </group>
       ))}
+    </group>
+  );
+}
+
+// GPU reference models are authored fan-face +x, height +y, bracket +z; the GPU slot lies flat
+// with the fans facing down, the top edge towards the glass and the bracket at the rear.
+const gpuFrameRotation = new Euler().setFromRotationMatrix(
+  new Matrix4().makeBasis(new Vector3(0, -1, 0), new Vector3(0, 0, 1), new Vector3(-1, 0, 0)),
+);
+
+/** A per-SKU reference reconstruction, drawn 1:1 from its millimetre parts. */
+function ReferenceModelMesh({ model }: { model: ReferenceModel }) {
+  const dim = useContext(DimContext);
+  return (
+    <group
+      rotation={model.frame === "gpu" ? gpuFrameRotation : undefined}
+      scale={1 / MM_PER_SCENE_UNIT}
+    >
+      {model.parts.map((part) => {
+        const material = model.materials[part.material];
+        const glass = !!material.transmission;
+        return (
+          <mesh
+            key={part.id}
+            position={part.positionMm}
+            scale={part.sizeMm}
+            castShadow={!glass}
+            receiveShadow
+          >
+            {part.shape === "box" ? <boxGeometry /> : <sphereGeometry args={[0.5, 48, 12]} />}
+            {glass ? (
+              <meshPhysicalMaterial
+                key={dim ? "dim" : "lit"}
+                color={material.color}
+                metalness={0}
+                roughness={material.roughness}
+                transmission={material.transmission}
+                thickness={0.05}
+                ior={1.5}
+                transparent
+                opacity={dim ? 0.04 : 0.22}
+                depthWrite={false}
+              />
+            ) : (
+              <Mat
+                color={material.color}
+                roughness={material.roughness}
+                metalness={material.metalness}
+              />
+            )}
+          </mesh>
+        );
+      })}
     </group>
   );
 }
@@ -322,15 +381,36 @@ function SlotMesh({
   const occupancy = slotOccupancy(document, slot);
   const target = slotPosition(slot, mode, explode, focusSlot);
   const dimmed = isDimmed(slot, focusSlot);
-  const size: Point =
-    slot === "case" && presentation.layout === "showcase" ? [2.55, 3.05, 1.75] : layout[slot].size;
-  // Ease towards the resting position; snap when the user prefers reduced motion.
+  const model =
+    occupancy === "selected" ? referenceModelFor(selectedPart(document, slot)?.id) : null;
+  const size: Point = model
+    ? sceneSize(model)
+    : slot === "case" && presentation.layout === "showcase"
+      ? [2.55, 3.05, 1.75]
+      : layout[slot].size;
+  // A focused GPU reference model turns its fan side to the viewer; in the case it lies fans-down.
+  const rotation: Point =
+    slot === "gpu" && model && focusSlot === slot
+      ? [-1.87, 0, 0]
+      : slot === "gpu" && presentation.gpuVertical
+        ? [0, 0, Math.PI / 2]
+        : [0, 0, 0];
+  const placed = useRef(false);
+  // Ease towards the resting pose; snap on the first frame and when the user prefers reduced motion.
   useFrame((_, delta) => {
     const node = group.current;
     if (!node) return;
     const goal = new Vector3(...target);
-    if (prefersReducedMotion()) node.position.copy(goal);
-    else node.position.lerp(goal, 1 - Math.exp(-delta * 9));
+    const turn = new Quaternion().setFromEuler(new Euler(...rotation));
+    if (!placed.current || prefersReducedMotion()) {
+      node.position.copy(goal);
+      node.quaternion.copy(turn);
+      placed.current = true;
+    } else {
+      const step = 1 - Math.exp(-delta * 9);
+      node.position.lerp(goal, step);
+      node.quaternion.slerp(turn, step);
+    }
   });
   const flagged =
     mode === "review" &&
@@ -353,12 +433,13 @@ function SlotMesh({
       <group
         ref={group}
         position={target}
-        rotation={slot === "gpu" && presentation.gpuVertical ? [0, 0, Math.PI / 2] : [0, 0, 0]}
         // A dimmed case would swallow clicks meant for the parts around it.
         onClick={dimmed && slot === "case" ? undefined : handleClick}
       >
         {occupancy === "selected" ? (
-          slot === "case" ? (
+          model ? (
+            <ReferenceModelMesh model={model} />
+          ) : slot === "case" ? (
             <CaseModel size={size} presentation={presentation} />
           ) : (
             <PartModel slot={slot} size={size} accent={presentation.accentColor} />

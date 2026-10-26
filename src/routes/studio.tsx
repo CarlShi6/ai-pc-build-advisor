@@ -63,7 +63,14 @@ const balanceLabels: Array<[BalanceWeight, string]> = [
 ];
 import { scenePresentation } from "@/lib/v3/scene-presentation";
 import { getValidatedOfficialUrl } from "@/lib/product-trust";
-import { priceCoverage } from "@/lib/v3/catalog";
+import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
+import { REFERENCE_MODEL_LABEL, referenceModelSlots } from "@/lib/v3/reference-models";
+
+/** Signed price change, or "Unknown" when either price is unknown (unknown is never $0). */
+function priceChangeText(delta: number, candidate: Part, current: Part | undefined) {
+  if (priceUnknown(candidate) || (current && priceUnknown(current))) return "Unknown";
+  return `${delta < 0 ? "−" : "+"}$${Math.abs(delta).toLocaleString()}`;
+}
 
 /** A manufacturer page when the catalog has one; otherwise the existing retailer search, labeled as such. */
 function partLinkFor(part: Part | undefined) {
@@ -213,6 +220,7 @@ function StudioPage() {
   const preview = proposal?.candidate ?? null;
   const previewStatus = preview ? completeness(preview) : null;
   const presentation = scenePresentation(document);
+  const referenceSlots = referenceModelSlots(document);
   const prices = priceCoverage(document.build.parts);
   const optimization =
     document.imageContext && current
@@ -405,9 +413,11 @@ function StudioPage() {
             </div>
           )}
           <p className="v3-scene-disclosure">
+            {referenceSlots.length > 0 &&
+              `${referenceSlots.map((slot) => slotLabel[slot]).join(" and ")}: ${REFERENCE_MODEL_LABEL}. `}
             {presentation.layout === "showcase" ? "Showcase" : "Tower"} layout uses generic
-            illustrative geometry. It does not verify exact SKU shape or physical clearance. Dashed
-            callouts remain for empty slots.
+            illustrative geometry{referenceSlots.length > 0 ? " for the other parts" : ""}. Neither
+            verifies physical clearance. Dashed callouts remain for empty slots.
           </p>
         </section>
         {document.imageContext && (
@@ -626,9 +636,8 @@ function StudioPage() {
                     >
                       <strong>{option.part.displayName}</strong>
                       <small>
-                        {option.proposal.priceDelta >= 0 ? "+" : ""}$
-                        {option.proposal.priceDelta.toLocaleString()} seed price ·{" "}
-                        {option.proposal.compatibilityAfter} rule status
+                        {priceChangeText(option.proposal.priceDelta, option.part, current)} seed
+                        price · {option.proposal.compatibilityAfter} rule status
                       </small>
                       {option.traitImpacts.length > 0 && (
                         <small>
@@ -700,13 +709,15 @@ function StudioPage() {
                 <h3>{candidate.displayName}</h3>
                 <div>
                   <span>Price difference</span>
-                  <strong>
-                    {proposal.priceDelta >= 0 ? "+" : ""}${proposal.priceDelta.toLocaleString()}
-                  </strong>
+                  <strong>{priceChangeText(proposal.priceDelta, candidate, current)}</strong>
                 </div>
                 <div>
                   <span>New seed total</span>
-                  <strong>${preview.build.totalPrice.toLocaleString()}</strong>
+                  <strong>
+                    ${preview.build.totalPrice.toLocaleString()}
+                    {priceCoverage(preview.build.parts).unknown > 0 &&
+                      ` + ${priceCoverage(preview.build.parts).unknown} unknown`}
+                  </strong>
                 </div>
                 <div>
                   <span>Selected slots</span>

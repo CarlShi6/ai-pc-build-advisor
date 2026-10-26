@@ -1,0 +1,6930 @@
+{
+ "targetName": "MSI RTX 5070 Ti GAMING TRIO OC WHITE graphics card",
+ "targetId": "msi-rtx-5070-ti-gaming-trio-oc-white-graphics-card",
+ "schemaVersion": "2.1",
+ "terminologyProfile": {
+  "domain": "real-time procedural Three.js asset",
+  "geometryTerms": [
+   "silhouette",
+   "topology",
+   "primitive",
+   "bevel",
+   "chamfer",
+   "taper",
+   "bend",
+   "boolean cut",
+   "edge loop",
+   "surface normal",
+   "displacement"
+  ],
+  "materialTerms": [
+   "albedo",
+   "baseColor",
+   "roughness",
+   "metalness",
+   "normal map",
+   "bump map",
+   "ambient occlusion",
+   "cavity dirt",
+   "edge wear",
+   "clearcoat"
+  ],
+  "lightingTerms": [
+   "key light",
+   "fill light",
+   "rim light",
+   "HDRI/environment reflection",
+   "contact shadow"
+  ],
+  "descriptionRule": "Use measurable 3D graphics terms. Avoid vague words unless they are paired with concrete geometry/material/shader parameters."
+ },
+ "sourceImage": "reference.png",
+ "referenceCamera": {
+  "solved": false,
+  "fovDegrees": 40.0,
+  "aspect": 1.0,
+  "orientation": {
+   "yaw": 0.0,
+   "pitch": 0.0,
+   "roll": 0.0
+  },
+  "positionHint": [
+   0.0,
+   0.0,
+   3.0
+  ],
+  "note": "For likeness work, solve the reference camera (forge/stage1_intake/solve_camera_pose.py) so the review render aligns with the photo and the reference can be projected. Confirm by overlay review."
+ },
+ "suitability": "conditional",
+ "scores": {
+  "object_isolation": 0,
+  "silhouette_readability": 0,
+  "depth_inference": 0,
+  "primitive_decomposition": 0,
+  "material_procedurality": 0,
+  "occlusion_risk": 0,
+  "interaction_fit": 0
+ },
+ "preSpecAssessment": {
+  "objectClass": {
+   "primaryType": "triple-fan graphics card (PCIe add-in board)",
+   "primaryDomain": "object",
+   "formLanguage": [
+    "hard-surface",
+    "mechanical"
+   ],
+   "structureKind": [
+    "compound object",
+    "layered shell"
+   ],
+   "motionPotential": [
+    "static prop",
+    "rotating parts"
+   ],
+   "materialFamilies": [
+    "plastic",
+    "metal"
+   ],
+   "notes": "Manufacturer gallery image of the exact SKU (white). Dimensions come from the spec table, not the image."
+  },
+  "complexity": {
+   "tier": "moderate",
+   "scores": {
+    "silhouetteComplexity": 1,
+    "componentCount": 2,
+    "hierarchyDepth": 2,
+    "repetitionDensity": 2,
+    "materialLayerCount": 2,
+    "localDetailDensity": 2,
+    "occlusionRisk": 1,
+    "actionReadinessNeed": 1
+   },
+   "estimatedCounts": {
+    "macroComponents": 4,
+    "mesoComponents": 10,
+    "microFeatureGroups": 3,
+    "materialLayers": 7,
+    "repetitionSystems": 1
+   },
+   "reasoning": [
+    "Long thin slab with a white shroud carrying three circular fans, bracket at one end.",
+    "Repetition: three fans (ring, blade disc, hub each).",
+    "Backplate and top edge visible in the back and three-quarter references."
+   ]
+  },
+  "specDepthDecision": {
+   "requiredDepth": "moderate",
+   "minimumComponentLevels": [
+    "macro",
+    "meso"
+   ],
+   "needsRepetitionSystems": false,
+   "needsMaterialLocalOverrides": false,
+   "needsMultipleReviewViews": true,
+   "needsActionReadyHierarchy": true,
+   "rationale": "Choose simple/moderate/complex/ultra-complex from observed structure, not from a hardcoded domain."
+  },
+  "unknownsToResolveBeforeImplementation": [],
+  "detailInventory": {
+   "scanMethod": "component-zones",
+   "targetMinDetails": 6,
+   "note": "Enumerate every identity-defining small detail before authoring the spec. Each detail must map to a component.localFeatures entry or material.localOverrides entry, never prose only. Use forge/stage1_intake/build_detail_inventory.py to scan zones.",
+   "details": [
+    {
+     "id": "three-fans",
+     "kind": "contour",
+     "zone": "fan side",
+     "description": "three ~96 mm axial fans across the shroud",
+     "mapsTo": {
+      "ref": "fan-ring-1"
+     }
+    },
+    {
+     "id": "fan-hubs",
+     "kind": "contour",
+     "zone": "fan centres",
+     "description": "white hubs; logos omitted",
+     "mapsTo": {
+      "ref": "fan-hub-1"
+     }
+    },
+    {
+     "id": "rgb-accents",
+     "kind": "emissive",
+     "zone": "shroud top-centre and bottom-left",
+     "description": "pale violet RGB diffusers",
+     "mapsTo": {
+      "ref": "rgb-accent-top"
+     }
+    },
+    {
+     "id": "pcie-fingers",
+     "kind": "linework",
+     "zone": "bottom near bracket",
+     "description": "gold PCIe x16 edge connector",
+     "mapsTo": {
+      "ref": "pcie-fingers"
+     }
+    },
+    {
+     "id": "io-bracket",
+     "kind": "contour",
+     "zone": "left end",
+     "description": "dark grey dual-slot PCIe bracket",
+     "mapsTo": {
+      "ref": "io-bracket"
+     }
+    },
+    {
+     "id": "white-shroud",
+     "kind": "gloss",
+     "zone": "fan side",
+     "description": "satin white shroud",
+     "mapsTo": {
+      "ref": "front-shroud"
+     }
+    },
+    {
+     "id": "backplate",
+     "kind": "contour",
+     "zone": "back",
+     "description": "white painted backplate",
+     "mapsTo": {
+      "ref": "backplate"
+     }
+    }
+   ]
+  },
+  "anatomy": {
+   "applies": false,
+   "styleHeads": 0.0,
+   "proportions": {
+    "headUnit": 0.0,
+    "torso": 0.0,
+    "legs": 0.0,
+    "shoulderWidth": 0.0,
+    "hipWidth": 0.0
+   },
+   "pose": {
+    "type": "unassessed",
+    "jointAngles": {}
+   },
+   "faceLandmarks": {
+    "eyeLine": 0.0,
+    "eyeSpacing": 0.0,
+    "noseBase": 0.0,
+    "mouthLine": 0.0,
+    "hairline": 0.0
+   },
+   "features": [],
+   "confidence": 0.0,
+   "note": "Only meaningful when objectClass.primaryDomain is character or hybrid. Set applies=true and fill from forge/stage1_intake/extract_landmarks.py. See grimoire/character/reconstruction.md and grimoire/character/likeness_maximization.md."
+  },
+  "sourceImage": "reference.png"
+ },
+ "qualityContract": {
+  "qualityBar": "moderate",
+  "definitionOfDone": [
+   "Outer bounding box is 1:1 with the published 338 x 140 x 50 mm (scene units = mm/150).",
+   "Fan side reads as a white shroud with three evenly spaced circular fans and the bracket at the left end.",
+   "Gold PCIe fingers under the bracket end; no brand marks."
+  ],
+  "minimumSpecDepth": {
+   "macroComponents": 4,
+   "mesoComponents": 8,
+   "microFeatureGroups": 2,
+   "materialLayers": 5,
+   "repetitionSystems": 1,
+   "reviewViewpoints": 3
+  },
+  "featureGroups": [
+   {
+    "id": "overall-silhouette",
+    "name": "Overall silhouette and proportions",
+    "required": true,
+    "qualityCriteria": [
+     "Bounding shape, dominant curves, negative spaces, and scale relationships are explicitly described."
+    ],
+    "evidenceRefs": [
+     "full-object"
+    ],
+    "failureModes": [
+     "model reads as a generic placeholder instead of the reference object",
+     "major proportions are guessed without evidence"
+    ]
+   },
+   {
+    "id": "primary-structure",
+    "name": "Primary structure and hierarchy",
+    "required": true,
+    "qualityCriteria": [
+     "Major parts, joints, seams, contact points, and parent-child relationships are named before code generation."
+    ],
+    "evidenceRefs": [
+     "full-object"
+    ],
+    "failureModes": [
+     "large visible parts are merged into one mesh",
+     "component hierarchy is too shallow for the observed complexity"
+    ]
+   },
+   {
+    "id": "attachment-joint-correctness",
+    "name": "Attachment and joint correctness",
+    "required": true,
+    "qualityCriteria": [
+     "Every visible child appendage, branch, limb, handle, connector, tube, cable, horn, wing, leg, or hinged part has an attachment contract with parent socket, localStart/localEnd, contact type, embed/overlap, and gap tolerance."
+    ],
+    "evidenceRefs": [
+     "full-object"
+    ],
+    "failureModes": [
+     "child part root floats away from the parent",
+     "branch/limb/tube is centered in space instead of pivoting from its root",
+     "parent-child transform mixes world and local coordinates"
+    ]
+   },
+   {
+    "id": "surface-material-response",
+    "name": "Surface material response",
+    "required": true,
+    "qualityCriteria": [
+     "Albedo zones, roughness, normal/bump/displacement intent, cavity dirt, edge wear, and local overrides are specified where visible.",
+     "Important materials define independent albedo, roughness, height/normal, and AO responses instead of reusing one texture for unrelated PBR channels.",
+     "Surface response is decomposed into macro, meso, and micro frequency bands with scale and amplitude tied to object scale."
+    ],
+    "evidenceRefs": [
+     "full-object"
+    ],
+    "failureModes": [
+     "surface looks like flat plastic",
+     "local material variation is missing or not tied to image evidence"
+    ]
+   },
+   {
+    "id": "reference-lookdev",
+    "name": "Reference color, material, and lighting response",
+    "required": true,
+    "qualityCriteria": [
+     "Material-pass names the reference-derived albedo palette, roughness variation, tactile normal/bump/displacement response, and local masks.",
+     "When a source image is available, run reference PBR extraction and require confidence >= 0.7 before treating maps as implementation-ready.",
+     "Lighting-pass names key/fill/rim or environment light, exposure, tone mapping, background, and contact shadow behavior.",
+     "Neutral, grazing-angle, and reference-matched renders prove that surface relief survives relighting and is not painted into albedo."
+    ],
+    "evidenceRefs": [
+     "full-object"
+    ],
+    "failureModes": [
+     "model has acceptable shape but reads as flat shaded or plastic",
+     "colors are a generic average instead of reference-observed local color zones",
+     "lighting is evenly ambient and cannot reproduce the source value range"
+    ]
+   }
+  ],
+  "visualDeltaChecks": [
+   "silhouette and negative-space delta",
+   "component hierarchy depth delta",
+   "repetition density and distribution delta",
+   "material albedo/roughness/normal response delta",
+   "local feature placement and scale delta"
+  ],
+  "antiShallowSpecRules": [
+   "Do not proceed to code if qualityContract.qualityBar is unassessed.",
+   "Do not proceed to code if the spec only contains a root component for a moderate or complex object.",
+   "Do not proceed to code if required featureGroups are not represented by componentTree, materials, or repetitionSystems.",
+   "Do not proceed to code if visible local features are described only in prose and not attached to components/materials/evidenceRefs.",
+   "Do not proceed past structural-pass if attached child parts lack attachment.parentSocket, localStart, localEnd, embedDepth/overlap, and gapTolerance.",
+   "Do not pass material look-dev when albedo is reused as roughness, height, normal, or AO.",
+   "Do not pass material look-dev without macro, meso, and micro surface frequency bands for close-up materials.",
+   "Do not pass reference-fidelity material look-dev from a source image without usable referencePbr maps or an explicit documented limitation.",
+   "Do not patch a spec with extracted PBR maps when extraction confidence is below the target threshold unless the user explicitly accepts lower fidelity.",
+   "Do not place adjacent separate-geometry parts below 0.02 world-unit seam overlap (source: grimoire/build/geometry_patterns.md).",
+   "Do not satisfy raised or recessed relief, fasteners, or grip structure with a map alone when the feature affects form; use geometry or displacement (source: grimoire/build/geometry_patterns.md).",
+   "Adjacent components must overlap by at least 0.02 world units at shared seams (source: grimoire/build/geometry_patterns.md).",
+   "Raised or recessed relief and fasteners must be geometry, instanced micro-parts, or displacement; a map alone is an approximation (source: grimoire/build/geometry_patterns.md)."
+  ],
+  "mustNotDo": [
+   "Do not proceed to code if qualityContract.qualityBar is unassessed.",
+   "Do not proceed to code if the spec only contains a root component for a moderate or complex object.",
+   "Do not proceed to code if required featureGroups are not represented by componentTree, materials, or repetitionSystems.",
+   "Do not proceed to code if visible local features are described only in prose and not attached to components/materials/evidenceRefs.",
+   "Do not proceed past structural-pass if attached child parts lack attachment.parentSocket, localStart, localEnd, embedDepth/overlap, and gapTolerance.",
+   "Do not pass material look-dev when albedo is reused as roughness, height, normal, or AO.",
+   "Do not pass material look-dev without macro, meso, and micro surface frequency bands for close-up materials.",
+   "Do not pass reference-fidelity material look-dev from a source image without usable referencePbr maps or an explicit documented limitation.",
+   "Do not patch a spec with extracted PBR maps when extraction confidence is below the target threshold unless the user explicitly accepts lower fidelity.",
+   "Do not place adjacent separate-geometry parts below 0.02 world-unit seam overlap (source: grimoire/build/geometry_patterns.md).",
+   "Do not satisfy raised or recessed relief, fasteners, or grip structure with a map alone when the feature affects form; use geometry or displacement (source: grimoire/build/geometry_patterns.md).",
+   "Adjacent components must overlap by at least 0.02 world units at shared seams (source: grimoire/build/geometry_patterns.md).",
+   "Raised or recessed relief and fasteners must be geometry, instanced micro-parts, or displacement; a map alone is an approximation (source: grimoire/build/geometry_patterns.md)."
+  ]
+ },
+ "qualityTargets": {
+  "targetFidelity": 0.7,
+  "mustMatch": [
+   "macro silhouette and proportions",
+   "primary material albedo/roughness response",
+   "reference-derived PBR material response at or above 0.7 confidence when source pixels are usable",
+   "most recognizable local features"
+  ],
+  "niceToHave": [
+   "micro scratches, stains, chips, and dirt masks",
+   "secondary lighting match"
+  ],
+  "fpsTarget": 60,
+  "reviewViewpoints": [
+   "front",
+   "three-quarter",
+   "side",
+   "thickness-axis",
+   "long-axis"
+  ]
+ },
+ "selfCorrectLoop": {
+  "enabled": true,
+  "visualAcceptance": {
+   "reviewer": "ai-vision",
+   "threshold": 0.7,
+   "comparisonArtifactRequired": true,
+   "layerScoresRequired": true,
+   "codePixelDiffIsAcceptanceAuthority": false,
+   "scoringRule": "AI vision must inspect a side-by-side reference/render sheet and score the current pass from 0 to 1. Pixel-diff code may assist diagnostics but cannot approve a pass.",
+   "requiredLayerScores": [
+    "silhouetteProportion",
+    "componentStructure",
+    "formDetail",
+    "materialSurface",
+    "lightingCamera"
+   ],
+   "featureReviewPolicy": {
+    "enabled": true,
+    "reviewUnit": "semantic-subsystem",
+    "maxCriticalFeaturesPerPass": 5,
+    "maxImportantFeaturesPerPass": 3,
+    "criticalDefaultThreshold": 0.8,
+    "importantAverageThreshold": 0.65,
+    "adaptiveEscalation": true,
+    "singleImagePairOnly": true,
+    "selectionRule": "Choose only the most visually salient, identity-defining, user-prioritized, or high-risk semantic systems. Group repeated parts instead of reviewing every mesh. AI vision scores every selected feature from the same full reference/render pair."
+   }
+  },
+  "reviewAfterPasses": [
+   "blockout",
+   "structural-pass",
+   "form-refinement",
+   "material-pass",
+   "surface-pass",
+   "lighting-pass",
+   "interaction-pass",
+   "optimization-pass"
+  ],
+  "allowedActions": [
+   "continue",
+   "refine-spec",
+   "refine-code",
+   "request-input",
+   "stop"
+  ],
+  "specRefineTriggers": [
+   "missing component",
+   "wrong primitive family",
+   "wrong proportions",
+   "material layer under-specified",
+   "local feature not traceable to viewEvidence",
+   "reference ambiguity discovered during implementation"
+  ],
+  "codeRefineTriggers": [
+   "spec is adequate but generated geometry/material does not match",
+   "browser render differs from reference",
+   "performance budget exceeded",
+   "lighting hides geometry or material response"
+  ],
+  "stopCriteria": [
+   "target fidelity reached or user accepts current approximation",
+   "remaining gaps require new reference images or manual art"
+  ],
+  "screenshotPolicy": {
+   "requiredForPasses": [
+    "blockout",
+    "structural-pass",
+    "form-refinement",
+    "material-pass",
+    "surface-pass",
+    "lighting-pass",
+    "interaction-pass"
+   ],
+   "preferredCapture": "in-app-browser-screenshot",
+   "fallbackCapture": "user-supplied-screenshot-path",
+   "minimumEvidence": "Each visual pass needs a reference image, rendered screenshot, side-by-side comparison sheet, AI vision score, layer scores, and critique before choosing continue.",
+   "reviewPairRule": "Compare the same camera/viewpoint whenever possible; do not judge a front reference against a random render angle.",
+   "acceptanceAuthority": "AI vision review of the comparison sheet. Code-generated pixel similarity is not sufficient evidence."
+  }
+ },
+ "featureReviewTargets": [
+  {
+   "id": "envelope-proportions",
+   "name": "Envelope 338 L x 140 H x 50 T mm",
+   "tier": "critical",
+   "passIds": [
+    "blockout"
+   ],
+   "minimumScore": 0.8,
+   "mustPass": true,
+   "componentRefs": [
+    "card-root",
+    "front-shroud",
+    "backplate"
+   ],
+   "evidenceRefs": [
+    "full-object"
+   ]
+  },
+  {
+   "id": "three-fans",
+   "name": "Three evenly spaced ~96 mm fans across the shroud",
+   "tier": "critical",
+   "passIds": [
+    "structural-pass",
+    "form-refinement"
+   ],
+   "minimumScore": 0.8,
+   "mustPass": true,
+   "componentRefs": [
+    "fan-ring-1",
+    "fan-ring-2",
+    "fan-ring-3"
+   ],
+   "evidenceRefs": [
+    "full-object"
+   ]
+  },
+  {
+   "id": "bracket-fingers",
+   "name": "Bracket at the left end, gold fingers below the bracket half",
+   "tier": "important",
+   "passIds": [
+    "structural-pass"
+   ],
+   "minimumScore": 0.7,
+   "mustPass": false,
+   "componentRefs": [
+    "io-bracket",
+    "pcie-fingers"
+   ],
+   "evidenceRefs": [
+    "full-object"
+   ]
+  },
+  {
+   "id": "white-shroud",
+   "name": "Satin white shroud with grey-reading fan discs",
+   "tier": "critical",
+   "passIds": [
+    "material-pass"
+   ],
+   "minimumScore": 0.75,
+   "mustPass": true,
+   "componentRefs": [
+    "front-shroud",
+    "fan-blades-1"
+   ],
+   "evidenceRefs": [
+    "full-object"
+   ]
+  }
+ ],
+ "sculptPipeline": {
+  "passGateMode": "locked-sequential",
+  "passOrder": [
+   "blockout",
+   "structural-pass",
+   "form-refinement",
+   "material-pass",
+   "surface-pass",
+   "lighting-pass",
+   "interaction-pass",
+   "optimization-pass"
+  ],
+  "currentPass": "complete",
+  "completedPasses": [
+   "blockout",
+   "structural-pass",
+   "form-refinement",
+   "material-pass",
+   "surface-pass",
+   "lighting-pass",
+   "interaction-pass",
+   "optimization-pass"
+  ],
+  "lastCompletedPass": "optimization-pass",
+  "blockedReason": "all build passes completed",
+  "nextRequiredEvidence": []
+ },
+ "lookDevTargets": {
+  "qualityPriority": "reference-fidelity",
+  "materialPass": {
+   "albedoPaletteRequired": true,
+   "roughnessVariationRequired": true,
+   "normalOrBumpRequired": true,
+   "localOverridesRequired": true,
+   "minimumTextureResolution": 1024,
+   "preferredTextureResolution": 2048,
+   "independentMapChannels": [
+    "albedo",
+    "roughness",
+    "height",
+    "normal",
+    "ambient-occlusion"
+   ],
+   "requiredSurfaceFrequencyBands": [
+    "macro",
+    "meso",
+    "micro"
+   ],
+   "geometryReliefRequiredWhenSilhouetteAffected": true,
+   "referencePbrExtraction": {
+    "requiredWhenSourceImagePresent": true,
+    "targetThreshold": 0.7,
+    "stopOnLowConfidence": true,
+    "script": "forge/stage1_intake/extract_pbr_evidence.py",
+    "acceptedLimitation": "single-image extraction is reference-derived inference, not exact photogrammetry"
+   },
+   "mustAvoid": [
+    "single flat albedo per material",
+    "uniform roughness",
+    "albedo texture reused as roughness/height/normal/AO",
+    "single-frequency random noise",
+    "plastic-looking smooth bark, stone, cloth, foliage, or aged material",
+    "local color/detail described only in prose without material masks",
+    "claiming exact PBR recovery when confidence is below the target threshold"
+   ]
+  },
+  "lightingPass": {
+   "requiredTerms": [
+    "key light",
+    "fill light",
+    "rim or environment light",
+    "exposure",
+    "tone mapping",
+    "background",
+    "contact shadow"
+   ],
+   "mustAvoid": [
+    "ambient-only lighting",
+    "flat value range",
+    "missing contact shadow",
+    "reference lighting copied without separating material readability"
+   ]
+  },
+  "screenshotReview": [
+   "Compare albedo palette and local color zones.",
+   "Compare roughness/normal/bump response under light.",
+   "Compare cavity dirt, edge wear, stains, moss, scratches, or other local masks.",
+   "Compare key/fill/rim structure, exposure, tone mapping, background, and contact shadows.",
+   "Capture a neutral-light render to verify material readability without reference lighting.",
+   "Capture a grazing-light close-up to expose flat normals, uniform roughness, tiling, and plastic highlights.",
+   "Capture a reference-matched render from the same camera framing as the source."
+  ]
+ },
+ "actionReadiness": {
+  "contract": "Every macro/meso component should be generated as a stable named Object3D pivot node with a mesh child, action metadata, optional sockets, collider proxy, and destruction metadata.",
+  "defaultRigType": "action-ready-static-rig",
+  "rootMotionNode": "root",
+  "requiredComponentFields": [
+   "id",
+   "parent",
+   "transform",
+   "attachment for child appendages, connectors, limbs, tubes, handles, legs, horns, wings, branches, or cables",
+   "actionProfile.animationRole",
+   "actionProfile.pivot",
+   "actionProfile.collider",
+   "actionProfile.destruction"
+  ],
+  "transformChannels": [
+   "translate",
+   "rotate",
+   "scale",
+   "bend",
+   "twist",
+   "detach",
+   "visibility",
+   "material-state"
+  ],
+  "authoringRules": [
+   "Do not collapse independently movable parts into one mesh.",
+   "Put transforms on component pivot groups, not only on raw meshes.",
+   "For attached child parts, put the pivot at the semantic root/socket and build visible geometry from localStart to localEnd.",
+   "Represent hinge, socket, detachable, and breakable intent even when no animation is implemented yet.",
+   "Use simplified collider proxies for runtime physics instead of visual mesh colliders by default."
+  ],
+  "destructionPolicy": {
+   "defaultBreakable": false,
+   "fractureGroupNaming": "Use stable semantic names such as body-shell, left-hinge, glass-panel, branch-segment.",
+   "debrisStrategy": "Prefer detachable component groups and a small number of procedural fragments over random mesh explosion."
+  }
+ },
+ "assumptions": [
+  "Outer envelope from the manufacturer spec table: 338 x 140 x 50 mm.",
+  "Sub-part placements (fan centres, bracket, gold fingers, RGB accents) are measured on the fan-side reference at 0.394 mm/px inside that envelope; they are not published values.",
+  "Fan blades are a tonal disc (reference mean) because blade detail is sub-pixel at scene scale.",
+  "Brand marks, hub logos and printed text are omitted by policy.",
+  "Silhouette IoU is advisory for white-on-white manufacturer references (user decision 2026-10-25, Option A); Divine Eye objectness is the evidence.",
+  "Reference reconstruction for illustration; does not prove physical fit.",
+  "Resolved unknown: Fan blade geometry: reduced to a tonal disc at scene scale.",
+  "Resolved unknown: Shroud facet bevels: approximated by flat panels.",
+  "Resolved unknown: Brand marks and hub logos: intentionally not modelled.",
+  "Material classes (plastic shroud, painted backplate, aluminium fins, gold contacts, steel bracket) come from the product type; colours and roughness are measured from the reference crops.",
+  "Shroud lip depth (20 mm) and end-cap thickness are visual estimates from the three-quarter view.",
+  "Backplate moved 2 mm outward after export so the card measures the published 50 mm thick (was 47.7 mm)."
+ ],
+ "coordinateFrame": {
+  "front": "+x (fan face)",
+  "up": "+y",
+  "length": "+z toward the I/O bracket",
+  "scaleReference": "millimetres, 1:1 with the manufacturer spec table; the app scales mm -> scene units"
+ },
+ "silhouette": {
+  "boundingShape": "",
+  "aspectRatios": [],
+  "symmetry": "",
+  "dominantCurves": [],
+  "negativeSpaces": [],
+  "landmarks": []
+ },
+ "viewEvidence": [
+  {
+   "id": "full-object",
+   "view": "primary",
+   "imageRegion": {
+    "x": 0.0,
+    "y": 0.0,
+    "width": 1.0,
+    "height": 1.0,
+    "units": "normalized"
+   },
+   "observations": [],
+   "confidence": 0.5
+  }
+ ],
+ "componentTree": [
+  {
+   "id": "card-root",
+   "name": "Heatsink core (structural root)",
+   "level": "macro",
+   "role": "body",
+   "importance": 1.0,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": null,
+   "attachment": null,
+   "dimensions": {
+    "width": 40,
+    "height": 124,
+    "depth": 334,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     -2,
+     6,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     40,
+     124,
+     334
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "root",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      40,
+      124,
+      334
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "heatsink-dark",
+   "materialLayers": [
+    "heatsink-dark"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "cavity occlusion between the fins and in the shroud-to-backplate gap",
+    "edgeWearPattern": "none: factory-new product",
+    "notes": "Locality is occlusion only."
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "heatsink-dark"
+   },
+   "materialRegions": [
+    {
+     "regionId": "heatsink-fins",
+     "materialId": "heatsink-dark",
+     "profileId": "metal.aluminum",
+     "crop": {
+      "path": ".\\material-evidence\\02-heatsink-fins.png",
+      "bbox": {
+       "x": 95,
+       "y": 285,
+       "width": 130,
+       "height": 60
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.0097
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "card-root",
+    "dominantAlbedo": "rgba(6, 5, 8, 1.0)",
+    "secondaryAlbedo": "rgba(21, 18, 24, 1.0)",
+    "materialClass": "metal",
+    "materialClassConfidence": 0.6,
+    "roughnessEstimate": 0.123,
+    "metalnessEstimate": 1.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\02-heatsink-fins.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.622
+    }
+   }
+  },
+  {
+   "id": "front-shroud",
+   "name": "White fan shroud",
+   "level": "macro",
+   "role": "shell",
+   "importance": 0.95,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     20,
+     0,
+     0
+    ],
+    "localEnd": [
+     20,
+     1.0,
+     0
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 6,
+    "height": 128,
+    "depth": 338,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     20,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     6,
+     128,
+     338
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      6,
+      128,
+      338
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [
+    {
+     "id": "no-logo",
+     "description": "brand marks intentionally omitted"
+    }
+   ],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "shroud-white"
+   },
+   "materialRegions": [
+    {
+     "regionId": "shroud-white",
+     "materialId": "shroud-white",
+     "profileId": "plastic.matte",
+     "crop": {
+      "path": ".\\material-evidence\\00-shroud-white.png",
+      "bbox": {
+       "x": 470,
+       "y": 494,
+       "width": 460,
+       "height": 22
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.0126
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "front-shroud",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "backplate",
+   "name": "White backplate",
+   "level": "macro",
+   "role": "panel",
+   "importance": 0.7,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     -23.5,
+     0,
+     0
+    ],
+    "localEnd": [
+     -23.5,
+     1,
+     0
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 3,
+    "height": 128,
+    "depth": 338,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     -23.5,
+     0,
+     0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     3,
+     128,
+     338
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      3,
+      128,
+      338
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "backplate-white",
+   "materialLayers": [
+    "backplate-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "backplate-white"
+   },
+   "materialRegions": [
+    {
+     "regionId": "backplate-paint",
+     "materialId": "backplate-white",
+     "profileId": "coating.painted-metal",
+     "crop": {
+      "path": ".\\material-evidence\\06-backplate-paint.png",
+      "bbox": {
+       "x": 85,
+       "y": 258,
+       "width": 460,
+       "height": 262
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.1507
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "backplate",
+    "dominantAlbedo": "rgba(35, 38, 45, 1.0)",
+    "secondaryAlbedo": "rgba(72, 73, 79, 1.0)",
+    "materialClass": "metal",
+    "materialClassConfidence": 0.6,
+    "roughnessEstimate": 0.165,
+    "metalnessEstimate": 1.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\06-backplate-paint.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.5
+    }
+   }
+  },
+  {
+   "id": "io-bracket",
+   "name": "PCIe bracket (dual-slot)",
+   "level": "macro",
+   "role": "bracket",
+   "importance": 0.6,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     -2,
+     -32.5,
+     172.2
+    ],
+    "localEnd": [
+     -2,
+     -31.5,
+     172.2
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 40,
+    "height": 120.6,
+    "depth": 1.5,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     -2,
+     -32.5,
+     172.2
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     40,
+     120.6,
+     1.5
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      40,
+      120.6,
+      1.5
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "bracket-steel",
+   "materialLayers": [
+    "bracket-steel"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "bracket-steel"
+   },
+   "materialRegions": [
+    {
+     "regionId": "bracket-steel",
+     "materialId": "bracket-steel",
+     "profileId": "metal.steel-brushed",
+     "crop": {
+      "path": ".\\material-evidence\\04-bracket-steel.png",
+      "bbox": {
+       "x": 52,
+       "y": 300,
+       "width": 26,
+       "height": 290
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.0094
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "io-bracket",
+    "dominantAlbedo": "rgba(199, 196, 185, 1.0)",
+    "secondaryAlbedo": "rgba(65, 64, 53, 1.0)",
+    "materialClass": "metal",
+    "materialClassConfidence": 0.6,
+    "roughnessEstimate": 0.577,
+    "metalnessEstimate": 1.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\04-bracket-steel.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.474
+    }
+   }
+  },
+  {
+   "id": "pcie-fingers",
+   "name": "PCIe x16 gold fingers",
+   "level": "meso",
+   "role": "connector",
+   "importance": 0.6,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     -10,
+     -70.8,
+     78.8
+    ],
+    "localEnd": [
+     -10,
+     -69.8,
+     78.8
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 1.6,
+    "height": 11,
+    "depth": 82.7,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     -10,
+     -70.8,
+     78.8
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1.6,
+     11,
+     82.7
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.6,
+      11,
+      82.7
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "gold-contacts",
+   "materialLayers": [
+    "gold-contacts"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "gold-contacts"
+   },
+   "materialRegions": [
+    {
+     "regionId": "gold-fingers",
+     "materialId": "gold-contacts",
+     "profileId": "metal.gold",
+     "crop": {
+      "path": ".\\material-evidence\\03-gold-fingers.png",
+      "bbox": {
+       "x": 222,
+       "y": 539,
+       "width": 186,
+       "height": 11
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.0026
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "pcie-fingers",
+    "dominantAlbedo": "rgba(121, 99, 66, 1.0)",
+    "secondaryAlbedo": "rgba(13, 10, 13, 1.0)",
+    "materialClass": "metal",
+    "materialClassConfidence": 0.6,
+    "roughnessEstimate": 0.137,
+    "metalnessEstimate": 1.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\03-gold-fingers.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.535
+    }
+   }
+  },
+  {
+   "id": "rgb-accent-top",
+   "name": "RGB diffuser accent (top centre)",
+   "level": "meso",
+   "role": "detail",
+   "importance": 0.4,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.6,
+     52.2,
+     -38.5
+    ],
+    "localEnd": [
+     23.6,
+     53.2,
+     -38.5
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 1.5,
+    "height": 19.7,
+    "depth": 29.5,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.6,
+     52.2,
+     -38.5
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1.5,
+     19.7,
+     29.5
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.5,
+      19.7,
+      29.5
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "rgb-diffuser",
+   "materialLayers": [
+    "rgb-diffuser"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "rgb-diffuser"
+   },
+   "materialRegions": [
+    {
+     "regionId": "rgb-diffuser",
+     "materialId": "rgb-diffuser",
+     "profileId": "plastic.glossy",
+     "crop": {
+      "path": ".\\material-evidence\\05-rgb-diffuser.png",
+      "bbox": {
+       "x": 592,
+       "y": 212,
+       "width": 44,
+       "height": 30
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.0016
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "rgb-accent-top",
+    "dominantAlbedo": "rgba(213, 217, 253, 1.0)",
+    "secondaryAlbedo": "rgba(180, 194, 222, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.6,
+    "roughnessEstimate": 0.87,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "broad, gradually-fading highlight \u2014 supports high roughness/diffuse response",
+    "sourceCropPath": ".\\material-evidence\\05-rgb-diffuser.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.447
+    }
+   }
+  },
+  {
+   "id": "rgb-accent-low",
+   "name": "RGB diffuser accent (bottom left)",
+   "level": "meso",
+   "role": "detail",
+   "importance": 0.4,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.6,
+     -50.3,
+     49.3
+    ],
+    "localEnd": [
+     23.6,
+     -49.3,
+     49.3
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 1.5,
+    "height": 23.7,
+    "depth": 47.3,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.6,
+     -50.3,
+     49.3
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     1.5,
+     23.7,
+     47.3
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      1.5,
+      23.7,
+      47.3
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "rgb-diffuser",
+   "materialLayers": [
+    "rgb-diffuser"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "rgb-accent-low",
+    "dominantAlbedo": "rgba(213, 217, 253, 1.0)",
+    "secondaryAlbedo": "rgba(180, 194, 222, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.6,
+    "roughnessEstimate": 0.87,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "broad, gradually-fading highlight \u2014 supports high roughness/diffuse response",
+    "sourceCropPath": ".\\material-evidence\\05-rgb-diffuser.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.447
+    }
+   }
+  },
+  {
+   "id": "fan-ring-1",
+   "name": "Fan 1 frame ring",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.85,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.5,
+     0.2,
+     109.1
+    ],
+    "localEnd": [
+     24.5,
+     0.2,
+     109.1
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 96.0,
+    "depth": 96.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.5,
+     0.2,
+     109.1
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     96.0,
+     96.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      96.0,
+      96.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [
+    {
+     "id": "axial-fan",
+     "description": "~96 mm axial fan opening"
+    }
+   ],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-ring-1",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "fan-blades-1",
+   "name": "Fan 1 blade disc (tonal)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.8,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.9,
+     0.2,
+     109.1
+    ],
+    "localEnd": [
+     24.9,
+     0.2,
+     109.1
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 90.0,
+    "depth": 90.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.9,
+     0.2,
+     109.1
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     90.0,
+     90.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      90.0,
+      90.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "fan-disc",
+   "materialLayers": [
+    "fan-disc"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "fan-disc"
+   },
+   "materialRegions": [
+    {
+     "regionId": "fan-blade-disc",
+     "materialId": "fan-disc",
+     "profileId": "plastic.matte",
+     "crop": {
+      "path": ".\\material-evidence\\01-fan-blade-disc.png",
+      "bbox": {
+       "x": 410,
+       "y": 262,
+       "width": 80,
+       "height": 70
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.007
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "fan-blades-1",
+    "dominantAlbedo": "rgba(195, 204, 219, 1.0)",
+    "secondaryAlbedo": "rgba(10, 10, 14, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.61,
+    "roughnessEstimate": 0.225,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\01-fan-blade-disc.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.438
+    }
+   }
+  },
+  {
+   "id": "fan-hub-1",
+   "name": "Fan 1 hub (logo omitted)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.6,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     24.4,
+     0.2,
+     109.1
+    ],
+    "localEnd": [
+     25.4,
+     0.2,
+     109.1
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 20.0,
+    "depth": 20.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     24.4,
+     0.2,
+     109.1
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     20.0,
+     20.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      20.0,
+      20.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-hub-1",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "fan-ring-2",
+   "name": "Fan 2 frame ring",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.85,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.5,
+     0.2,
+     1.2
+    ],
+    "localEnd": [
+     24.5,
+     0.2,
+     1.2
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 96.0,
+    "depth": 96.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.5,
+     0.2,
+     1.2
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     96.0,
+     96.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      96.0,
+      96.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [
+    {
+     "id": "axial-fan",
+     "description": "~96 mm axial fan opening"
+    }
+   ],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-ring-2",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "fan-blades-2",
+   "name": "Fan 2 blade disc (tonal)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.8,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.9,
+     0.2,
+     1.2
+    ],
+    "localEnd": [
+     24.9,
+     0.2,
+     1.2
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 90.0,
+    "depth": 90.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.9,
+     0.2,
+     1.2
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     90.0,
+     90.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      90.0,
+      90.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "fan-disc",
+   "materialLayers": [
+    "fan-disc"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-blades-2",
+    "dominantAlbedo": "rgba(195, 204, 219, 1.0)",
+    "secondaryAlbedo": "rgba(10, 10, 14, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.61,
+    "roughnessEstimate": 0.225,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\01-fan-blade-disc.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.438
+    }
+   }
+  },
+  {
+   "id": "fan-hub-2",
+   "name": "Fan 2 hub (logo omitted)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.6,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     24.4,
+     0.2,
+     1.2
+    ],
+    "localEnd": [
+     25.4,
+     0.2,
+     1.2
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 20.0,
+    "depth": 20.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     24.4,
+     0.2,
+     1.2
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     20.0,
+     20.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      20.0,
+      20.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-hub-2",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "fan-ring-3",
+   "name": "Fan 3 frame ring",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.85,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.5,
+     0.2,
+     -108.4
+    ],
+    "localEnd": [
+     24.5,
+     0.2,
+     -108.4
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 96.0,
+    "depth": 96.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.5,
+     0.2,
+     -108.4
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     96.0,
+     96.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      96.0,
+      96.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [
+    {
+     "id": "axial-fan",
+     "description": "~96 mm axial fan opening"
+    }
+   ],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-ring-3",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "fan-blades-3",
+   "name": "Fan 3 blade disc (tonal)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.8,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.9,
+     0.2,
+     -108.4
+    ],
+    "localEnd": [
+     24.9,
+     0.2,
+     -108.4
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 90.0,
+    "depth": 90.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.9,
+     0.2,
+     -108.4
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     90.0,
+     90.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      90.0,
+      90.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "fan-disc",
+   "materialLayers": [
+    "fan-disc"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-blades-3",
+    "dominantAlbedo": "rgba(195, 204, 219, 1.0)",
+    "secondaryAlbedo": "rgba(10, 10, 14, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.61,
+    "roughnessEstimate": 0.225,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\01-fan-blade-disc.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.438
+    }
+   }
+  },
+  {
+   "id": "fan-hub-3",
+   "name": "Fan 3 hub (logo omitted)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.6,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     24.4,
+     0.2,
+     -108.4
+    ],
+    "localEnd": [
+     25.4,
+     0.2,
+     -108.4
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 20.0,
+    "depth": 20.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     24.4,
+     0.2,
+     -108.4
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     20.0,
+     20.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      20.0,
+      20.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-hub-3",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "shroud-top-lip",
+   "name": "Shroud lip over the top edge",
+   "level": "meso",
+   "role": "shell",
+   "importance": 0.95,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     10.0,
+     63.0,
+     0.0
+    ],
+    "localEnd": [
+     10.0,
+     64.0,
+     0.0
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 20,
+    "height": 2,
+    "depth": 338,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     10.0,
+     63.0,
+     0.0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     20,
+     2,
+     338
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      20,
+      2,
+      338
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "shroud-white"
+   },
+   "materialRegions": [
+    {
+     "regionId": "shroud-white",
+     "materialId": "shroud-white",
+     "profileId": "plastic.matte",
+     "crop": {
+      "path": ".\\material-evidence\\00-shroud-white.png",
+      "bbox": {
+       "x": 470,
+       "y": 494,
+       "width": 460,
+       "height": 22
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.0126
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "shroud-top-lip",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "shroud-bottom-lip",
+   "name": "Shroud lip under the bottom edge",
+   "level": "meso",
+   "role": "shell",
+   "importance": 0.95,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     10.0,
+     -63.0,
+     0.0
+    ],
+    "localEnd": [
+     10.0,
+     -62.0,
+     0.0
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 20,
+    "height": 2,
+    "depth": 338,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     10.0,
+     -63.0,
+     0.0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     20,
+     2,
+     338
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      20,
+      2,
+      338
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "shroud-white"
+   },
+   "materialRegions": [
+    {
+     "regionId": "shroud-white",
+     "materialId": "shroud-white",
+     "profileId": "plastic.matte",
+     "crop": {
+      "path": ".\\material-evidence\\00-shroud-white.png",
+      "bbox": {
+       "x": 470,
+       "y": 494,
+       "width": 460,
+       "height": 22
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.0126
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "shroud-bottom-lip",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "shroud-end-cap",
+   "name": "Shroud end cap (logo omitted)",
+   "level": "meso",
+   "role": "shell",
+   "importance": 0.95,
+   "confidence": 0.75,
+   "primitive": "box",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/frame",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     0.0,
+     0.0,
+     -168.0
+    ],
+    "localEnd": [
+     0.0,
+     1.0,
+     -168.0
+    ],
+    "contactNormal": [
+     0,
+     1,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 46,
+    "height": 128,
+    "depth": 2,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     0.0,
+     0.0,
+     -168.0
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     46,
+     128,
+     2
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      46,
+      128,
+      2
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "shroud-white",
+   "materialLayers": [
+    "shroud-white"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "shroud-white"
+   },
+   "materialRegions": [
+    {
+     "regionId": "shroud-white",
+     "materialId": "shroud-white",
+     "profileId": "plastic.matte",
+     "crop": {
+      "path": ".\\material-evidence\\00-shroud-white.png",
+      "bbox": {
+       "x": 470,
+       "y": 494,
+       "width": 460,
+       "height": 22
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.0126
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "shroud-end-cap",
+    "dominantAlbedo": "rgba(217, 223, 232, 1.0)",
+    "secondaryAlbedo": "rgba(238, 243, 248, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.75,
+    "roughnessEstimate": 0.438,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "moderate hotspot spread \u2014 mid-range roughness",
+    "sourceCropPath": ".\\material-evidence\\00-shroud-white.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.757
+    }
+   }
+  },
+  {
+   "id": "fan-outline-1",
+   "name": "Fan 1 outline ring (grey tone)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.8,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.1,
+     0.2,
+     109.1
+    ],
+    "localEnd": [
+     24.1,
+     0.2,
+     109.1
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 100.0,
+    "depth": 100.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.1,
+     0.2,
+     109.1
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     100.0,
+     100.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      100.0,
+      100.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "fan-disc",
+   "materialLayers": [
+    "fan-disc"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "uvContract": {
+    "status": "unwrapped",
+    "strategy": "generated procedural coordinates",
+    "materialId": "fan-disc"
+   },
+   "materialRegions": [
+    {
+     "regionId": "fan-blade-disc",
+     "materialId": "fan-disc",
+     "profileId": "plastic.matte",
+     "crop": {
+      "path": ".\\material-evidence\\01-fan-blade-disc.png",
+      "bbox": {
+       "x": 410,
+       "y": 262,
+       "width": 80,
+       "height": 70
+      },
+      "sourceWidth": 1000,
+      "sourceHeight": 800,
+      "loaderWarnings": [],
+      "coverage": 0.007
+     }
+    }
+   ],
+   "colorMaterialRecipe": {
+    "componentId": "fan-outline-1",
+    "dominantAlbedo": "rgba(195, 204, 219, 1.0)",
+    "secondaryAlbedo": "rgba(10, 10, 14, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.61,
+    "roughnessEstimate": 0.225,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\01-fan-blade-disc.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.438
+    }
+   }
+  },
+  {
+   "id": "fan-outline-2",
+   "name": "Fan 2 outline ring (grey tone)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.8,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.1,
+     0.2,
+     1.2
+    ],
+    "localEnd": [
+     24.1,
+     0.2,
+     1.2
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 100.0,
+    "depth": 100.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.1,
+     0.2,
+     1.2
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     100.0,
+     100.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      100.0,
+      100.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "fan-disc",
+   "materialLayers": [
+    "fan-disc"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-outline-2",
+    "dominantAlbedo": "rgba(195, 204, 219, 1.0)",
+    "secondaryAlbedo": "rgba(10, 10, 14, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.61,
+    "roughnessEstimate": 0.225,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\01-fan-blade-disc.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.438
+    }
+   }
+  },
+  {
+   "id": "fan-outline-3",
+   "name": "Fan 3 outline ring (grey tone)",
+   "level": "meso",
+   "role": "fan",
+   "importance": 0.8,
+   "confidence": 0.75,
+   "primitive": "ellipsoid",
+   "topologyClass": "assembled-solid",
+   "topologyRationale": "Hard-surface part; box or disc primitives match the orthographic reference.",
+   "geometryDescriptor": {
+    "topologyIntent": "hard-surface part, bevel-ready edges",
+    "edgeTreatment": {
+     "type": "bevel",
+     "bevelRadius": 1.0,
+     "segments": 2
+    },
+    "deformationStack": [],
+    "uvStrategy": "generated procedural coordinates",
+    "normalStrategy": "vertex normals from generated geometry"
+   },
+   "parent": "card-root",
+   "attachment": {
+    "parentId": "card-root",
+    "parentSocket": "card-root/fan-face",
+    "contactType": "rigid-fastened",
+    "localStart": [
+     23.1,
+     0.2,
+     -108.4
+    ],
+    "localEnd": [
+     24.1,
+     0.2,
+     -108.4
+    ],
+    "contactNormal": [
+     1,
+     0,
+     0
+    ],
+    "embedDepth": 0.5,
+    "gapTolerance": 1.0,
+    "evidenceRefs": [
+     "full-object"
+    ]
+   },
+   "dimensions": {
+    "width": 0.6,
+    "height": 100.0,
+    "depth": 100.0,
+    "units": "mm",
+    "confidence": 0.7
+   },
+   "transform": {
+    "position": [
+     23.1,
+     0.2,
+     -108.4
+    ],
+    "rotation": [
+     0,
+     0,
+     0
+    ],
+    "scale": [
+     0.6,
+     100.0,
+     100.0
+    ]
+   },
+   "actionProfile": {
+    "animationRole": "rigid-child",
+    "pivot": {
+     "mode": "center",
+     "localPosition": [
+      0,
+      0,
+      0
+     ],
+     "axis": [
+      0,
+      1,
+      0
+     ],
+     "confidence": 0.5
+    },
+    "transformChannels": {
+     "translate": true,
+     "rotate": true,
+     "scale": true,
+     "bend": false,
+     "twist": false,
+     "detach": false,
+     "visibility": true,
+     "materialState": true
+    },
+    "sockets": [],
+    "collider": {
+     "type": "box",
+     "offset": [
+      0,
+      0,
+      0
+     ],
+     "scale": [
+      0.6,
+      100.0,
+      100.0
+     ],
+     "isTrigger": false,
+     "notes": "Replace with sphere/capsule/compound proxy when the object shape demands it."
+    },
+    "constraints": [],
+    "destruction": {
+     "breakable": false,
+     "fractureGroup": "root",
+     "seamRefs": [],
+     "detachableFragments": [],
+     "breakImpulse": 0.0,
+     "debrisMaterial": "base"
+    }
+   },
+   "material": "fan-disc",
+   "materialLayers": [
+    "fan-disc"
+   ],
+   "deformations": [],
+   "joints": [],
+   "seams": [],
+   "localFeatures": [],
+   "surfaceDetail": {
+    "macroRoughness": 0.0,
+    "microRoughness": 0.0,
+    "bumpAmplitude": 0.0,
+    "normalPattern": "",
+    "displacementPattern": "",
+    "occlusionPattern": "",
+    "edgeWearPattern": "",
+    "notes": ""
+   },
+   "evidenceRefs": [
+    "full-object"
+   ],
+   "details": [],
+   "fidelityTier": "blockout",
+   "colorMaterialRecipe": {
+    "componentId": "fan-outline-3",
+    "dominantAlbedo": "rgba(195, 204, 219, 1.0)",
+    "secondaryAlbedo": "rgba(10, 10, 14, 1.0)",
+    "materialClass": "plastic",
+    "materialClassConfidence": 0.61,
+    "roughnessEstimate": 0.225,
+    "metalnessEstimate": 0.0,
+    "highlightEvidence": "sharp, tight specular hotspot \u2014 supports low roughness/high specularity",
+    "sourceCropPath": ".\\material-evidence\\01-fan-blade-disc.png",
+    "labClusterMeta": {
+     "clusterCount": 3,
+     "dominantClusterSharePct": 0.438
+    }
+   }
+  }
+ ],
+ "materials": [
+  {
+   "id": "shroud-white",
+   "name": "Satin white shroud plastic",
+   "type": "standard",
+   "shaderModel": "MeshStandardMaterial / PBR approximation",
+   "baseColor": "#E0E6EF",
+   "color": "#E0E6EF",
+   "albedo": {
+    "dominant": "#E0E6EF",
+    "secondary": [
+     "#E0E6EF"
+    ],
+    "samplingNotes": "shroud crop mean #DBE1EA under the photo's cool key; uniform plastic, no grain; render #DFE0E2 vs reference #DBE1EA: shifted cooler to match"
+   },
+   "colorVariation": {
+    "palette": [
+     "#E0E6EF"
+    ],
+    "pattern": "uniform",
+    "amplitude": 0.0,
+    "heightCorrelation": 0.0
+   },
+   "roughness": {
+    "base": 0.68,
+    "variation": 0.04,
+    "map": "none (uniform factory finish)",
+    "localResponse": "uniform"
+   },
+   "metalness": {
+    "base": 0.0,
+    "variation": 0.0
+   },
+   "ambientOcclusion": {
+    "cavityStrength": 0.25,
+    "contactShadowBias": 0.35,
+    "notes": "Darken creases, seams, intersections, and recessed local features."
+   },
+   "wear": {
+    "edgeWear": 0.0,
+    "scratches": [],
+    "chips": []
+   },
+   "dirt": {
+    "amount": 0.0,
+    "cavityBias": 0.0,
+    "color": "#2F2A22"
+   },
+   "localOverrides": [],
+   "shaderNotes": [
+    "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+    "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+    "Use normal/bump/displacement only when they map to observed surface relief.",
+    "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there."
+   ],
+   "notes": "Replace with image-derived color, roughness, noise, and edge-wear notes.",
+   "textureless": {
+    "declared": true,
+    "evidence": [
+     "shroud crop mean #DBE1EA under the photo's cool key; uniform plastic, no grain",
+     "manufacturer product photos show flat factory finishes"
+    ]
+   },
+   "referenceMaterialId": "plastic.matte",
+   "materialFamily": "plastic",
+   "materialSubtype": "generic-polymer",
+   "materialFinish": "matte",
+   "materialReference": {
+    "registry": "~/.claude/skills/img2threejs\\docs\\materials\\material-reference.json",
+    "profileId": "plastic.matte",
+    "method": "family-subtype-finish",
+    "confidence": 0.716,
+    "sourceRefs": [
+     "three.mesh-standard",
+     "adobe.pbr-guide-1",
+     "google.filament-pbr",
+     "mit.material-recognition"
+    ],
+    "requiredMaps": [
+     "map",
+     "roughnessMap"
+    ],
+    "optionalMaps": [
+     "normalMap",
+     "aoMap"
+    ],
+    "validationViews": [
+     "albedo-unlit",
+     "neutral-studio",
+     "grazing"
+    ]
+   },
+   "ior": {
+    "base": 1.5,
+    "variation": 0.0
+   },
+   "textureAnalysis": {
+    "finishClass": "brushed-steel",
+    "recipe": {
+     "metalness": 1.0,
+     "roughness": 0.35,
+     "clearcoat": 0.0,
+     "clearcoatRoughness": 0.0,
+     "transmission": 0.0,
+     "ior": 1.5,
+     "envMapIntensity": 1.0,
+     "anisotropy": 1.0,
+     "procedural": "brushed"
+    },
+    "palette": [
+     "#D6DCE7",
+     "#DADFE9",
+     "#D0D6E2",
+     "#DADFE5",
+     "#EFF3F9"
+    ],
+    "paletteHueRisk": [],
+    "gradientAxis": "horizontal",
+    "stats": {
+     "meanLum": 224.2,
+     "meanSaturation": 0.063,
+     "gradientStrength": 0.137,
+     "mottle": 0.012,
+     "streakRatio": 3.43,
+     "hueSpread": 0.0,
+     "specularFraction": 0.178
+    }
+   },
+   "materialEvidence": {
+    "referencePbrSummary": {
+     "confidence": 0.716,
+     "usable": true
+    },
+    "note": "reference-derived inference from crops; kept for provenance"
+   }
+  },
+  {
+   "id": "fan-disc",
+   "name": "Fan blade disc (tonal mean)",
+   "type": "standard",
+   "shaderModel": "MeshStandardMaterial / PBR approximation",
+   "baseColor": "#939AA6",
+   "color": "#939AA6",
+   "albedo": {
+    "dominant": "#939AA6",
+    "secondary": [
+     "#939AA6"
+    ],
+    "samplingNotes": "mean over the three blade annuli (#AEB4BE/#B0B5C0/#AFB5C0): white blades over the dark heatsink; blades are sub-pixel at scene scale; render-vs-reference calibration: rendered #C6C9CF vs reference #A7AEBC, albedo scaled by the measured ratio"
+   },
+   "colorVariation": {
+    "palette": [
+     "#939AA6"
+    ],
+    "pattern": "uniform",
+    "amplitude": 0.0,
+    "heightCorrelation": 0.0
+   },
+   "roughness": {
+    "base": 0.68,
+    "variation": 0.04,
+    "map": "none (uniform factory finish)",
+    "localResponse": "uniform"
+   },
+   "metalness": {
+    "base": 0.0,
+    "variation": 0.0
+   },
+   "ambientOcclusion": {
+    "cavityStrength": 0.25,
+    "contactShadowBias": 0.35,
+    "notes": "Darken creases, seams, intersections, and recessed local features."
+   },
+   "wear": {
+    "edgeWear": 0.0,
+    "scratches": [],
+    "chips": []
+   },
+   "dirt": {
+    "amount": 0.0,
+    "cavityBias": 0.0,
+    "color": "#2F2A22"
+   },
+   "localOverrides": [
+    {
+     "id": "blade-gaps",
+     "region": "between fan blades",
+     "effect": "dark heatsink seen through the blade gaps, folded into the disc mean tone (cavity occlusion), not albedo noise"
+    }
+   ],
+   "shaderNotes": [
+    "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+    "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+    "Use normal/bump/displacement only when they map to observed surface relief.",
+    "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there."
+   ],
+   "notes": "Replace with image-derived color, roughness, noise, and edge-wear notes.",
+   "textureless": {
+    "declared": true,
+    "evidence": [
+     "mean over the three blade annuli (#AEB4BE/#B0B5C0/#AFB5C0): white blades over the dark heatsink; blades are sub-pixel at scene scale",
+     "manufacturer product photos show flat factory finishes"
+    ]
+   },
+   "referenceMaterialId": "plastic.matte",
+   "materialFamily": "plastic",
+   "materialSubtype": "generic-polymer",
+   "materialFinish": "matte",
+   "materialReference": {
+    "registry": "~/.claude/skills/img2threejs\\docs\\materials\\material-reference.json",
+    "profileId": "plastic.matte",
+    "method": "family-subtype-finish",
+    "confidence": 0.909,
+    "sourceRefs": [
+     "three.mesh-standard",
+     "adobe.pbr-guide-1",
+     "google.filament-pbr",
+     "mit.material-recognition"
+    ],
+    "requiredMaps": [
+     "map",
+     "roughnessMap"
+    ],
+    "optionalMaps": [
+     "normalMap",
+     "aoMap"
+    ],
+    "validationViews": [
+     "albedo-unlit",
+     "neutral-studio",
+     "grazing"
+    ]
+   },
+   "ior": {
+    "base": 1.5,
+    "variation": 0.0
+   },
+   "textureAnalysis": {
+    "finishClass": "worn-composite",
+    "recipe": {
+     "metalness": 0.0,
+     "roughness": 0.9,
+     "clearcoat": 0.0,
+     "clearcoatRoughness": 0.0,
+     "transmission": 0.0,
+     "ior": 1.5,
+     "envMapIntensity": 0.5,
+     "anisotropy": 0.0,
+     "procedural": "mottle"
+    },
+    "palette": [
+     "#C5CCD9",
+     "#CFD4DF",
+     "#3B3F49",
+     "#CED6E5",
+     "#D8DEEB"
+    ],
+    "paletteHueRisk": [
+     {
+      "stop": "#3B3F49",
+      "hueRisk": "blue-collapse",
+      "suggestedRgb": [
+       73,
+       63,
+       59
+      ]
+     }
+    ],
+    "gradientAxis": "vertical",
+    "stats": {
+     "meanLum": 182.1,
+     "meanSaturation": 0.161,
+     "gradientStrength": 0.65,
+     "mottle": 0.036,
+     "streakRatio": 0.82,
+     "hueSpread": 0.431,
+     "specularFraction": 0.031
+    }
+   },
+   "materialEvidence": {
+    "referencePbrSummary": {
+     "confidence": 0.909,
+     "usable": true
+    },
+    "note": "reference-derived inference from crops; kept for provenance"
+   }
+  },
+  {
+   "id": "heatsink-dark",
+   "name": "Dark heatsink fins",
+   "type": "standard",
+   "shaderModel": "MeshStandardMaterial / PBR approximation",
+   "baseColor": "#1A191F",
+   "color": "#1A191F",
+   "albedo": {
+    "dominant": "#1A191F",
+    "secondary": [
+     "#1A191F"
+    ],
+    "samplingNotes": "fin crop from the three-quarter view: near-black anodised aluminium"
+   },
+   "colorVariation": {
+    "palette": [
+     "#1A191F"
+    ],
+    "pattern": "uniform",
+    "amplitude": 0.0,
+    "heightCorrelation": 0.0
+   },
+   "roughness": {
+    "base": 0.3,
+    "variation": 0.04,
+    "map": "none (uniform factory finish)",
+    "localResponse": "uniform"
+   },
+   "metalness": {
+    "base": 1.0,
+    "variation": 0.0
+   },
+   "ambientOcclusion": {
+    "cavityStrength": 0.25,
+    "contactShadowBias": 0.35,
+    "notes": "Darken creases, seams, intersections, and recessed local features."
+   },
+   "wear": {
+    "edgeWear": 0.0,
+    "scratches": [],
+    "chips": []
+   },
+   "dirt": {
+    "amount": 0.0,
+    "cavityBias": 0.0,
+    "color": "#2F2A22"
+   },
+   "localOverrides": [
+    {
+     "id": "fin-cavities",
+     "region": "between heatsink fins",
+     "effect": "cavity occlusion darkening between fins"
+    }
+   ],
+   "shaderNotes": [
+    "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+    "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+    "Use normal/bump/displacement only when they map to observed surface relief.",
+    "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there."
+   ],
+   "notes": "Replace with image-derived color, roughness, noise, and edge-wear notes.",
+   "textureless": {
+    "declared": true,
+    "evidence": [
+     "fin crop from the three-quarter view: near-black anodised aluminium",
+     "manufacturer product photos show flat factory finishes"
+    ]
+   },
+   "referenceMaterialId": "metal.aluminum",
+   "materialFamily": "metal",
+   "materialSubtype": "aluminum",
+   "materialFinish": "satin",
+   "materialReference": {
+    "registry": "~/.claude/skills/img2threejs\\docs\\materials\\material-reference.json",
+    "profileId": "metal.aluminum",
+    "method": "family-subtype-finish",
+    "confidence": 0.831,
+    "sourceRefs": [
+     "three.mesh-standard",
+     "three.pmrem",
+     "gltf.2",
+     "khronos.gltf-pbr",
+     "adobe.pbr-guide-2",
+     "google.filament-pbr"
+    ],
+    "requiredMaps": [
+     "map",
+     "roughnessMap"
+    ],
+    "optionalMaps": [
+     "normalMap",
+     "anisotropyMap"
+    ],
+    "validationViews": [
+     "neutral-studio",
+     "environment-reflection",
+     "grazing"
+    ]
+   },
+   "anisotropy": {
+    "base": 0.2,
+    "variation": 0.0
+   },
+   "textureAnalysis": {
+    "finishClass": "candy-coat",
+    "recipe": {
+     "metalness": 0.35,
+     "roughness": 0.18,
+     "clearcoat": 0.6,
+     "clearcoatRoughness": 0.15,
+     "transmission": 0.0,
+     "ior": 1.5,
+     "envMapIntensity": 0.7,
+     "anisotropy": 0.0,
+     "procedural": "gradient-smoke"
+    },
+    "palette": [
+     "#323135",
+     "#121013",
+     "#333339",
+     "#605F64",
+     "#7A7A80"
+    ],
+    "paletteHueRisk": [
+     {
+      "stop": "#121013",
+      "hueRisk": "blue-collapse",
+      "suggestedRgb": [
+       19,
+       16,
+       18
+      ]
+     }
+    ],
+    "gradientAxis": "horizontal",
+    "stats": {
+     "meanLum": 69.1,
+     "meanSaturation": 0.221,
+     "gradientStrength": 0.622,
+     "mottle": 0.085,
+     "streakRatio": 2.2,
+     "hueSpread": 0.155,
+     "specularFraction": 0.0
+    }
+   },
+   "materialEvidence": {
+    "referencePbrSummary": {
+     "confidence": 0.831,
+     "usable": true
+    },
+    "note": "reference-derived inference from crops; kept for provenance"
+   },
+   "needsEnvironment": true
+  },
+  {
+   "id": "gold-contacts",
+   "name": "Gold-plated PCIe contacts",
+   "type": "standard",
+   "shaderModel": "MeshStandardMaterial / PBR approximation",
+   "baseColor": "#8C7048",
+   "color": "#8C7048",
+   "albedo": {
+    "dominant": "#8C7048",
+    "secondary": [
+     "#8C7048"
+    ],
+    "samplingNotes": "gold-finger crop palette #796242/#5C4931"
+   },
+   "colorVariation": {
+    "palette": [
+     "#8C7048"
+    ],
+    "pattern": "uniform",
+    "amplitude": 0.0,
+    "heightCorrelation": 0.0
+   },
+   "roughness": {
+    "base": 0.22,
+    "variation": 0.04,
+    "map": "none (uniform factory finish)",
+    "localResponse": "uniform"
+   },
+   "metalness": {
+    "base": 1.0,
+    "variation": 0.0
+   },
+   "ambientOcclusion": {
+    "cavityStrength": 0.25,
+    "contactShadowBias": 0.35,
+    "notes": "Darken creases, seams, intersections, and recessed local features."
+   },
+   "wear": {
+    "edgeWear": 0.0,
+    "scratches": [],
+    "chips": []
+   },
+   "dirt": {
+    "amount": 0.0,
+    "cavityBias": 0.0,
+    "color": "#2F2A22"
+   },
+   "localOverrides": [],
+   "shaderNotes": [
+    "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+    "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+    "Use normal/bump/displacement only when they map to observed surface relief.",
+    "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there."
+   ],
+   "notes": "Replace with image-derived color, roughness, noise, and edge-wear notes.",
+   "textureless": {
+    "declared": true,
+    "evidence": [
+     "gold-finger crop palette #796242/#5C4931",
+     "manufacturer product photos show flat factory finishes"
+    ]
+   },
+   "referenceMaterialId": "metal.gold",
+   "materialFamily": "metal",
+   "materialSubtype": "gold",
+   "materialFinish": "polished",
+   "materialReference": {
+    "registry": "~/.claude/skills/img2threejs\\docs\\materials\\material-reference.json",
+    "profileId": "metal.gold",
+    "method": "family-subtype-finish",
+    "confidence": 0.811,
+    "sourceRefs": [
+     "three.mesh-standard",
+     "three.pmrem",
+     "gltf.2",
+     "khronos.gltf-pbr",
+     "adobe.pbr-guide-2",
+     "google.filament-pbr"
+    ],
+    "requiredMaps": [
+     "map",
+     "roughnessMap"
+    ],
+    "optionalMaps": [
+     "normalMap",
+     "metalnessMap"
+    ],
+    "validationViews": [
+     "albedo-unlit",
+     "environment-reflection",
+     "grazing",
+     "reference-beauty"
+    ]
+   },
+   "textureAnalysis": {
+    "finishClass": "candy-coat",
+    "recipe": {
+     "metalness": 0.35,
+     "roughness": 0.18,
+     "clearcoat": 0.6,
+     "clearcoatRoughness": 0.15,
+     "transmission": 0.0,
+     "ior": 1.5,
+     "envMapIntensity": 0.7,
+     "anisotropy": 0.0,
+     "procedural": "gradient-smoke"
+    },
+    "palette": [
+     "#463827",
+     "#46392E",
+     "#4A3E25",
+     "#463B2A",
+     "#4A392B"
+    ],
+    "paletteHueRisk": [],
+    "gradientAxis": "horizontal",
+    "stats": {
+     "meanLum": 65.9,
+     "meanSaturation": 0.412,
+     "gradientStrength": 0.832,
+     "mottle": 0.045,
+     "streakRatio": 5.71,
+     "hueSpread": 0.34,
+     "specularFraction": 0.016
+    }
+   },
+   "materialEvidence": {
+    "referencePbrSummary": {
+     "confidence": 0.811,
+     "usable": true
+    },
+    "note": "reference-derived inference from crops; kept for provenance"
+   },
+   "needsEnvironment": true
+  },
+  {
+   "id": "bracket-steel",
+   "name": "Dark grey steel bracket",
+   "type": "standard",
+   "shaderModel": "MeshStandardMaterial / PBR approximation",
+   "baseColor": "#4A4A45",
+   "color": "#4A4A45",
+   "albedo": {
+    "dominant": "#4A4A45",
+    "secondary": [
+     "#4A4A45"
+    ],
+    "samplingNotes": "bracket crop palette #4E4D46/#323226"
+   },
+   "colorVariation": {
+    "palette": [
+     "#4A4A45"
+    ],
+    "pattern": "uniform",
+    "amplitude": 0.0,
+    "heightCorrelation": 0.0
+   },
+   "roughness": {
+    "base": 0.35,
+    "variation": 0.04,
+    "map": "none (uniform factory finish)",
+    "localResponse": "uniform"
+   },
+   "metalness": {
+    "base": 1.0,
+    "variation": 0.0
+   },
+   "ambientOcclusion": {
+    "cavityStrength": 0.25,
+    "contactShadowBias": 0.35,
+    "notes": "Darken creases, seams, intersections, and recessed local features."
+   },
+   "wear": {
+    "edgeWear": 0.0,
+    "scratches": [],
+    "chips": []
+   },
+   "dirt": {
+    "amount": 0.0,
+    "cavityBias": 0.0,
+    "color": "#2F2A22"
+   },
+   "localOverrides": [],
+   "shaderNotes": [
+    "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+    "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+    "Use normal/bump/displacement only when they map to observed surface relief.",
+    "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there."
+   ],
+   "notes": "Replace with image-derived color, roughness, noise, and edge-wear notes.",
+   "textureless": {
+    "declared": true,
+    "evidence": [
+     "bracket crop palette #4E4D46/#323226",
+     "manufacturer product photos show flat factory finishes"
+    ]
+   },
+   "referenceMaterialId": "metal.steel-brushed",
+   "materialFamily": "metal",
+   "materialSubtype": "steel",
+   "materialFinish": "brushed",
+   "materialReference": {
+    "registry": "~/.claude/skills/img2threejs\\docs\\materials\\material-reference.json",
+    "profileId": "metal.steel-brushed",
+    "method": "family-subtype-finish",
+    "confidence": 0.846,
+    "sourceRefs": [
+     "three.mesh-physical",
+     "three.pmrem",
+     "gltf.2",
+     "khronos.gltf-pbr",
+     "adobe.pbr-guide-2",
+     "google.filament-pbr"
+    ],
+    "requiredMaps": [
+     "map",
+     "roughnessMap",
+     "normalMap",
+     "anisotropyMap"
+    ],
+    "optionalMaps": [
+     "metalnessMap"
+    ],
+    "validationViews": [
+     "neutral-studio",
+     "grazing",
+     "environment-reflection",
+     "reference-beauty"
+    ]
+   },
+   "anisotropy": {
+    "base": 0.85,
+    "variation": 0.0
+   },
+   "textureAnalysis": {
+    "finishClass": "brushed-steel",
+    "recipe": {
+     "metalness": 1.0,
+     "roughness": 0.35,
+     "clearcoat": 0.0,
+     "clearcoatRoughness": 0.0,
+     "transmission": 0.0,
+     "ior": 1.5,
+     "envMapIntensity": 1.0,
+     "anisotropy": 1.0,
+     "procedural": "brushed"
+    },
+    "palette": [
+     "#B0B2B3",
+     "#908F82",
+     "#878578",
+     "#878279",
+     "#E0E0DD"
+    ],
+    "paletteHueRisk": [],
+    "gradientAxis": "vertical",
+    "stats": {
+     "meanLum": 131.3,
+     "meanSaturation": 0.122,
+     "gradientStrength": 0.646,
+     "mottle": 0.008,
+     "streakRatio": 0.16,
+     "hueSpread": 0.079,
+     "specularFraction": 0.023
+    }
+   },
+   "materialEvidence": {
+    "referencePbrSummary": {
+     "confidence": 0.846,
+     "usable": true
+    },
+    "note": "reference-derived inference from crops; kept for provenance"
+   },
+   "needsEnvironment": true
+  },
+  {
+   "id": "rgb-diffuser",
+   "name": "Pale violet RGB diffuser",
+   "type": "standard",
+   "shaderModel": "MeshStandardMaterial / PBR approximation",
+   "baseColor": "#D9DCFB",
+   "color": "#D9DCFB",
+   "albedo": {
+    "dominant": "#D9DCFB",
+    "secondary": [
+     "#D9DCFB"
+    ],
+    "samplingNotes": "diffuser crop mean #E4E1FA/#E5E6FB (lit LEDs)"
+   },
+   "colorVariation": {
+    "palette": [
+     "#D9DCFB"
+    ],
+    "pattern": "uniform",
+    "amplitude": 0.0,
+    "heightCorrelation": 0.0
+   },
+   "roughness": {
+    "base": 0.28,
+    "variation": 0.04,
+    "map": "none (uniform factory finish)",
+    "localResponse": "uniform"
+   },
+   "metalness": {
+    "base": 0.0,
+    "variation": 0.0
+   },
+   "ambientOcclusion": {
+    "cavityStrength": 0.25,
+    "contactShadowBias": 0.35,
+    "notes": "Darken creases, seams, intersections, and recessed local features."
+   },
+   "wear": {
+    "edgeWear": 0.0,
+    "scratches": [],
+    "chips": []
+   },
+   "dirt": {
+    "amount": 0.0,
+    "cavityBias": 0.0,
+    "color": "#2F2A22"
+   },
+   "localOverrides": [],
+   "shaderNotes": [
+    "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+    "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+    "Use normal/bump/displacement only when they map to observed surface relief.",
+    "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there."
+   ],
+   "notes": "Replace with image-derived color, roughness, noise, and edge-wear notes.",
+   "textureless": {
+    "declared": true,
+    "evidence": [
+     "diffuser crop mean #E4E1FA/#E5E6FB (lit LEDs)",
+     "manufacturer product photos show flat factory finishes"
+    ]
+   },
+   "referenceMaterialId": "plastic.glossy",
+   "materialFamily": "plastic",
+   "materialSubtype": "generic-polymer",
+   "materialFinish": "glossy",
+   "materialReference": {
+    "registry": "~/.claude/skills/img2threejs\\docs\\materials\\material-reference.json",
+    "profileId": "plastic.glossy",
+    "method": "family-subtype-finish",
+    "confidence": 0.819,
+    "sourceRefs": [
+     "three.mesh-physical",
+     "three.mesh-standard",
+     "adobe.pbr-guide-1",
+     "google.filament-pbr",
+     "mit.material-recognition"
+    ],
+    "requiredMaps": [
+     "map",
+     "roughnessMap"
+    ],
+    "optionalMaps": [
+     "normalMap",
+     "clearcoatMap"
+    ],
+    "validationViews": [
+     "neutral-studio",
+     "grazing",
+     "environment-reflection",
+     "reference-beauty"
+    ]
+   },
+   "clearcoat": {
+    "base": 0.2,
+    "variation": 0.0
+   },
+   "clearcoatRoughness": {
+    "base": 0.18,
+    "variation": 0.0
+   },
+   "ior": {
+    "base": 1.5,
+    "variation": 0.0
+   },
+   "textureAnalysis": {
+    "finishClass": "brushed-steel",
+    "recipe": {
+     "metalness": 1.0,
+     "roughness": 0.35,
+     "clearcoat": 0.0,
+     "clearcoatRoughness": 0.0,
+     "transmission": 0.0,
+     "ior": 1.5,
+     "envMapIntensity": 1.0,
+     "anisotropy": 1.0,
+     "procedural": "brushed"
+    },
+    "palette": [
+     "#BFCAE9",
+     "#D6DCF8",
+     "#E7E5FD",
+     "#F0E8FD",
+     "#F4E5FE"
+    ],
+    "paletteHueRisk": [
+     {
+      "stop": "#BFCAE9",
+      "hueRisk": "blue-collapse",
+      "suggestedRgb": [
+       233,
+       202,
+       191
+      ]
+     }
+    ],
+    "gradientAxis": "vertical",
+    "stats": {
+     "meanLum": 228.3,
+     "meanSaturation": 0.115,
+     "gradientStrength": 0.138,
+     "mottle": 0.003,
+     "streakRatio": 0.98,
+     "hueSpread": 0.002,
+     "specularFraction": 0.423
+    }
+   },
+   "materialEvidence": {
+    "referencePbrSummary": {
+     "confidence": 0.819,
+     "usable": true
+    },
+    "note": "reference-derived inference from crops; kept for provenance"
+   }
+  },
+  {
+   "id": "backplate-white",
+   "name": "White painted backplate",
+   "type": "standard",
+   "shaderModel": "MeshStandardMaterial / PBR approximation",
+   "baseColor": "#E6E9F1",
+   "color": "#E6E9F1",
+   "albedo": {
+    "dominant": "#E6E9F1",
+    "secondary": [
+     "#E6E9F1"
+    ],
+    "samplingNotes": "backplate crop palette #E6E9F1, uniform paint"
+   },
+   "colorVariation": {
+    "palette": [
+     "#E6E9F1"
+    ],
+    "pattern": "uniform",
+    "amplitude": 0.0,
+    "heightCorrelation": 0.0
+   },
+   "roughness": {
+    "base": 0.45,
+    "variation": 0.04,
+    "map": "none (uniform factory finish)",
+    "localResponse": "uniform"
+   },
+   "metalness": {
+    "base": 0.0,
+    "variation": 0.0
+   },
+   "ambientOcclusion": {
+    "cavityStrength": 0.25,
+    "contactShadowBias": 0.35,
+    "notes": "Darken creases, seams, intersections, and recessed local features."
+   },
+   "wear": {
+    "edgeWear": 0.0,
+    "scratches": [],
+    "chips": []
+   },
+   "dirt": {
+    "amount": 0.0,
+    "cavityBias": 0.0,
+    "color": "#2F2A22"
+   },
+   "localOverrides": [],
+   "shaderNotes": [
+    "Prefer MeshPhysicalMaterial when clearcoat, sheen, transmission, or thin-surface response is observed; otherwise use MeshStandardMaterial-compatible PBR channels.",
+    "Generate albedo, roughness, height/normal, and AO independently; never alias albedo into roughness.",
+    "Use normal/bump/displacement only when they map to observed surface relief.",
+    "Use displacement geometry when the observed relief changes the close-up silhouette; texture-only relief is insufficient there."
+   ],
+   "notes": "Replace with image-derived color, roughness, noise, and edge-wear notes.",
+   "textureless": {
+    "declared": true,
+    "evidence": [
+     "backplate crop palette #E6E9F1, uniform paint",
+     "manufacturer product photos show flat factory finishes"
+    ]
+   },
+   "referenceMaterialId": "coating.painted-metal",
+   "materialFamily": "coating",
+   "materialSubtype": "paint-over-metal",
+   "materialFinish": "gloss-or-satin",
+   "materialReference": {
+    "registry": "~/.claude/skills/img2threejs\\docs\\materials\\material-reference.json",
+    "profileId": "coating.painted-metal",
+    "method": "family-subtype-finish",
+    "confidence": 0.742,
+    "sourceRefs": [
+     "three.mesh-physical",
+     "gltf.2",
+     "khronos.gltf-pbr",
+     "adobe.pbr-guide-1",
+     "adobe.pbr-guide-2"
+    ],
+    "requiredMaps": [
+     "map",
+     "roughnessMap"
+    ],
+    "optionalMaps": [
+     "normalMap",
+     "clearcoatMap",
+     "clearcoatRoughnessMap",
+     "metalnessMap"
+    ],
+    "validationViews": [
+     "albedo-unlit",
+     "neutral-studio",
+     "grazing",
+     "environment-reflection",
+     "reference-beauty"
+    ]
+   },
+   "clearcoat": {
+    "base": 0.75,
+    "variation": 0.0
+   },
+   "clearcoatRoughness": {
+    "base": 0.12,
+    "variation": 0.0
+   },
+   "ior": {
+    "base": 1.5,
+    "variation": 0.0
+   },
+   "textureAnalysis": {
+    "finishClass": "brushed-steel",
+    "recipe": {
+     "metalness": 1.0,
+     "roughness": 0.35,
+     "clearcoat": 0.0,
+     "clearcoatRoughness": 0.0,
+     "transmission": 0.0,
+     "ior": 1.5,
+     "envMapIntensity": 1.0,
+     "anisotropy": 1.0,
+     "procedural": "brushed"
+    },
+    "palette": [
+     "#898B8F",
+     "#E3E6EE",
+     "#E5E8F0",
+     "#E7EAF2",
+     "#E6EAF1"
+    ],
+    "paletteHueRisk": [],
+    "gradientAxis": "vertical",
+    "stats": {
+     "meanLum": 224.7,
+     "meanSaturation": 0.051,
+     "gradientStrength": 0.453,
+     "mottle": 0.009,
+     "streakRatio": 0.72,
+     "hueSpread": 0.003,
+     "specularFraction": 0.115
+    }
+   },
+   "materialEvidence": {
+    "referencePbrSummary": {
+     "confidence": 0.742,
+     "usable": true
+    },
+    "note": "reference-derived inference from crops; kept for provenance"
+   }
+  }
+ ],
+ "repetitionSystems": [
+  {
+   "id": "fans",
+   "componentRef": "fan-ring-1",
+   "count": 3,
+   "distribution": "three fans at ~109 mm pitch along the length",
+   "primitive": "ellipsoid",
+   "material": "shroud-white",
+   "variation": "identical diameter",
+   "elementComponentIds": [
+    "fan-blades-1",
+    "fan-blades-2",
+    "fan-blades-3",
+    "fan-hub-1",
+    "fan-hub-2",
+    "fan-hub-3",
+    "fan-outline-1",
+    "fan-outline-2",
+    "fan-outline-3",
+    "fan-ring-1",
+    "fan-ring-2",
+    "fan-ring-3"
+   ]
+  }
+ ],
+ "buildPasses": [
+  {
+   "id": "blockout",
+   "goal": "Match macro silhouette and proportions.",
+   "componentRefs": [
+    "root"
+   ],
+   "acceptance": [
+    "Silhouette reads correctly without materials.",
+    "Quality contract has named all required macro feature groups before code generation.",
+    "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+   ]
+  },
+  {
+   "id": "structural-pass",
+   "goal": "Build the component hierarchy implied by the pre-spec complexity assessment.",
+   "componentRefs": [
+    "root"
+   ],
+   "acceptance": [
+    "Macro, meso, and repeated structures meet qualityContract.minimumSpecDepth.",
+    "Parent-child relations, joints, seams, sockets, and contact points are explicit.",
+    "Every attached child appendage/connector has parentSocket, localStart/localEnd, contactType, embedDepth or overlap, and gapTolerance.",
+    "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+   ]
+  },
+  {
+   "id": "form-refinement",
+   "goal": "Refine shape, deformation, bevels, tapers, curves, asymmetry, and visible local geometry.",
+   "componentRefs": [
+    "root"
+   ],
+   "acceptance": [
+    "Important visible forms are represented in component geometryDescriptor, deformations, localFeatures, or repetitionSystems.",
+    "Endpoint-based child parts are rooted at their attachment sockets and do not visibly float away from parents.",
+    "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+   ]
+  },
+  {
+   "id": "material-pass",
+   "goal": "Match material color, roughness, bump, and local variation.",
+   "componentRefs": [
+    "root"
+   ],
+   "acceptance": [
+    "Reference-derived albedo palette records dominant, secondary, and accent colors per visible material.",
+    "Each important material defines roughness variation and at least one normal/bump/displacement response.",
+    "Local material overrides, dirt/wear/stains/moss/chips/scratches or equivalent masks are tied to evidenceRefs.",
+    "Thin, transparent, reflective, wet, or fibrous materials document alpha/transmission/clearcoat/metalness/fiber response when relevant.",
+    "Generated preview uses procedural albedo/roughness/bump texture or vertex color variation instead of one flat color.",
+    "Generated preview uses independent PBR maps at 1024px or higher for the quality-first tier.",
+    "If source pixels are available, referencePbr extraction passed at confidence >= 0.7 or the pass is stopped/requesting better references.",
+    "Macro, meso, and micro surface frequency bands are visible at the intended review distance without obvious tiling.",
+    "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+   ]
+  },
+  {
+   "id": "surface-pass",
+   "goal": "Add procedural surface locality such as normal/bump/displacement, AO, dirt, stains, chips, grain, moss, scratches, and wear.",
+   "componentRefs": [
+    "root"
+   ],
+   "acceptance": [
+    "Every required material feature group has local overrides or surfaceDetail tied to evidenceRefs.",
+    "A grazing-angle close-up proves that normal/height detail breaks highlights naturally and does not read as smooth plastic.",
+    "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+   ]
+  },
+  {
+   "id": "lighting-pass",
+   "goal": "Make material and form readable under neutral turntable lighting plus optional reference lighting.",
+   "componentRefs": [
+    "root"
+   ],
+   "acceptance": [
+    "lightingFromPhoto identifies key light direction/color/intensity, fill light, rim or environment light, and ambient color.",
+    "Exposure, tone mapping, background color/gradient, shadow softness, and contact shadow behavior are specified.",
+    "Lighting does not hide geometry/material gaps and screenshots can be compared fairly to the reference.",
+    "Neutral, grazing, and reference-matched lighting checks distinguish material errors from lighting errors.",
+    "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+   ]
+  },
+  {
+   "id": "interaction-pass",
+   "goal": "Make the model ready for future animation, transformation, physics, or destruction.",
+   "componentRefs": [
+    "root"
+   ],
+   "acceptance": [
+    "Macro and movable meso components have stable pivot nodes.",
+    "Sockets, collider proxies, and destruction metadata are present for future runtime actions.",
+    "AI vision comparison score meets selfCorrectLoop.visualAcceptance.threshold."
+   ]
+  },
+  {
+   "id": "optimization-pass",
+   "goal": "Protect runtime performance after visual fidelity is accepted.",
+   "componentRefs": [
+    "root"
+   ],
+   "acceptance": [
+    "Triangle count, draw calls, instancing, LOD strategy, and FPS target are documented or verified.",
+    "Repeated detail is instanced or simplified where possible without breaking silhouette/material believability."
+   ]
+  }
+ ],
+ "visualEvidence": [
+  {
+   "timestamp": "2026-10-26T09:26:01.019139+00:00",
+   "passId": "blockout",
+   "estimatedFidelity": 0.7,
+   "aiVisionScore": 0.74,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.86,
+    "componentStructure": 0.74,
+    "formDetail": 0.55,
+    "materialSurface": 0.55,
+    "lightingCamera": 0.62
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.86
+    },
+    {
+     "id": "three-fans",
+     "score": 0.78
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.72
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.6
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/blockout-fixed-front.png",
+   "comparisonImage": "renders/blockout-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  },
+  {
+   "timestamp": "2026-10-26T09:26:57.396890+00:00",
+   "passId": "structural-pass",
+   "estimatedFidelity": 0.73,
+   "aiVisionScore": 0.76,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.88,
+    "componentStructure": 0.8,
+    "formDetail": 0.6,
+    "materialSurface": 0.58,
+    "lightingCamera": 0.64
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.87
+    },
+    {
+     "id": "three-fans",
+     "score": 0.8
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.75
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.62
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/structural-pass-fixed-front.png",
+   "comparisonImage": "renders/structural-pass-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  },
+  {
+   "timestamp": "2026-10-26T09:29:02.322146+00:00",
+   "passId": "form-refinement",
+   "estimatedFidelity": 0.76,
+   "aiVisionScore": 0.78,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.82,
+    "formDetail": 0.72,
+    "materialSurface": 0.6,
+    "lightingCamera": 0.64
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.64
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/form-refinement-fixed-front.png",
+   "comparisonImage": "renders/form-refinement-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  },
+  {
+   "timestamp": "2026-10-26T09:30:37.883740+00:00",
+   "passId": "material-pass",
+   "estimatedFidelity": 0.78,
+   "aiVisionScore": 0.79,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.82,
+    "formDetail": 0.72,
+    "materialSurface": 0.76,
+    "lightingCamera": 0.64
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.78
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/material-pass-fixed-front.png",
+   "comparisonImage": "renders/material-pass-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  },
+  {
+   "timestamp": "2026-10-26T09:31:04.973015+00:00",
+   "passId": "surface-pass",
+   "estimatedFidelity": 0.78,
+   "aiVisionScore": 0.79,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.82,
+    "formDetail": 0.72,
+    "materialSurface": 0.76,
+    "lightingCamera": 0.64
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.78
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/surface-pass-fixed-front.png",
+   "comparisonImage": "renders/surface-pass-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  },
+  {
+   "timestamp": "2026-10-26T09:31:48.027979+00:00",
+   "passId": "lighting-pass",
+   "estimatedFidelity": 0.79,
+   "aiVisionScore": 0.8,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.84,
+    "formDetail": 0.72,
+    "materialSurface": 0.77,
+    "lightingCamera": 0.72
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.79
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/lighting-pass-fixed-front.png",
+   "comparisonImage": "renders/lighting-pass-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  },
+  {
+   "timestamp": "2026-10-26T09:32:29.384901+00:00",
+   "passId": "interaction-pass",
+   "estimatedFidelity": 0.79,
+   "aiVisionScore": 0.8,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.85,
+    "formDetail": 0.72,
+    "materialSurface": 0.77,
+    "lightingCamera": 0.72
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.79
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/interaction-pass-fixed-front.png",
+   "comparisonImage": "renders/interaction-pass-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  },
+  {
+   "timestamp": "2026-10-26T09:32:56.651596+00:00",
+   "passId": "optimization-pass",
+   "estimatedFidelity": 0.79,
+   "aiVisionScore": 0.8,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.85,
+    "formDetail": 0.72,
+    "materialSurface": 0.77,
+    "lightingCamera": 0.72
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.79
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/optimization-pass-fixed-front.png",
+   "comparisonImage": "renders/optimization-pass-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  },
+  {
+   "timestamp": "2026-10-26T09:39:59.166294+00:00",
+   "passId": "optimization-pass",
+   "estimatedFidelity": 0.79,
+   "aiVisionScore": 0.8,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.85,
+    "formDetail": 0.72,
+    "materialSurface": 0.77,
+    "lightingCamera": 0.72
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.79
+    }
+   ],
+   "referenceScreenshot": "reference.png",
+   "renderScreenshot": "renders/optimization-pass-fixed-front.png",
+   "comparisonImage": "renders/optimization-pass-cmp.png",
+   "cameraView": "",
+   "notes": "",
+   "aiVisionNotes": ""
+  }
+ ],
+ "reviewHistory": [
+  {
+   "timestamp": "2026-10-26T09:26:01.019139+00:00",
+   "passId": "blockout",
+   "estimatedFidelity": 0.7,
+   "aiVisionScore": 0.74,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.86,
+    "componentStructure": 0.74,
+    "formDetail": 0.55,
+    "materialSurface": 0.55,
+    "lightingCamera": 0.62
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.86
+    },
+    {
+     "id": "three-fans",
+     "score": 0.78
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.72
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.6
+    }
+   ],
+   "action": "continue",
+   "summary": "Envelope 338x140x50 mm with measured placements: three round ~96 mm fans at the reference centres, gold fingers under the bracket half, two RGB accents, dark bracket at the left end. Tier 1 passes outright (IoU 0.913, scale 0.058). Open: hub/disc ellipsoid fronts z-fight near the hub edge; heatsink shows dark along the top edge where the real shroud wraps it; shroud facets absent.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "mapStrippedRender": "renders/blockout-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/blockout-fixed-front.png",
+    "comparisonImage": "renders/blockout-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  },
+  {
+   "timestamp": "2026-10-26T09:26:57.396890+00:00",
+   "passId": "structural-pass",
+   "estimatedFidelity": 0.73,
+   "aiVisionScore": 0.76,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.88,
+    "componentStructure": 0.8,
+    "formDetail": 0.6,
+    "materialSurface": 0.58,
+    "lightingCamera": 0.64
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.87
+    },
+    {
+     "id": "three-fans",
+     "score": 0.8
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.75
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.62
+    }
+   ],
+   "action": "continue",
+   "summary": "Fan layers separated (ring 23.3 / disc 23.7 / hub 24.4 mm) so hubs read cleanly; shroud top and bottom lips plus end cap wrap the heatsink, leaving the dark fin strip visible along the top edge as in the three-quarter reference. Bracket and fingers placed as measured. Open: fan ring outline is low-contrast white-on-white; shroud facets absent.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "mapStrippedRender": "renders/structural-pass-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/structural-pass-fixed-front.png",
+    "comparisonImage": "renders/structural-pass-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  },
+  {
+   "timestamp": "2026-10-26T09:29:02.322146+00:00",
+   "passId": "form-refinement",
+   "estimatedFidelity": 0.76,
+   "aiVisionScore": 0.78,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.82,
+    "formDetail": 0.72,
+    "materialSurface": 0.6,
+    "lightingCamera": 0.64
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.64
+    }
+   ],
+   "action": "continue",
+   "summary": "Each fan now reads as in the reference: grey outline ring (100 mm), white frame ring (96 mm), grey blade disc, white hub, layered 0.6 mm discs at separated depths so no rim z-fighting. Proportions and placements unchanged (IoU 0.913). Open: shroud facet lines between fans not modelled; blade swirl reduced to tone.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "mapStrippedRender": "renders/form-refinement-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/form-refinement-fixed-front.png",
+    "comparisonImage": "renders/form-refinement-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  },
+  {
+   "timestamp": "2026-10-26T09:30:37.883740+00:00",
+   "passId": "material-pass",
+   "estimatedFidelity": 0.78,
+   "aiVisionScore": 0.79,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.82,
+    "formDetail": 0.72,
+    "materialSurface": 0.76,
+    "lightingCamera": 0.64
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.78
+    }
+   ],
+   "action": "continue",
+   "summary": "Albedos from reference crops, then render-vs-reference calibrated: shroud #E0E6EF renders #DFE0E2-ish against reference #DBE1EA; fan-disc scaled to #939AA6 so the disc reads like the reference's #A7AEBC; gold fingers render #483319 vs reference #4E4130. All finishes textureless with crop evidence (material-pass gate via harness/i2t.py textureless exemption, documented deviation). No logos.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "mapStrippedRender": "renders/material-pass-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/material-pass-fixed-front.png",
+    "comparisonImage": "renders/material-pass-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  },
+  {
+   "timestamp": "2026-10-26T09:31:04.973015+00:00",
+   "passId": "surface-pass",
+   "estimatedFidelity": 0.78,
+   "aiVisionScore": 0.79,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.82,
+    "formDetail": 0.72,
+    "materialSurface": 0.76,
+    "lightingCamera": 0.64
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.78
+    }
+   ],
+   "action": "continue",
+   "summary": "Factory-new product: no dirt or wear added. Occlusion locality recorded on the heatsink fin cavities and shroud/backplate gap; the generator keeps occlusionPattern as metadata, so the render matches material-pass.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "mapStrippedRender": "renders/surface-pass-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/surface-pass-fixed-front.png",
+    "comparisonImage": "renders/surface-pass-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  },
+  {
+   "timestamp": "2026-10-26T09:31:48.027979+00:00",
+   "passId": "lighting-pass",
+   "estimatedFidelity": 0.79,
+   "aiVisionScore": 0.8,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.84,
+    "formDetail": 0.72,
+    "materialSurface": 0.77,
+    "lightingCamera": 0.72
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.79
+    }
+   ],
+   "action": "continue",
+   "summary": "High-key exposure 1.35 under ACES (spec intent, applied by the review harness); shroud reads near-white with soft facet shading in orbit, dark fin strip visible on the top edge. In the app the card is lit by BuildScene's studio rig. Unlit map-stripped render verified flat.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "mapStrippedRender": "renders/lighting-pass-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/lighting-pass-fixed-front.png",
+    "comparisonImage": "renders/lighting-pass-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  },
+  {
+   "timestamp": "2026-10-26T09:32:29.384901+00:00",
+   "passId": "interaction-pass",
+   "estimatedFidelity": 0.79,
+   "aiVisionScore": 0.8,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.85,
+    "formDetail": 0.72,
+    "materialSurface": 0.77,
+    "lightingCamera": 0.72
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.79
+    }
+   ],
+   "action": "continue",
+   "summary": "Every component is a named pivot Group with collider, sockets and rigid-mount attachment; root.userData.sculptRuntime has nodes/meshes/sockets/colliders/destructionGroups (23 pivots, 22 colliders, 0 unnamed meshes). Part coverage 21 specified / 22 built (root), 0 errors, 0 warnings. Visual unchanged.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "mapStrippedRender": "renders/interaction-pass-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/interaction-pass-fixed-front.png",
+    "comparisonImage": "renders/interaction-pass-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  },
+  {
+   "timestamp": "2026-10-26T09:32:56.651596+00:00",
+   "passId": "optimization-pass",
+   "estimatedFidelity": 0.79,
+   "aiVisionScore": 0.8,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.85,
+    "formDetail": 0.72,
+    "materialSurface": 0.77,
+    "lightingCamera": 0.72
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.79
+    }
+   ],
+   "action": "continue",
+   "summary": "Runtime budget: 3576 triangles across 22 meshes and 7 materials, under the 4000 target; one draw call per part is fine for a single card in the build scene, so no instancing or LOD. Repetition system documents authored fans so nothing renders twice.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "mapStrippedRender": "renders/optimization-pass-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/optimization-pass-fixed-front.png",
+    "comparisonImage": "renders/optimization-pass-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  },
+  {
+   "timestamp": "2026-10-26T09:39:59.166294+00:00",
+   "passId": "optimization-pass",
+   "estimatedFidelity": 0.79,
+   "aiVisionScore": 0.8,
+   "visualAcceptanceThreshold": 0.7,
+   "layerScores": {
+    "silhouetteProportion": 0.9,
+    "componentStructure": 0.85,
+    "formDetail": 0.72,
+    "materialSurface": 0.77,
+    "lightingCamera": 0.72
+   },
+   "featureReviews": [
+    {
+     "id": "envelope-proportions",
+     "score": 0.88
+    },
+    {
+     "id": "three-fans",
+     "score": 0.84
+    },
+    {
+     "id": "bracket-fingers",
+     "score": 0.76
+    },
+    {
+     "id": "white-shroud",
+     "score": 0.79
+    }
+   ],
+   "action": "continue",
+   "summary": "Re-review after a dimensional correction: backplate moved 2 mm outward so the card's thickness is the published 50 mm (export measured 47.7 mm). Front view unchanged; Tier 1 unchanged.",
+   "matched": [],
+   "mismatches": [],
+   "specFixes": [],
+   "codeFixes": [],
+   "evidence": [],
+   "outOfSequence": true,
+   "mapStrippedRender": "renders/optimization-pass-unlit-front.png",
+   "visualEvidence": {
+    "referenceScreenshot": "reference.png",
+    "renderScreenshot": "renders/optimization-pass-fixed-front.png",
+    "comparisonImage": "renders/optimization-pass-cmp.png",
+    "cameraView": "",
+    "notes": "",
+    "aiVisionNotes": ""
+   }
+  }
+ ],
+ "lodPlan": [
+  {
+   "tier": "near",
+   "distance": 0,
+   "strategy": "full component tree and material layers"
+  },
+  {
+   "tier": "far",
+   "distance": 30,
+   "strategy": "merge static components and reduce local feature geometry"
+  }
+ ],
+ "performanceBudget": {
+  "qualityPriority": "reference-fidelity",
+  "targetTriangles": 4000,
+  "maxDrawCalls": 160,
+  "textureSize": 2048,
+  "fpsTarget": 30,
+  "optimizationPolicy": "Reach accepted visual fidelity first, then optimize without removing reference-critical geometry or surface layers."
+ },
+ "lightingFromPhoto": [
+  {
+   "id": "key",
+   "type": "directional",
+   "direction": [
+    0.6,
+    0.8,
+    0.3
+   ],
+   "intensity": 2.4,
+   "color": "#FFFFFF",
+   "evidence": "product photo: soft frontal key, cool highlight on the shroud facets"
+  },
+  {
+   "id": "fill",
+   "type": "directional",
+   "direction": [
+    -0.5,
+    0.3,
+    -0.4
+   ],
+   "intensity": 1.0,
+   "color": "#DDE6FF",
+   "evidence": "shadowed fan gaps stay mid-grey: strong fill"
+  },
+  {
+   "id": "environment",
+   "type": "environment",
+   "preset": "studio lightformers (no HDRI file)",
+   "intensity": 1.5,
+   "evidence": "white seamless studio background"
+  },
+  {
+   "id": "tone-and-shadow",
+   "type": "render-intent",
+   "toneMapping": "ACES filmic, exposure 1.35 (high-key product photo)",
+   "groundShadow": "soft contact shadow under the card (ContactShadows) plus ambient occlusion",
+   "evidence": "high-key white-seamless product photo"
+  }
+ ],
+ "proceduralStrategy": [
+  "Block out macro silhouette first.",
+  "Add component hierarchy and joints.",
+  "Create stable pivot groups, sockets, collider proxies, and destruction metadata before visual polish.",
+  "Refine forms with bevels, tapers, bends, and procedural noise.",
+  "Run reference PBR extraction for important source-image materials and stop when confidence is below the target threshold.",
+  "Add material variation before adding expensive micro-geometry."
+ ],
+ "animationAnchors": [
+  "root pivot node supports whole-object translation, rotation, scale, and visibility changes",
+  "component pivot groups support later local transforms without rebuilding geometry"
+ ],
+ "destructionAnchors": [
+  "actionProfile.destruction.fractureGroup marks detachable or breakable component sets",
+  "component seams and sockets define plausible break points instead of random explosions"
+ ],
+ "risks": [],
+ "localSpecSearch": {
+  "collection": "core_3d",
+  "query": "MSI RTX 5070 Ti GAMING TRIO OC WHITE graphics card graphics card shroud axial cooling fan white plastic shroud hard surface box bevel",
+  "index": {
+   "status": "hit",
+   "reason": "current",
+   "fingerprint": "06f0b2ece2935e441653f5c3533f91b3a4d6163f2aec4267559d7d8419bdd040"
+  },
+  "matches": [
+   {
+    "record_id": "core.coordinate-relative-units",
+    "file_path": "grimoire/glossary/3d_vocabulary.md",
+    "heading": "Geometry And Topology",
+    "key_path": null,
+    "score": 5.594547623161,
+    "snippets": [
+     "A bevel radius is sized in object-relative units."
+    ],
+    "source_refs": [
+     {
+      "path": "grimoire/glossary/3d_vocabulary.md",
+      "heading": "Geometry And Topology",
+      "key_path": null
+     },
+     {
+      "path": "grimoire/intake/image_analysis.md",
+      "heading": "Layer 2 \u2014 Overall form & silhouette",
+      "key_path": null
+     }
+    ],
+    "evidence_refs": [
+     {
+      "kind": "source",
+      "ref": "grimoire/glossary/3d_vocabulary.md"
+     },
+     {
+      "kind": "notebooklm-research",
+      "ref": "notebooklm:4b03c2f9-8393-411f-b5b4-039ab9532843",
+      "note": "Validated generic schema vocabulary; numeric claims remain backed by local source_refs."
+     }
+    ]
+   },
+   {
+    "record_id": "core.pbr-metalness",
+    "file_path": "docs/raw/img2threejs-skill-dataset.json",
+    "heading": null,
+    "key_path": "categories.material_pbr[0]",
+    "score": 4.925246978206,
+    "snippets": [
+     "Binary or scalar property defining whether a surface is dielectric (0.0) or conductive metal (1.0); intermediate values blend the two. Thu\u1ed9c t\u00ednh nh\u1ecb ph\u00e2n ho\u1eb7c v\u00f4 h\u01b0\u1edbng x\u00e1c \u0111\u1ecbnh b\u1ec1 m\u1eb7t l\u00e0 \u0111i\u1ec7n m\u00f4i (0.0) hay kim lo\u1ea1i d\u1eabn \u0111i\u1ec7n (1.0); gi\u00e1 tr\u1ecb trung ..."
+    ],
+    "source_refs": [
+     {
+      "path": "docs/raw/img2threejs-skill-dataset.json",
+      "heading": null,
+      "key_path": "categories.material_pbr[0]"
+     }
+    ],
+    "evidence_refs": [
+     {
+      "kind": "source",
+      "ref": "docs/raw/img2threejs-skill-dataset.json",
+      "note": "img2threejs NotebookLM research distillation"
+     }
+    ]
+   },
+   {
+    "record_id": "core.description-scene-graph-relational-triplets",
+    "file_path": "docs/raw/img2threejs-skill-dataset.json",
+    "heading": null,
+    "key_path": "categories.description_conventions[2]",
+    "score": 4.647388731945,
+    "snippets": [
+     "... capturing spatial/semantic relationships between parts (e.g. <blade, attached_to, handle>), plus per-node bounding box and class label. C\u00e1c ph\u00e1t bi\u1ec3u <Ch\u1ee7 th\u1ec3, V\u1ecb ng\u1eef, \u0110\u1ed1i t\u01b0\u1ee3ng> n\u1eafm b\u1eaft quan h\u1ec7 kh\u00f4ng gian/ng\u1eef ngh\u0129a gi\u1eefa c\u00e1c b\u1ed9 ph\u1eadn ..."
+    ],
+    "source_refs": [
+     {
+      "path": "docs/raw/img2threejs-skill-dataset.json",
+      "heading": null,
+      "key_path": "categories.description_conventions[2]"
+     }
+    ],
+    "evidence_refs": [
+     {
+      "kind": "source",
+      "ref": "docs/raw/img2threejs-skill-dataset.json",
+      "note": "img2threejs NotebookLM research distillation"
+     }
+    ]
+   }
+  ]
+ },
+ "materialPipeline": {
+  "schemaVersion": 1,
+  "status": "proceed",
+  "registry": "~/.claude/skills/img2threejs\\docs\\materials\\material-reference.json",
+  "analysisArtifact": ".\\material-analysis.json",
+  "targetThreshold": 0.7,
+  "unresolvedNotObservedMaterials": [],
+  "regions": [
+   {
+    "componentId": "front-shroud",
+    "regionId": "shroud-white",
+    "specMaterialId": "shroud-white",
+    "profileId": "plastic.matte",
+    "status": "proceed"
+   },
+   {
+    "componentId": "fan-blades-1",
+    "regionId": "fan-blade-disc",
+    "specMaterialId": "fan-disc",
+    "profileId": "plastic.matte",
+    "status": "proceed"
+   },
+   {
+    "componentId": "card-root",
+    "regionId": "heatsink-fins",
+    "specMaterialId": "heatsink-dark",
+    "profileId": "metal.aluminum",
+    "status": "proceed"
+   },
+   {
+    "componentId": "pcie-fingers",
+    "regionId": "gold-fingers",
+    "specMaterialId": "gold-contacts",
+    "profileId": "metal.gold",
+    "status": "proceed"
+   },
+   {
+    "componentId": "io-bracket",
+    "regionId": "bracket-steel",
+    "specMaterialId": "bracket-steel",
+    "profileId": "metal.steel-brushed",
+    "status": "proceed"
+   },
+   {
+    "componentId": "rgb-accent-top",
+    "regionId": "rgb-diffuser",
+    "specMaterialId": "rgb-diffuser",
+    "profileId": "plastic.glossy",
+    "status": "proceed"
+   },
+   {
+    "componentId": "backplate",
+    "regionId": "backplate-paint",
+    "specMaterialId": "backplate-white",
+    "profileId": "coating.painted-metal",
+    "status": "proceed"
+   }
+  ],
+  "controlledViewsRequired": [
+   "albedo-unlit",
+   "environment-reflection",
+   "grazing",
+   "neutral-studio",
+   "reference-beauty"
+  ]
+ },
+ "materialAnalysisHistory": [
+  {
+   "analysisArtifact": ".\\material-analysis.json",
+   "status": "proceed",
+   "unresolvedNotObservedMaterials": [],
+   "regions": 7
+  }
+ ],
+ "tier1Results": [
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.913,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0208
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "722a7a5f0d88bc86",
+   "passId": "blockout",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9131,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0209
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "3d2d41a1a39b93fb",
+   "passId": "structural-pass",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9131,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0209
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "6eb3f667625868b7",
+   "passId": "form-refinement",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9131,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0209
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "ce1fad56bea8ac1c",
+   "passId": "form-refinement",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9131,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0209
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "ce1fad56bea8ac1c",
+   "passId": "material-pass",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9061,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0256
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "f72b1348003610f4",
+   "passId": "material-pass",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9061,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0256
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "f72b1348003610f4",
+   "passId": "surface-pass",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9149,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0224
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "cff70d1b8e72ea65",
+   "passId": "lighting-pass",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9149,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0224
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "cff70d1b8e72ea65",
+   "passId": "interaction-pass",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9149,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0224
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "cff70d1b8e72ea65",
+   "passId": "optimization-pass",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  },
+  {
+   "passed": true,
+   "checks": {
+    "silhouetteIoU": 0.9148,
+    "aspectRatioDelta": 0.0407,
+    "scaleDelta": 0.0577,
+    "bilateralSymmetryError": 0.0224
+   },
+   "failures": [],
+   "maskWarnings": [],
+   "renderHash": "174b7c3db696d07b",
+   "passId": "optimization-pass",
+   "gatesStillEnforced": [
+    "aspectRatioDelta",
+    "scaleDelta",
+    "bilateralSymmetryError",
+    "map-stripped evidence"
+   ]
+  }
+ ]
+}

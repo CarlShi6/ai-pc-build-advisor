@@ -15,6 +15,7 @@ import {
 } from "@/lib/v3/replace-options";
 import { confirmWithLockOverride } from "@/lib/v3/visual-optimization";
 import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
+import { REFERENCE_MODEL_LABEL, referenceModelFor } from "@/lib/v3/reference-models";
 
 function totalText(total: { known: number; unknown: number }) {
   return `${total.known.toLocaleString()}${total.unknown ? ` + ${total.unknown} unknown` : ""}`;
@@ -91,6 +92,11 @@ export function PartReplaceCard({
             <a href={link.href} target="_blank" rel="noopener noreferrer">
               {link.label} ↗
             </a>
+          )}
+          {current && (
+            <small className="v3-replace-model">
+              {referenceModelFor(current.id) ? REFERENCE_MODEL_LABEL : "Illustrative geometry"}
+            </small>
           )}
         </div>
         <button type="button" className="v3-replace-close" aria-label="Close" onClick={onClose}>

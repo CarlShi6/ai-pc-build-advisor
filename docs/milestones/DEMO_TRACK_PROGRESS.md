@@ -90,10 +90,46 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - Gate: lint 0, typecheck passed, **191 tests in 28 files** passed, build passed. E2E 7/7.
 - Not done yet in week 3: 1:1 millimetre part models (waiting on the img2threejs approval and Python), the white showcase demo configuration as a one-click sample, and real image recognition (needs `OPENAI_API_KEY`, to be requested from the user).
 
-### Slice 6 (in progress): reference-reconstructed part models — 2026-10-25
+### Slice 6: reference-reconstructed part models in the scene — 2026-10-26
 
-- Installed with user approval: Python 3.12.10 (winget, per-user, installer hash verified) and img2threejs v2.0.0 cloned to `~/.claude/skills/img2threejs` (tag → commit `a669e9a`, Claude Code only, no npx installer). It is listed as installed in `REUSE_DECISIONS.md` only after this note (the row still says pending).
-- O11 Dynamic EVO White: the img2threejs checklist ran through intake, suitability (conditional), admission, assessment, 9-item detail inventory, material evidence (4 regions, 0.74–0.91), strict spec validation and the blockout factory. Rendered envelope is 467 × 459 × 285 mm vs published 465 × 459 × 285 (the I/O insert protrudes 2 mm; to fix). Sub-part proportions follow the reference image inside the published envelope (recorded as assumptions). No logo.
-- Tier 1 silhouette IoU was 0.40: a white case on the white manufacturer background defeats mask extraction. Divine Eye flagged reconstruction mode (objectness 0.75, pHash 0.75). **User decision (Option A):** IoU is advisory for white-on-white manufacturer references, recorded with that evidence in the spec; aspect, scale, symmetry and all other gates stay enforced. The blockout pass gate now passes.
-- Working files (references, spec, renders, review harness) live in the session scratchpad, not the repository.
-- Next: blockout multi-angle check, comparison sheet and review; the six remaining O11 passes; the MSI white GPU through the same pipeline; mm-spec models for the other parts; wiring into the scene with the "Reference reconstruction · dimensions from manufacturer specs" label.
+- **img2threejs v2.0.0, full checklist, two parts** (installed with user approval: Python 3.12.10 via winget; tag v2.0.0 = `a669e9a` in `~/.claude/skills/img2threejs`, Claude Code only):
+
+  | Part | References (manufacturer gallery) | Passes | Final review | Parts / triangles | Envelope vs published |
+  |---|---|---|---|---|---|
+  | Lian Li O11 Dynamic EVO White | lian-li.com front + side views | 8/8 credited | vision 0.79, fidelity 0.78 | 34 / 408 | 467 × 459 × 286 vs 465 × 459 × 285 mm (glass border print stands ≤1.3 mm proud) |
+  | MSI RTX 5070 Ti GAMING TRIO OC WHITE | msi.com fan side, three-quarter and back views | 8/8 credited | vision 0.80, fidelity 0.79 | 22 / 3,576 | 338 × 140 × 49.7 mm card; the 120 mm PCIe bracket adds height |
+
+  Each run went through intake, suitability (conditional: white on white), admission, assessment, detail inventory, material evidence and strict validation. Then blockout → structural → form → material → surface → lighting → interaction → optimization, each with renders, Tier 1, multi-angle, pass gate, comparison sheet and a recorded review, plus part coverage (0 errors), action-ready, emission and plugin gates.
+
+  Sub-part placements were measured on the manufacturer images (0.79 mm/px for the O11, 0.394 mm/px for the MSI) inside the published envelope and recorded as assumptions. Brand marks, hub logos and printed text are not modelled.
+- **What the passes changed.**
+  - O11: glass border print and frameless corner, pillar seam, slot covers, the I/O ports where the reference shows them, hex-zone tones at the reference's measured mean colours, near-neutral glass.
+  - MSI: fans as flattened discs, because v2.0.0's endpoint cylinders are hard-coded to 8 segments (octagons). Each fan is an outline / ring / blade disc / hub stack, layered so the rims don't z-fight; shroud lips and end cap; albedo calibrated render-vs-reference.
+  - After export, the MSI card measured 47.7 mm thick, so the backplate moved 2 mm and the final pass was re-reviewed (now 49.7 mm).
+- **Documented deviations** (also in the specs and `REUSE_DECISIONS.md`):
+  1. **Silhouette IoU advisory** for white-on-white references (user decision, Option A). It was needed for the O11 (IoU 0.40, Divine Eye objectness 0.75–0.84). The MSI passed IoU outright (0.91).
+  2. **Textureless exemption in the orchestrator.** The v2.0.0 spec validator exempts evidence-backed `textureless` materials from the texture-map bar, but the pass orchestrator didn't. `tools/reference-models/harness/i2t.py` applies the validator's own rule there; the skill itself is untouched.
+  3. The review harness applies the spec's exposure intent (1.35), because the generator's renderer config has no exposure field.
+- **Spec-envelope models** (no image pipeline): NZXT H5 Flow White and Corsair 4000D Airflow White cases, and the ASUS PRIME RTX 5070 White, built in `src/lib/v3/reference-models.ts` from the published millimetres plus features each manufacturer page states:
+  - H5 Flow: mesh top and front, perforated PSU shroud, ultra-clear glass.
+  - 4000D Airflow: steel high-airflow front, tempered glass; no shroud, because the page doesn't mention one.
+  - ASUS PRIME: "three Axial-tech fans", evenly spaced, because no pitch is published.
+
+  Cooler, RAM and PSU publish no usable millimetres, so they stay illustrative.
+- **In the app.** `reference-models/<slug>/object-sculpt-spec.json` (local paths removed) → `tools/reference-models/export_reference_models.py` → `src/data/referenceModels.generated.ts`, as plain millimetre boxes and discs with material colour, roughness, metalness and transmission. Nothing from img2threejs ships.
+  - `BuildScene` draws a selected part's reference model at mm/150 through the same dim-aware materials, so Focus/Isolate still works. GPU models rotate into the flat GPU slot (fans down, top edge to the glass, bracket at the rear). A focused GPU eases round to show its fans.
+  - Labels:
+    - The focus card shows **"Reference reconstruction · dimensions from manufacturer specs"**, or "Illustrative geometry".
+    - The scene disclosure names the reconstructed slots and says neither kind verifies physical clearance.
+  - Fixed in passing: the Studio's slot-detail preview showed "Price difference +$0" for an unknown price. It now shows "Unknown", and the preview total adds "+ N unknown".
+- Tests: `src/lib/v3/reference-models.test.ts` (7):
+  - every white case or GPU with published mm has a model, and nothing else does
+  - labels and accuracy
+  - case envelopes within 1% of the published figures; GPU length, thickness and card height within 1–2%
+  - credited passes
+  - scene sizing and axes
+  - which build slots render reconstructions
+- Gate: lint 0, typecheck passed, **198 tests in 29 files** passed, build passed, **E2E 7/7**.
+- Browser: before/after screenshots of the eight-part white build (scene, focused GPU, focused case) and the H5 Flow + ASUS PRIME variant. Headless Edge with SwiftShader.
+- Tooling in `tools/reference-models/harness/` (excluded from ESLint): review page, renderer, pass runner, advisory Tier 1, orchestrator wrapper, WebP→PNG. Manufacturer reference images are **not** committed.
+- Still open in week 3: the white showcase one-click sample; real image recognition (ask before `OPENAI_API_KEY`).
