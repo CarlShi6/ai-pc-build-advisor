@@ -68,7 +68,9 @@ export function ImageCandidateReview({
                   ? "No catalog coverage"
                   : set.status === "unresolved"
                     ? "Unresolved"
-                    : `${set.candidates.length} alternatives`}
+                    : set.status === "not_in_photo"
+                      ? "Not in photo"
+                      : `${set.candidates.length} alternatives`}
               </small>
             </div>
             <p>{set.explanation}</p>
@@ -168,12 +170,15 @@ export function ImageCandidateReview({
               );
             })}
             <div className="v3-review-other">
-              <button
-                type="button"
-                onClick={() => update(set.category, keepCandidateUnknown(review))}
-              >
-                Keep unknown
-              </button>
+              {/* Nothing to keep unknown when the photo shows the part isn't there. */}
+              {set.status !== "not_in_photo" && (
+                <button
+                  type="button"
+                  onClick={() => update(set.category, keepCandidateUnknown(review))}
+                >
+                  Keep unknown
+                </button>
+              )}
               <label>
                 Enter model manually
                 <input

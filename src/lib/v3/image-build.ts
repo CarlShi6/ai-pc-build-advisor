@@ -76,6 +76,8 @@ export function proposeImageBuild(
     const slot = set.category === "fan" ? null : (set.category as SlotId);
     if (!slot) continue;
     const review = reviews[set.category];
+    // Not in the photo: leave the slot open (unselected), not "needs review", unless the user wrote a note.
+    if (set.status === "not_in_photo" && review?.status !== "manual") continue;
     const picked =
       review?.status === "chosen"
         ? set.candidates.find((item) => item.partId === review.chosenPartId)

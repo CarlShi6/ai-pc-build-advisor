@@ -43,6 +43,7 @@ const systemPrompt = [
   "Never identify hidden CPU, power supply, storage, memory specification, or physical clearance. Do not infer compatibility, price, or ownership.",
   "Use normalized region coordinates only when a specific visible area supports the observation; otherwise use null.",
   "Each observation needs a short evidence explanation. If you cannot see a detail, mark it unknown or omit it.",
+  "List in absentParts only a GPU, cooler, fan or motherboard you can clearly see is not installed because the area where it would sit is plainly visible (for example an empty case interior). If a part could be hidden, out of frame or obscured, do not list it; leave absentParts empty when unsure.",
 ].join(" ");
 
 export const analyzeReferenceImage: ImageAnalyzer = async ({ bytes, mime, width, height }) => {

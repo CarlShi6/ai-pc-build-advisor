@@ -2,6 +2,10 @@ import { z } from "zod";
 import { primarySlots, type SlotId } from "@/lib/v3/build-document";
 import type { ImageMime } from "@/lib/v3/image-input";
 
+/** Visible parts a photo can show are *not installed* (an empty case). Hidden parts never qualify. */
+export const absentPartCategories = ["gpu", "cooler", "fan", "motherboard"] as const;
+export type AbsentPartCategory = (typeof absentPartCategories)[number];
+
 const regionSchema = z
   .object({
     x: z.number().min(0).max(1),
@@ -32,6 +36,8 @@ export const observationDraftSchema = z
           .strict(),
       )
       .max(24),
+    // Optional for older fixtures and saved drafts; the live provider must always send it.
+    absentParts: z.array(z.enum(absentPartCategories)).max(4).default([]),
   })
   .strict();
 
@@ -53,6 +59,8 @@ export interface ImageAnalysisResult {
   qualityIssues: string[];
   observations: VisualObservation[];
   unknownPartIdentities: SlotId[];
+  /** Categories the photo clearly shows are not installed; dropped for poor-quality photos. */
+  absentParts: AbsentPartCategory[];
 }
 
 export type ImageAnalyzer = (input: {
@@ -65,11 +73,15 @@ export type ImageAnalyzer = (input: {
 export const observationJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "quality", "qualityIssues", "observations"],
+  required: ["summary", "quality", "qualityIssues", "observations", "absentParts"],
   properties: {
     summary: { type: "string" },
     quality: { type: "string", enum: ["clear", "limited", "poor"] },
     qualityIssues: { type: "array", items: { type: "string" } },
+    absentParts: {
+      type: "array",
+      items: { type: "string", enum: [...absentPartCategories] },
+    },
     observations: {
       type: "array",
       items: {
@@ -151,5 +163,7 @@ export function createImageAnalysisResult(
     qualityIssues: draft.qualityIssues,
     observations,
     unknownPartIdentities: [...primarySlots],
+    // A poor photo can't show that something is missing.
+    absentParts: draft.quality === "poor" ? [] : [...new Set(draft.absentParts)],
   };
 }

@@ -27,7 +27,7 @@ export interface AppearanceCandidate {
 
 export interface CandidateSet {
   category: VisibleCatalogCategory;
-  status: "candidates" | "unresolved" | "no_catalog_coverage";
+  status: "candidates" | "unresolved" | "no_catalog_coverage" | "not_in_photo";
   observationIds: string[];
   candidates: AppearanceCandidate[];
   explanation: string;
@@ -146,11 +146,33 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
   return { score, marking, matchedObservationIds, matchedSignals, observationEvidence };
 }
 
+const absentLabels: Record<string, string> = {
+  gpu: "graphics card",
+  cooler: "CPU cooler",
+  fan: "fans",
+  motherboard: "motherboard",
+};
+
 export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateSet[] {
+  // Older saved analyses predate `absentParts`.
+  const absent = new Set<string>(analysis.absentParts ?? []);
   return visibleCatalogCategories
-    .filter((category) => analysis.observations.some((item) => item.category === category))
+    .filter(
+      (category) =>
+        absent.has(category) || analysis.observations.some((item) => item.category === category),
+    )
     .map((category) => {
       const observations = analysis.observations.filter((item) => item.category === category);
+      if (absent.has(category))
+        return {
+          category,
+          status: "not_in_photo" as const,
+          observationIds: observations.map((item) => item.id),
+          candidates: [],
+          explanation:
+            `The photo shows no ${absentLabels[category]} installed, so there is nothing to match.` +
+            (category === "fan" ? "" : " The Build slot stays open for you to choose."),
+        };
       const profiles = appearanceProfiles.filter((profile) => profile.category === category);
       if (!profiles.length)
         return {

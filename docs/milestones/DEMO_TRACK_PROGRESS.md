@@ -174,6 +174,26 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - O11 white front view: 8 observations in 5.6 s. The candidates were all three white cases as "Weak visual match · appearance only", each saying photo similarity doesn't verify the SKU; it didn't claim the case is an O11. Confirming the first (4000D White, no price) gave "$0 + 1 unknown price, not counted".
 
   One imprecision: it called the front glass "the left side panel". The review step is there for exactly this.
-- Observed gap (not fixed): when the AI says a GPU, fans or motherboard are *not present* (empty case), candidate review still lists those slots as "Unresolved". A follow-up could show "not in photo" instead.
+- Observed gap: when the AI said a GPU, fans or motherboard were *not present* (empty case), candidate review still listed those slots as "Unresolved". Fixed in slice 10.
 - Not verified: production/hosted environment, rate-limit behaviour against the real provider, cost per photo, photos from users' own builds. E2E stays keyless (7 flows + sample, keys blanked).
+
+### Slice 10: "Not in photo" in candidate review — 2026-10-26
+
+- Absence is now an explicit structured-output field, not parsed from wording. The model's absence wording varied ("no GPU installed", "visible: no", "visible fan count: 0").
+- `src/lib/v3/image-contract.ts`: new required `absentParts` in the strict JSON schema, limited to `gpu`, `cooler`, `fan`, `motherboard` (hidden parts can't be listed). `createImageAnalysisResult` drops it for `poor` photos and dedupes it. It defaults to `[]` for the dev fixture and older saved analyses.
+- Prompt (`image-analysis.server.ts`): list a part only when the area where it would sit is plainly visible; leave the list empty if the part could be hidden, out of frame or obscured.
+- `candidate-matcher.ts`: new set status `not_in_photo`, shown even with no observation for that part, with no candidates. The explanation says the photo shows no such part installed and the Build slot stays open (fans: no slot sentence, since they aren't a Build slot). It deliberately doesn't claim the build needs the part.
+- Candidate review shows **Not in photo** and hides "Keep unknown" for those sets; "Enter model manually" stays.
+- `image-build.ts`: an absent part leaves its slot open (unselected) instead of marking it "needs review", unless the user wrote a manual note.
+- Live recheck (local dev, `gpt-4.1-mini`):
+  - Both empty-O11 photos returned `absentParts: [gpu, cooler, fan, motherboard]`.
+  - The populated `og.png` build returned `[]` (no false absence).
+  - UI flow for the white front photo: four "Not in photo" sets, and the Studio went from **Unresolved 2 → 0**.
+  - One MSI recheck hit the app's own `SESSION_RATE_LIMITED` (3/min, shared local guest session), as designed; it wasn't retried.
+- Tests: `src/lib/v3/absent-parts.test.ts` (4):
+  - schema requires the field
+  - poor-quality drop, default, rejects `psu`
+  - "Not in photo" status, explanation, rendered label and hidden button
+  - the draft leaves absent slots open, and a manual note still flags the slot
+- Gate: lint 0, typecheck passed, **208 tests in 32 files** passed, build passed, **E2E 8/8**.
 
