@@ -14,6 +14,7 @@ import { V3Shell } from "@/components/v3-shell";
 import {
   catalogForSlot,
   completeness,
+  fromSavedBuild,
   primarySlots,
   selectedPart,
   setVisualPriorityLock,
@@ -31,7 +32,8 @@ import {
   type PartRemovalProposal,
 } from "@/lib/v3/build-proposal";
 import { readDraft, writeDraft } from "@/lib/v3/draft-session";
-import { saveCurrentBuild } from "@/lib/apiClient";
+import { ApiClientError, getSavedBuild, saveCurrentBuild } from "@/lib/apiClient";
+import { SAVE_CONFLICT_CODE } from "@/lib/persistence/save-version";
 import type { Part } from "@/types/parts";
 import type { BuildSceneProps, SceneMode } from "@/features/build-3d/BuildScene";
 import { SceneBoundary } from "@/features/build-3d/SceneBoundary";
@@ -63,6 +65,7 @@ function StudioPage() {
   const [saving, setSaving] = useState(false);
   const [savedRevision, setSavedRevision] = useState<number | null>(null);
   const [saveError, setSaveError] = useState("");
+  const [saveConflict, setSaveConflict] = useState(false);
   useEffect(() => {
     const draft = readDraft();
     setDocument(draft);
@@ -95,19 +98,52 @@ function StudioPage() {
   async function saveDraft(current: BuildDocumentV3) {
     setSaving(true);
     setSaveError("");
+    setSaveConflict(false);
     try {
       const response = await saveCurrentBuild({
         id: current.savedBuildId,
         name: current.build.name,
         build: toSavedBuildPayload(current),
         buildNeeds: { budget: current.build.budget, targetUseCase: current.build.targetUseCase },
+        expectedUpdatedAt: current.savedBuildId ? current.savedVersion : undefined,
       });
-      const next = { ...current, savedBuildId: response.savedBuild.id };
+      const next = {
+        ...current,
+        savedBuildId: response.savedBuild.id,
+        savedVersion: response.savedBuild.updatedAt,
+      };
       writeDraft(next);
       setDocument(next);
       setSavedRevision(next.revision);
     } catch (failure) {
+      if (failure instanceof ApiClientError && failure.code === SAVE_CONFLICT_CODE)
+        setSaveConflict(true);
       setSaveError(failure instanceof Error ? failure.message : "This build could not be saved.");
+    } finally {
+      setSaving(false);
+    }
+  }
+  /** Conflict resolution: either replace this tab's draft with the newer save, or overwrite it. */
+  async function resolveSaveConflict(current: BuildDocumentV3, keep: "saved" | "this_tab") {
+    if (!current.savedBuildId) return;
+    setSaving(true);
+    try {
+      const latest = await getSavedBuild(current.savedBuildId);
+      if (keep === "this_tab") {
+        setSaving(false);
+        await saveDraft({ ...current, savedVersion: latest.updatedAt });
+        return;
+      }
+      const restored = fromSavedBuild(latest);
+      if (!restored) throw new Error("The saved version could not be read.");
+      commit(restored);
+      setSavedRevision(restored.revision);
+      setSaveConflict(false);
+      setSaveError("");
+    } catch (failure) {
+      setSaveError(
+        failure instanceof Error ? failure.message : "The saved version could not be loaded.",
+      );
     } finally {
       setSaving(false);
     }
@@ -180,6 +216,26 @@ function StudioPage() {
             >
               <Save size={16} /> {document.savedBuildId ? "Save changes" : "Save build"}
             </button>
+            {saveConflict && (
+              <div className="v3-save-conflict" role="group" aria-label="Resolve save conflict">
+                <button
+                  type="button"
+                  className="v3-secondary"
+                  disabled={saving}
+                  onClick={() => void resolveSaveConflict(document, "saved")}
+                >
+                  Open saved version
+                </button>
+                <button
+                  type="button"
+                  className="v3-secondary"
+                  disabled={saving}
+                  onClick={() => void resolveSaveConflict(document, "this_tab")}
+                >
+                  Overwrite with this tab
+                </button>
+              </div>
+            )}
             <Link className="v3-secondary" to="/">
               Start another build <ArrowRight size={16} />
             </Link>

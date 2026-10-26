@@ -27,6 +27,32 @@ Build Studio could open a saved Build, but a v3 draft could not be saved. Drafts
 
 ## Next R6 slices
 
-1. Export or report for an incomplete draft, showing unresolved and unknown states (not `pass`).
-2. Price and source disclosures plus shopping links from the Studio for selected slots only.
-3. Revision check on save (reject a stale tab overwriting a newer save), then privacy deletion.
+1. Export or report for an incomplete draft, showing unresolved and unknown states (not `pass`). Done in slice 2 (Studio shopping plan with Markdown and JSON report).
+2. Price and source disclosures plus shopping links from the Studio for selected slots only. Done in slice 2.
+3. Revision check on save (reject a stale tab overwriting a newer save). Done in slice 3, below. Privacy deletion is still open.
+
+# R6 slice 3: revision check on save — 2026-10-25
+
+## Problem
+
+Two tabs could open the same saved Build. Whichever tab saved last silently replaced the other's save, because the save endpoint overwrote by `id` with no version check.
+
+## Implemented
+
+- `src/lib/persistence/save-version.ts`: the saved record's `updatedAt` is its save version. `assertSaveVersion` throws `SaveConflictError` (code `SAVE_CONFLICT`) when the caller's expected version no longer matches. `nextSaveTimestamp` always moves the version forward, even for two saves in the same millisecond.
+- `SaveBuildInput` / `SaveBuildRequest` carry an optional `expectedUpdatedAt`. Both stores check it before writing. The Supabase update also filters on `updated_at = <checked version>`, so a save that lands between the read and the write matches no row (`PGRST116`) and is reported as a conflict, not applied. **No SQL migration.** A save without `expectedUpdatedAt` stays unchecked, so legacy routes and tabs opened before this change behave as before.
+- `src/lib/api-router.ts`: a conflict returns `409 { error: { code: "SAVE_CONFLICT", message } }`. Other save failures keep their existing 403.
+- `src/lib/v3/build-document.ts`: `BuildDocumentV3.savedVersion` (tab state only, not stored in the envelope). `fromSavedBuild` opens a saved record with its version and saved name; My Builds uses it.
+- `src/routes/studio.tsx` (plus one CSS rule): saves send `expectedUpdatedAt` and store the returned version. On a conflict the status explains that the build was saved elsewhere and offers **Open saved version** (replaces this tab's draft with the newer save) or **Overwrite with this tab** (re-fetches the latest version and saves against it). Both choices are explicit, and neither happens automatically.
+- Tests: 4 in `build-document-save.test.ts` (open-with-version, stale save rejected and the newer save kept, explicit overwrite stays one saved slot, unversioned saves unchecked, strictly increasing versions). 1 in `api-router.test.ts` (409 `SAVE_CONFLICT` over HTTP).
+
+## Verification
+
+- Gate: lint 0, typecheck passed, **149 tests in 20 files** passed, build passed (existing chunk-size, `"use client"` and Wrangler warnings only).
+- Browser, `http://127.0.0.1:5175/`, two tabs. Tab A: Blank → Save build. Tab B: My Builds → Open in Studio → case NZXT H5 Flow → Save changes (200). Tab A: case Corsair 4000D Airflow → Save changes → **409**, conflict message and both buttons shown. **Open saved version** loaded tab B's NZXT case and showed "Saved to My Builds". Then tab A saved again (200), making tab B stale. Tab B: Lian Li O11 Dynamic EVO → Save → 409 → **Overwrite with this tab** → GET latest → POST 200. My Builds still listed one build.
+
+## Limitations
+
+- Post-build feedback also bumps a saved Build's `updatedAt`, so feedback added elsewhere makes the next Studio save report a conflict even though the parts didn't change. Overwriting is safe in that case, because feedback is stored separately.
+- The Supabase conditional update is untested against a real project here. The mock store checks and writes synchronously, so it has no race window.
+- A deleted saved Build is still recreated by a later save from an open tab (existing behavior, unchanged).

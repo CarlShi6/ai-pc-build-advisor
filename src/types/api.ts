@@ -158,6 +158,8 @@ export interface SaveBuildRequest {
   name: string;
   build: Build;
   buildNeeds: CustomerNeeds;
+  /** The saved record's `updatedAt` this client last saw; a stale value returns 409. */
+  expectedUpdatedAt?: string;
 }
 
 export interface SaveBuildResponse {

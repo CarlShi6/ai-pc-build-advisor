@@ -53,6 +53,8 @@ export interface BuildDocumentV3 {
   unresolved: Partial<Record<SlotId, string>>;
   imageContext?: ImageBuildContext;
   savedBuildId?: string;
+  /** `updatedAt` of the saved record this draft was last loaded from or saved as. */
+  savedVersion?: string;
 }
 
 export const slotCategory: Record<SlotId, PartCategory> = {
@@ -235,6 +237,18 @@ export function fromLegacyBuild(value: unknown, savedBuildId?: string): BuildDoc
     build,
     unresolved: {},
     savedBuildId,
+  };
+}
+
+/** Opens a saved record as a Studio draft that remembers which save version it came from. */
+export function fromSavedBuild(saved: SavedBuild): BuildDocumentV3 | null {
+  const restored = fromLegacyBuild(saved.build, saved.id);
+  if (!restored) return null;
+  // The store rebuilds `build` from its parts and regenerates its name; keep the saved name.
+  return {
+    ...restored,
+    build: { ...restored.build, name: saved.name },
+    savedVersion: saved.updatedAt,
   };
 }
 

@@ -1,10 +1,12 @@
 import { describe, expect, it } from "vitest";
 import { seedParts } from "@/data/seedParts";
 import { MockPersistenceStore } from "@/lib/persistence/mock-store";
+import { nextSaveTimestamp, SaveConflictError } from "@/lib/persistence/save-version";
 import {
   completeness,
   createDraft,
   fromLegacyBuild,
+  fromSavedBuild,
   selectPart,
   slotOccupancy,
   toSavedBuildPayload,
@@ -137,5 +139,97 @@ describe("saved draft envelope limits", () => {
         buildNeeds: {},
       }),
     ).rejects.toThrow("too large");
+  });
+});
+
+describe("save revision check", () => {
+  async function savedTwice() {
+    const { store, actor } = await signedInStore();
+    const first = await store.saveBuild(actor, {
+      name: "Shared build",
+      build: toSavedBuildPayload(importedDraft()),
+      buildNeeds: {},
+    });
+    const opened = fromSavedBuild(first.savedBuild)!;
+    return { store, actor, first, opened };
+  }
+
+  it("opens a saved build with its save version and saved name", async () => {
+    const { first, opened } = await savedTwice();
+    expect(opened).toMatchObject({
+      savedBuildId: first.savedBuild.id,
+      savedVersion: first.savedBuild.updatedAt,
+      build: { name: "Shared build" },
+      source: "import",
+    });
+  });
+
+  it("rejects a stale tab instead of overwriting a newer save", async () => {
+    const { store, actor, first, opened } = await savedTwice();
+    const newerTab = selectPart(opened, "gpu", gpu);
+    const newer = await store.saveBuild(actor, {
+      id: first.savedBuild.id,
+      name: "Shared build",
+      build: toSavedBuildPayload(newerTab),
+      buildNeeds: {},
+      expectedUpdatedAt: opened.savedVersion,
+    });
+    expect(Date.parse(newer.savedBuild.updatedAt)).toBeGreaterThan(
+      Date.parse(first.savedBuild.updatedAt),
+    );
+
+    const staleTab = selectPart(opened, "psu", psu);
+    await expect(
+      store.saveBuild(actor, {
+        id: first.savedBuild.id,
+        name: "Shared build",
+        build: toSavedBuildPayload(staleTab),
+        buildNeeds: {},
+        expectedUpdatedAt: opened.savedVersion,
+      }),
+    ).rejects.toBeInstanceOf(SaveConflictError);
+
+    const stored = await store.getSavedBuild(actor, first.savedBuild.id);
+    expect(stored?.updatedAt).toBe(newer.savedBuild.updatedAt);
+    expect(stored?.build.parts.some((part) => part.id === gpu.id)).toBe(true);
+    expect(stored?.build.parts.some((part) => part.id === psu.id)).toBe(false);
+
+    // Overwriting is an explicit choice: the tab re-saves against the version it was shown.
+    const overwritten = await store.saveBuild(actor, {
+      id: first.savedBuild.id,
+      name: "Shared build",
+      build: toSavedBuildPayload(staleTab),
+      buildNeeds: {},
+      expectedUpdatedAt: stored!.updatedAt,
+    });
+    expect(overwritten.savedBuild.build.parts.some((part) => part.id === psu.id)).toBe(true);
+    expect(overwritten.builds).toHaveLength(1);
+  });
+
+  it("leaves saves without a version unchecked for older clients", async () => {
+    const { store, actor, first } = await savedTwice();
+    await store.saveBuild(actor, {
+      id: first.savedBuild.id,
+      name: "Shared build",
+      build: toSavedBuildPayload(importedDraft()),
+      buildNeeds: {},
+    });
+    await expect(
+      store.saveBuild(actor, {
+        id: first.savedBuild.id,
+        name: "Legacy client",
+        build: toSavedBuildPayload(importedDraft()),
+        buildNeeds: {},
+      }),
+    ).resolves.toMatchObject({ savedBuild: { name: "Legacy client" } });
+  });
+
+  it("never reuses a save version for saves within the same millisecond", () => {
+    const previous = "2026-10-25T12:00:00.000Z";
+    expect(nextSaveTimestamp(previous, Date.parse(previous))).toBe("2026-10-25T12:00:00.001Z");
+    expect(nextSaveTimestamp(previous, Date.parse(previous) - 5000)).toBe(
+      "2026-10-25T12:00:00.001Z",
+    );
+    expect(nextSaveTimestamp(undefined, Date.parse(previous))).toBe(previous);
   });
 });

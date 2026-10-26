@@ -60,3 +60,29 @@ describe("Milestone 34 API validation", () => {
     expect(console.info).not.toHaveBeenCalled();
   });
 });
+
+describe("v3 save revision check", () => {
+  function save(body: Record<string, unknown>) {
+    return handleInternalApiRequest(
+      new Request("http://localhost/api/builds/save", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ name: "Router build", buildNeeds: {}, ...body }),
+      }),
+    );
+  }
+
+  it("returns 409 SAVE_CONFLICT when a stale tab saves over a newer version", async () => {
+    const build = { id: "router-build", name: "Router build", parts: [], budget: 1500 };
+    const created = await save({ build });
+    expect(created?.status).toBe(200);
+    const first = (await created!.json()).savedBuild;
+
+    const newer = await save({ id: first.id, build, expectedUpdatedAt: first.updatedAt });
+    expect(newer?.status).toBe(200);
+
+    const stale = await save({ id: first.id, build, expectedUpdatedAt: first.updatedAt });
+    expect(stale?.status).toBe(409);
+    await expect(stale?.json()).resolves.toMatchObject({ error: { code: "SAVE_CONFLICT" } });
+  });
+});

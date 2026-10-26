@@ -1,6 +1,7 @@
 import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import { recalculateBuild } from "@/lib/build-advisor";
 import { withDraftEnvelope } from "@/lib/persistence/draft-envelope";
+import { assertSaveVersion, nextSaveTimestamp } from "@/lib/persistence/save-version";
 import { createPostBuildFeedbackSummary } from "@/lib/post-build-feedback";
 import type {
   PostBuildFeedback,
@@ -332,6 +333,9 @@ export class MockPersistenceStore implements PersistenceStore {
       : -1;
     const limit = this.getSavedBuildLimit(actor);
 
+    if (existingIndex >= 0)
+      assertSaveVersion(state.savedBuilds[existingIndex].updatedAt, input.expectedUpdatedAt);
+
     if (existingIndex === -1 && state.savedBuilds.length >= limit) {
       throw new Error(
         this.getCurrentPlan(actor) === "build_pro"
@@ -522,8 +526,8 @@ export class MockPersistenceStore implements PersistenceStore {
 
   private createSavedBuild(actor: PersistenceActor, input: SaveBuildInput): SavedBuild {
     const state = this.getActorState(actor);
-    const now = nowIso();
     const existing = input.id ? state.savedBuilds.find((item) => item.id === input.id) : undefined;
+    const now = nextSaveTimestamp(existing?.updatedAt);
     const safeBuild = withDraftEnvelope(input.build, recalculateBuild(input.build));
 
     return {

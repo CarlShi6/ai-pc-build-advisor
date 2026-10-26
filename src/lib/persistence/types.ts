@@ -140,6 +140,8 @@ export interface SaveBuildInput {
   name: string;
   build: Build;
   buildNeeds: CustomerNeeds;
+  /** The saved record's `updatedAt` this client last saw. A mismatch rejects the save. */
+  expectedUpdatedAt?: string;
 }
 
 export interface SaveBuildResult {

@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { ArrowRight, FolderOpen } from "lucide-react";
 import { V3Shell } from "@/components/v3-shell";
 import { getSavedBuild, getSavedBuilds } from "@/lib/apiClient";
-import { fromLegacyBuild } from "@/lib/v3/build-document";
+import { fromSavedBuild } from "@/lib/v3/build-document";
 import { writeDraft } from "@/lib/v3/draft-session";
 import type { SavedBuildSummary } from "@/types/build";
 
@@ -37,10 +37,8 @@ function MyBuildsPage() {
     setError("");
     try {
       const saved = await getSavedBuild(id);
-      const restored = fromLegacyBuild(saved.build, saved.id);
-      if (!restored) throw new Error("This saved build could not be read.");
-      // The store rebuilds `build` from its parts and regenerates its name; keep the saved name.
-      const document = { ...restored, build: { ...restored.build, name: saved.name } };
+      const document = fromSavedBuild(saved);
+      if (!document) throw new Error("This saved build could not be read.");
       writeDraft(document);
       await navigate({ to: "/studio" });
     } catch (failure) {

@@ -11,6 +11,7 @@ import { getAdvisorResponse } from "@/lib/ai/advisor-service";
 import { normalizeAdvisorActions } from "@/lib/ai/types";
 import { getPersistenceStore } from "@/lib/persistence";
 import { clearSessionCookie, createSessionCookie } from "@/lib/persistence/mock-store";
+import { SaveConflictError } from "@/lib/persistence/save-version";
 import { searchProducts } from "@/lib/product-search/search-service";
 import { runSupabaseSmokeTest } from "@/lib/supabase/smoke-test.server";
 import { createStripeCheckoutSession } from "@/lib/stripe.server";
@@ -407,12 +408,21 @@ export async function handleInternalApiRequest(
       if (!input.build || !input.name?.trim()) {
         throw new ApiRouteError(400, "Saving a build requires a name and build.");
       }
+      if (input.expectedUpdatedAt !== undefined && typeof input.expectedUpdatedAt !== "string") {
+        throw new ApiRouteError(400, "expectedUpdatedAt must be a string.");
+      }
 
       const actor = await store.getActor(request);
       let payload: SaveBuildResponse;
       try {
         payload = await store.saveBuild(actor, input);
       } catch (error) {
+        if (error instanceof SaveConflictError) {
+          return jsonResponse(
+            { error: { code: error.code, message: error.message } },
+            { status: 409, headers: { "cache-control": "no-store" } },
+          );
+        }
         throw new ApiRouteError(
           403,
           error instanceof Error ? error.message : "This saved build could not be stored.",

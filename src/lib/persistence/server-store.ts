@@ -2,6 +2,11 @@ import { BUILD_PRO_PLAN, FREE_PLAN } from "@/lib/monetization";
 import { recalculateBuild } from "@/lib/build-advisor";
 import { withDraftEnvelope } from "@/lib/persistence/draft-envelope";
 import { MockPersistenceStore } from "@/lib/persistence/mock-store";
+import {
+  assertSaveVersion,
+  nextSaveTimestamp,
+  SaveConflictError,
+} from "@/lib/persistence/save-version";
 import { createPostBuildFeedbackSummary } from "@/lib/post-build-feedback";
 import {
   createSupabaseAuthClient,
@@ -505,8 +510,9 @@ export class SupabasePersistenceStore implements PersistenceStore {
   }
 
   async saveBuild(actor: PersistenceActor, input: SaveBuildInput): Promise<SaveBuildResult> {
-    const now = nowIso();
     const existing = input.id ? await this.getSavedBuild(actor, input.id) : null;
+    if (existing) assertSaveVersion(existing.updatedAt, input.expectedUpdatedAt);
+    const now = nextSaveTimestamp(existing?.updatedAt);
     const { builds, limit } = await this.listSavedBuilds(actor);
 
     if (!existing && builds.length >= limit) {
@@ -532,12 +538,25 @@ export class SupabasePersistenceStore implements PersistenceStore {
       updated_at: now,
     };
 
+    // A versioned update only matches while the row is still at the version that was checked,
+    // so a save from another tab between the read and this write cannot be overwritten.
+    const versioned = existing && input.expectedUpdatedAt !== undefined;
     const query = existing
-      ? this.service.from("saved_builds").update(row).eq("id", existing.id).select("*").single()
+      ? (versioned
+          ? this.service
+              .from("saved_builds")
+              .update(row)
+              .eq("id", existing.id)
+              .eq("updated_at", existing.updatedAt)
+          : this.service.from("saved_builds").update(row).eq("id", existing.id)
+        )
+          .select("*")
+          .single()
       : this.service.from("saved_builds").insert(row).select("*").single();
     const { data, error } = await query;
 
     if (error) {
+      if (versioned && error.code === "PGRST116") throw new SaveConflictError();
       throw new Error(error.message);
     }
 
