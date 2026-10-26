@@ -159,3 +159,21 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - `.env.example` documents both switches; `playwright.config.ts` blanks `ADVISOR_AI_PROVIDER` like the other AI settings, so E2E never calls a provider.
 - Tests: `src/lib/ai/advisor-provider.test.ts` (2): image AI on → advisor mock; advisor on → OpenAI only with a key.
 - No key has been configured. Next: the user adds `AI_PROVIDER`, `OPENAI_API_KEY` and `AI_PROVIDER_MODEL` to `.env.local` themselves; then verify that the dev server reads them and run real photos.
+
+### Slice 9: real image recognition verified (local dev) — 2026-10-26
+
+- Setup: the user put `AI_PROVIDER=openai`, the key and `AI_PROVIDER_MODEL=gpt-4.1-mini` in `.env.local` of the main checkout. That file also holds unrelated live keys (Supabase service role, Stripe, Best Buy with `PRICE_PROVIDER=bestbuy`), so it was **not** copied. The v3 dev server was restarted with only the four image-AI variables exported from it; the key was never printed or written elsewhere. `ADVISOR_AI_PROVIDER` unset, so the advisor stays mock. No code change was needed: `image-analysis.server.ts` already worked as built.
+- API checks (`POST /api/image-analyses`, 3 images, all HTTP 200 in 6.6–7.6 s, `provider: openai`, structured output valid):
+  - Lian Li O11 side view, empty case: white metal, side panel removed, tower; no GPU, cooler, fans or motherboard installed.
+  - MSI GPU three-quarter view: only the legible "GEFORCE RTX" and msi marks were transcribed; it did not guess "5070 Ti".
+  - `public/og.png` (dark build): upright silhouette, glass side, mesh front, green lighting, one rear fan; board form factor marked inferred, medium confidence.
+
+  All eight part identities stayed unknown in every result, and no SKU was guessed.
+- UI checks (home hero upload → **Analyze image** → observations → candidate review → draft → Studio), headless Edge, 2 photos:
+  - `og.png`: observations in 6.1 s, labelled "AI visual observations · review required" (6 observations). The case got appearance-only alternatives; GPU, fans and motherboard stayed unresolved with "Keep unknown". The Studio showed a reference-photo draft, 1/8, Incomplete.
+  - O11 white front view: 8 observations in 5.6 s. The candidates were all three white cases as "Weak visual match · appearance only", each saying photo similarity doesn't verify the SKU; it didn't claim the case is an O11. Confirming the first (4000D White, no price) gave "$0 + 1 unknown price, not counted".
+
+  One imprecision: it called the front glass "the left side panel". The review step is there for exactly this.
+- Observed gap (not fixed): when the AI says a GPU, fans or motherboard are *not present* (empty case), candidate review still lists those slots as "Unresolved". A follow-up could show "not in photo" instead.
+- Not verified: production/hosted environment, rate-limit behaviour against the real provider, cost per photo, photos from users' own builds. E2E stays keyless (7 flows + sample, keys blanked).
+

@@ -26,7 +26,7 @@ Read these before starting work. They record where the rebuild stands:
 - Manual and 2D flows must keep working without AI or WebGL.
 - Do not invent product identities, specs or prices. For example, catalog fans (`src/data/curatedFans.ts`) come only from manufacturer pages, with a URL and verification date per entry; unclear fields stay `null`.
 - Secrets stay server-only. Never use a `VITE_` prefix for keys.
-- Real image AI is not connected yet. The demo track connects it in week 3; ask the user before configuring `OPENAI_API_KEY` or any provider key, and never set one yourself. Until then use the dev fixture on the Image page. Do not claim the live provider path is verified. `AI_PROVIDER` switches only image recognition; the build advisor chat has its own `ADVISOR_AI_PROVIDER` (default mock), so turning on image AI never moves the advisor off mock.
+- Real image AI was verified live on 2026-10-26 (OpenAI `gpt-4.1-mini`, local dev server only; see demo track slice 9). The user owns the key: it lives in `.env.local` of the main checkout (`C:/Users/carls/projects/ai-pc-build-advisor`), not this worktree. Never read, print, copy or commit it; start the v3 dev server with only `AI_PROVIDER`, `OPENAI_API_KEY`, `AI_PROVIDER_API_KEY` and `AI_PROVIDER_MODEL` exported from that file. Never set or change a provider key yourself. E2E and unit tests keep the keys blank and never call a provider; the dev fixture stays available for keyless runs. `AI_PROVIDER` switches only image recognition; the build advisor chat has its own `ADVISOR_AI_PROVIDER` (default mock). Hosted/production image AI is not verified.
 - Never report a planned or mocked capability as implemented.
 
 ## Reuse before building
