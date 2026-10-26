@@ -66,6 +66,7 @@ import { scenePresentation } from "@/lib/v3/scene-presentation";
 import { getValidatedOfficialUrl } from "@/lib/product-trust";
 import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
 import { REFERENCE_MODEL_LABEL, referenceModelSlots } from "@/lib/v3/reference-models";
+import { PHOTO_APPEARANCE_LABEL, photoAppearance } from "@/lib/v3/photo-appearance";
 
 /** Signed price change, or "Unknown" when either price is unknown (unknown is never $0). */
 function priceChangeText(delta: number, candidate: Part, current: Part | undefined) {
@@ -222,6 +223,7 @@ function StudioPage() {
   const previewStatus = preview ? completeness(preview) : null;
   const presentation = scenePresentation(document);
   const referenceSlots = referenceModelSlots(document);
+  const photoLookSlots = Object.keys(photoAppearance(document)) as SlotId[];
   const show3D = view === "3d" && sceneAvailable;
   // One replace card for both views: beside the focused part in 3D, under the grid in 2D.
   const replaceCard = focusSlot ? (
@@ -416,6 +418,8 @@ function StudioPage() {
           <p className="v3-scene-disclosure">
             {referenceSlots.length > 0 &&
               `${referenceSlots.map((slot) => slotLabel[slot]).join(" and ")}: ${REFERENCE_MODEL_LABEL}. `}
+            {photoLookSlots.length > 0 &&
+              `${photoLookSlots.map((slot) => slotLabel[slot]).join(", ")}: ${PHOTO_APPEARANCE_LABEL}. `}
             {presentation.layout === "showcase" ? "Showcase" : "Tower"} layout uses generic
             illustrative geometry{referenceSlots.length > 0 ? " for the other parts" : ""}. Neither
             verifies physical clearance.{show3D && " Dashed callouts remain for empty slots."}

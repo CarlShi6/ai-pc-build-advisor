@@ -38,6 +38,15 @@ import {
   type SceneMode,
 } from "@/lib/v3/scene-focus";
 import {
+  PHOTO_APPEARANCE_LABEL,
+  appearanceHex,
+  appearanceSummary,
+  colorName,
+  lightHex,
+  photoAppearance,
+  type SlotAppearance,
+} from "@/lib/v3/photo-appearance";
+import {
   MM_PER_SCENE_UNIT,
   referenceModelFor,
   sceneSize,
@@ -146,55 +155,117 @@ function RgbStrip({ size, position, color }: { size: Point; position: Point; col
   );
 }
 
-function CaseModel({ size, presentation }: { size: Point; presentation: ScenePresentation }) {
+/** A fan: frame disc, hub and a lit ring facing +x (front intake), +y (bottom intake) or -y. */
+function CaseFan({
+  position,
+  facing,
+  radius,
+  frameColor,
+  light,
+}: {
+  position: Point;
+  facing: "x" | "y" | "-y";
+  radius: number;
+  frameColor: string;
+  light: string;
+}) {
+  return (
+    <group
+      position={position}
+      rotation={
+        facing === "x"
+          ? [0, Math.PI / 2, 0]
+          : facing === "y"
+            ? [-Math.PI / 2, 0, 0]
+            : [Math.PI / 2, 0, 0]
+      }
+    >
+      <mesh rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[radius, radius, 0.05, 32]} />
+        <Mat color={frameColor} metalness={0.05} roughness={0.55} />
+      </mesh>
+      <mesh position={[0, 0, 0.03]} rotation={[Math.PI / 2, 0, 0]}>
+        <cylinderGeometry args={[radius * 0.26, radius * 0.26, 0.02, 20]} />
+        <Mat color={frameColor} metalness={0.05} roughness={0.5} />
+      </mesh>
+      <RgbRing radius={radius * 0.92} position={[0, 0, 0.03]} color={light} />
+    </group>
+  );
+}
+
+function CaseModel({
+  size,
+  presentation,
+  glass = true,
+}: {
+  size: Point;
+  presentation: ScenePresentation;
+  /** False when the photo shows a case without a windowed side. */
+  glass?: boolean;
+}) {
   const dim = useContext(DimContext);
   const light = useContext(LightTierContext);
   const [w, h, d] = size;
   const t = 0.035;
-  const panel = { color: presentation.caseColor, metalness: 0.55, roughness: 0.42 };
-  const fanCount = Math.min(3, Math.max(0, presentation.fanAccentCount));
+  const white = presentation.caseColor === appearanceHex.white;
+  const panel = white
+    ? { color: presentation.caseColor, metalness: 0.1, roughness: 0.45 }
+    : { color: presentation.caseColor, metalness: 0.55, roughness: 0.42 };
+  // Up to three front intakes, then up to three on the PSU shroud.
+  const fanCount = Math.min(6, Math.max(0, presentation.fanAccentCount));
+  const fanFrame = white ? "#dfe3e8" : "#18191c";
   return (
     <group>
       <Box size={[w, t, d]} position={[0, h / 2, 0]} material={panel} />
       <Box size={[w, t, d]} position={[0, -h / 2, 0]} material={panel} />
       <Box size={[w, h, t]} position={[0, 0, -d / 2]} material={panel} />
       <Box size={[t, h, d]} position={[-w / 2, 0, 0]} material={panel} />
-      {/* Front panel: dark mesh look. */}
+      {/* Front panel: mesh look; see-through enough to show lit front fans. */}
       <Box
         size={[t, h, d]}
         position={[w / 2, 0, 0]}
-        material={{ color: "#101113", metalness: 0.3, roughness: 0.8 }}
+        material={{
+          color: white ? "#cfd4da" : "#101113",
+          metalness: 0.3,
+          roughness: 0.8,
+          ...(fanCount > 0 && { transparent: true, opacity: 0.45, depthWrite: false }),
+        }}
       />
       {/* PSU shroud. */}
       <Box size={[w - t * 2, 0.04, d - t * 2]} position={[0, -h / 2 + 0.72, 0]} material={panel} />
       {/* Tempered glass side panel, facing the default camera. */}
-      <mesh position={[0, 0, d / 2]}>
-        <boxGeometry args={[w, h, 0.02]} />
-        <meshPhysicalMaterial
-          key={dim ? "dim" : "lit"}
-          color="#d8e2e6"
-          metalness={0}
-          roughness={0.04}
-          transmission={light ? 0 : 1}
-          thickness={0.05}
-          ior={1.5}
-          transparent
-          opacity={dim ? 0.04 : 0.22}
-          depthWrite={false}
-        />
-      </mesh>
+      {glass ? (
+        <mesh position={[0, 0, d / 2]}>
+          <boxGeometry args={[w, h, 0.02]} />
+          <meshPhysicalMaterial
+            key={dim ? "dim" : "lit"}
+            color="#d8e2e6"
+            metalness={0}
+            roughness={0.04}
+            transmission={light ? 0 : 1}
+            thickness={0.05}
+            ior={1.5}
+            transparent
+            opacity={dim ? 0.04 : 0.22}
+            depthWrite={false}
+          />
+        </mesh>
+      ) : (
+        <Box size={[w, h, t]} position={[0, 0, d / 2]} material={panel} />
+      )}
       {Array.from({ length: fanCount }, (_, index) => (
-        <group
+        <CaseFan
           key={index}
-          position={[w / 2 - 0.09, h / 2 - 0.62 - index * 0.78, 0]}
-          rotation={[0, Math.PI / 2, 0]}
-        >
-          <mesh>
-            <cylinderGeometry args={[0.3, 0.3, 0.05, 32]} />
-            <Mat {...plastic} />
-          </mesh>
-          <RgbRing radius={0.28} position={[0, 0, 0.03]} color={presentation.accentColor} />
-        </group>
+          position={
+            index < 3
+              ? [w / 2 - 0.09, h / 2 - 0.62 - index * 0.78, 0]
+              : [-w / 2 + 0.5 + (index - 3) * 0.66, -h / 2 + 0.81, 0]
+          }
+          facing={index < 3 ? "x" : "y"}
+          radius={0.3}
+          frameColor={fanFrame}
+          light={presentation.accentColor}
+        />
       ))}
     </group>
   );
@@ -258,27 +329,29 @@ function PartModel({
   slot,
   size,
   accent,
+  color,
+  coolerType = null,
 }: {
   slot: Exclude<SlotId, "case">;
   size: Point;
   accent: string;
+  /** Body colour from the catalog or the photo; the generic dark finish when unknown. */
+  color?: string;
+  coolerType?: "aio" | "air" | null;
 }): ReactNode {
   const [w, h, d] = size;
+  const body = (fallback: Record<string, unknown>) =>
+    color ? { color, metalness: 0.1, roughness: 0.45 } : fallback;
+  const trim = color
+    ? { color: color === appearanceHex.white ? "#cdd2d8" : color, metalness: 0.3, roughness: 0.5 }
+    : darkMetal;
   switch (slot) {
     case "motherboard":
       return (
         <group>
-          <Box size={size} material={pcb} />
-          <Box
-            size={[w * 0.5, 0.18, 0.1]}
-            position={[-w * 0.12, h * 0.42, d]}
-            material={darkMetal}
-          />
-          <Box
-            size={[0.16, h * 0.42, 0.1]}
-            position={[-w * 0.42, h * 0.12, d]}
-            material={darkMetal}
-          />
+          <Box size={size} material={body(pcb)} />
+          <Box size={[w * 0.5, 0.18, 0.1]} position={[-w * 0.12, h * 0.42, d]} material={trim} />
+          <Box size={[0.16, h * 0.42, 0.1]} position={[-w * 0.42, h * 0.12, d]} material={trim} />
           <Box
             size={[w * 0.32, 0.12, 0.06]}
             position={[w * 0.18, -h * 0.28, d * 0.8]}
@@ -289,12 +362,34 @@ function PartModel({
     case "cpu":
       return <Box size={[w, h, d * 0.35]} material={metal} />;
     case "cooler":
+      if (coolerType === "aio")
+        // Pump head on the CPU plus a 360 mm-class radiator under the case top (offsets from the
+        // cooler anchor to the generic case roof), with three lit fans below it.
+        return (
+          <group>
+            <Box size={[w * 0.56, h * 0.56, d * 0.42]} material={body(metal)} />
+            <RgbRing radius={w * 0.2} position={[0, 0, d * 0.22]} color={accent} />
+            <group position={[0.25, 0.8, -0.23]}>
+              <Box size={[1.9, 0.12, 0.5]} material={body(metal)} />
+              {[-0.62, 0, 0.62].map((x) => (
+                <CaseFan
+                  key={x}
+                  position={[x, -0.1, 0]}
+                  facing="-y"
+                  radius={0.24}
+                  frameColor={color ?? plastic.color}
+                  light={accent}
+                />
+              ))}
+            </group>
+          </group>
+        );
       return (
         <group>
-          <Box size={[w * 0.66, h * 0.92, d * 0.62]} material={metal} />
+          <Box size={[w * 0.66, h * 0.92, d * 0.62]} material={body(metal)} />
           <mesh position={[0, 0, d * 0.42]} rotation={[Math.PI / 2, 0, 0]}>
             <cylinderGeometry args={[w * 0.4, w * 0.4, 0.05, 32]} />
-            <Mat {...plastic} />
+            <Mat {...body(plastic)} />
           </mesh>
           <RgbRing radius={w * 0.38} position={[0, 0, d * 0.46]} color={accent} />
         </group>
@@ -302,7 +397,7 @@ function PartModel({
     case "gpu":
       return (
         <group>
-          <Box size={[w, h * 0.72, d]} material={darkMetal} />
+          <Box size={[w, h * 0.72, d]} material={body(darkMetal)} />
           <Box
             size={[w, 0.03, d]}
             position={[0, h * 0.38, 0]}
@@ -313,7 +408,7 @@ function PartModel({
             <group key={x} position={[x, -h * 0.37, 0]}>
               <mesh>
                 <cylinderGeometry args={[d * 0.4, d * 0.4, 0.02, 32]} />
-                <Mat {...plastic} />
+                <Mat {...body(plastic)} />
               </mesh>
               <RgbRing
                 radius={d * 0.38}
@@ -335,7 +430,7 @@ function PartModel({
         <group>
           {[-w * 0.25, w * 0.25].map((x) => (
             <group key={x} position={[x, 0, 0]}>
-              <Box size={[w * 0.32, h, d]} material={darkMetal} />
+              <Box size={[w * 0.32, h, d]} material={body(darkMetal)} />
               <RgbStrip
                 size={[w * 0.32, 0.05, d]}
                 position={[0, h / 2 + 0.025, 0]}
@@ -369,6 +464,40 @@ function PartModel({
   }
 }
 
+/** Look-alike stand-in for an unresolved part, built only from what the photo shows. */
+function AppearancePlaceholder({
+  slot,
+  size,
+  look,
+  presentation,
+}: {
+  slot: SlotId;
+  size: Point;
+  look: SlotAppearance;
+  presentation: ScenePresentation;
+}) {
+  const color = look.color ? appearanceHex[look.color] : undefined;
+  const accent = look.lightColor
+    ? (lightHex[look.lightColor] ?? presentation.accentColor)
+    : presentation.accentColor;
+  if (slot === "case")
+    return (
+      <CaseModel
+        size={size}
+        glass={look.glassPanel}
+        presentation={{
+          ...presentation,
+          caseColor: color ?? presentation.caseColor,
+          accentColor: accent,
+          fanAccentCount: look.fanCount,
+        }}
+      />
+    );
+  return (
+    <PartModel slot={slot} size={size} accent={accent} color={color} coolerType={look.coolerType} />
+  );
+}
+
 function SlotMesh({
   slot,
   document,
@@ -378,6 +507,7 @@ function SlotMesh({
   focusSlot,
   onPick,
   presentation,
+  look,
 }: {
   slot: SlotId;
   document: BuildDocumentV3;
@@ -387,6 +517,8 @@ function SlotMesh({
   focusSlot: SlotId | null;
   onPick: (slot: SlotId) => void;
   presentation: ScenePresentation;
+  /** Unresolved slot the photo shows: drawn as a look-alike placeholder (PRD §9.3 level 2). */
+  look?: SlotAppearance;
 }) {
   const group = useRef<Group>(null);
   const occupancy = slotOccupancy(document, slot);
@@ -394,6 +526,7 @@ function SlotMesh({
   const dimmed = isDimmed(slot, focusSlot);
   const model =
     occupancy === "selected" ? referenceModelFor(selectedPart(document, slot)?.id) : null;
+  const partColor = colorName(selectedPart(document, slot)?.color);
   const size: Point = model
     ? sceneSize(model)
     : slot === "case" && presentation.layout === "showcase"
@@ -428,9 +561,10 @@ function SlotMesh({
     document.build.compatibilityWarnings.some((warning) =>
       warning.affectedPartIds.includes(selectedPart(document, slot)?.id ?? ""),
     );
+  // A photo look-alike already reads as a part; its "not confirmed" state is on the label.
   const edgeColor = selected
     ? "#c4f59f"
-    : occupancy === "unresolved" || flagged
+    : (occupancy === "unresolved" && !look) || flagged
       ? "#edba75"
       : occupancy === "unselected"
         ? "#6d7c74"
@@ -453,8 +587,22 @@ function SlotMesh({
           ) : slot === "case" ? (
             <CaseModel size={size} presentation={presentation} />
           ) : (
-            <PartModel slot={slot} size={size} accent={presentation.accentColor} />
+            <PartModel
+              slot={slot}
+              size={size}
+              accent={presentation.accentColor}
+              color={partColor ? appearanceHex[partColor] : undefined}
+              coolerType={
+                selectedPart(document, slot)?.specs.coolerType === "aio"
+                  ? "aio"
+                  : selectedPart(document, slot)?.specs.coolerType === "air"
+                    ? "air"
+                    : null
+              }
+            />
           )
+        ) : look ? (
+          <AppearancePlaceholder slot={slot} size={size} look={look} presentation={presentation} />
         ) : (
           // Empty or unresolved slot: a faint placeholder volume, never a fake part.
           <mesh>
@@ -467,7 +615,7 @@ function SlotMesh({
             />
           </mesh>
         )}
-        {edgeColor && !dimmed && !(slot === "case" && occupancy === "selected") && (
+        {edgeColor && !dimmed && !(slot === "case" && (occupancy === "selected" || look)) && (
           <mesh>
             <boxGeometry args={[size[0] * 1.02, size[1] * 1.02, size[2] * 1.02]} />
             <meshBasicMaterial visible={false} />
@@ -578,7 +726,8 @@ function StudioEnvironment() {
         rotation={[0, -Math.PI / 2, 0]}
         scale={[6, 3, 1]}
       />
-      <Lightformer form="ring" intensity={1.2} position={[0, 2, 8]} scale={3} color="#dfe8ff" />
+      {/* Soft: the glass side panel mirrors it straight back over the interior. */}
+      <Lightformer form="ring" intensity={0.5} position={[0, 2, 8]} scale={3} color="#dfe8ff" />
     </Environment>
   );
 }
@@ -599,6 +748,11 @@ export default function BuildScene({
   const labelRefs = useRef<Partial<Record<SlotId, HTMLElement | null>>>({});
   const cardRef = useRef<HTMLDivElement | null>(null);
   const presentation = scenePresentation(document);
+  const looks = photoAppearance(document);
+  // A white board right behind the interior fill light blows out; move the light towards the glass.
+  const whiteBoard =
+    (looks.motherboard?.color ?? colorName(selectedPart(document, "motherboard")?.color)) ===
+    "white";
   const pick = (slot: SlotId) => {
     onSelect(slot);
     onFocus?.(slot);
@@ -615,6 +769,7 @@ export default function BuildScene({
   // Adaptive quality: a device that can't hold ~30 fps drops to the light tier for the session.
   const [quality, setQuality] = useState<"high" | "low">("high");
   const lowerQuality = () => setQuality("low");
+  // Bloom only above 1.6: lit white panels stay below it, emissive RGB (2.2+) glows.
   return (
     <div
       className={`v3-scene-canvas ${focusSlot ? "is-focused" : ""}`}
@@ -644,8 +799,8 @@ export default function BuildScene({
           <directionalLight position={[-5, 3, -4]} intensity={1.2} color="#cfd8ff" />
           {/* Interior fill so parts read through the glass, plus a soft accent glow. */}
           <pointLight
-            position={[0, 0.3, 0.1]}
-            intensity={focusSlot ? 2 : 4}
+            position={[0, 0.3, whiteBoard ? 0.65 : 0.1]}
+            intensity={(focusSlot ? 2 : 4) * (whiteBoard ? 0.5 : 1)}
             distance={4.5}
             decay={1.6}
           />
@@ -666,6 +821,7 @@ export default function BuildScene({
               focusSlot={focusSlot}
               onPick={pick}
               presentation={presentation}
+              look={looks[slot]}
             />
           ))}
           {primarySlots.map((slot) => (
@@ -719,14 +875,14 @@ export default function BuildScene({
           {quality === "high" ? (
             <EffectComposer multisampling={4}>
               <N8AO aoRadius={0.6} intensity={2.2} distanceFalloff={1} halfRes />
-              <Bloom mipmapBlur luminanceThreshold={1} intensity={0.9} />
+              <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
               <DepthOfField target={[0, 0, 0.6]} focalLength={0.2} bokehScale={0.7} />
               <Vignette eskil={false} offset={0.25} darkness={0.55} />
             </EffectComposer>
           ) : (
             // Light tier: no SSAO or depth of field, no multisampling; RGB glow and vignette stay.
             <EffectComposer multisampling={0}>
-              <Bloom mipmapBlur luminanceThreshold={1} intensity={0.9} />
+              <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
               <Vignette eskil={false} offset={0.25} darkness={0.55} />
             </EffectComposer>
           )}
@@ -737,6 +893,7 @@ export default function BuildScene({
           const part = selectedPart(document, slot);
           const occupancy = slotOccupancy(document, slot);
           const link = part ? partLink?.(slot) : null;
+          const look = looks[slot];
           return (
             <div
               key={slot}
@@ -744,16 +901,24 @@ export default function BuildScene({
                 labelRefs.current[slot] = element;
               }}
               data-scene-slot={slot}
-              className={`v3-scene-callout ${selectedSlot === slot ? "active" : ""} ${occupancy} ${isDimmed(slot, focusSlot) ? "dimmed" : ""}`}
+              data-color={look?.color ?? colorName(part?.color) ?? undefined}
+              data-look={look ? "photo" : undefined}
+              className={`v3-scene-callout ${selectedSlot === slot ? "active" : ""} ${occupancy} ${look ? "photo-look" : ""} ${isDimmed(slot, focusSlot) ? "dimmed" : ""}`}
             >
               <button
                 type="button"
                 onClick={() => pick(slot)}
-                aria-label={`${slotLabel[slot]}: ${part?.displayName ?? occupancy}`}
+                aria-label={`${slotLabel[slot]}: ${part?.displayName ?? (look ? PHOTO_APPEARANCE_LABEL : occupancy)}`}
+                title={look ? appearanceSummary(look) : undefined}
               >
                 <strong>{slotLabel[slot]}</strong>
                 <small>
-                  {part?.model ?? (occupancy === "unresolved" ? "Review match" : "Add part")}
+                  {part?.model ??
+                    (look
+                      ? PHOTO_APPEARANCE_LABEL
+                      : occupancy === "unresolved"
+                        ? "Review match"
+                        : "Add part")}
                 </small>
               </button>
               {link && (

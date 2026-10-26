@@ -84,13 +84,39 @@ Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 
 
 **Decision (2026-10-25): the 4-week demo track comes first.** The user needs a demonstrable visual result within a month, so the demo track below runs before the rest of R7. The R7 user study moves to after the demo track.
 
-Demo track weeks 1–4 are done (see `docs/milestones/DEMO_TRACK_PROGRESS.md`): photo-first home, studio-look 3D with Focus/Isolate and replace card, white showcase parts with reference-reconstructed models (`reference-models/`, `tools/reference-models/`), one-click white sample, live image recognition verified locally, adaptive scene quality, full 2D fallback without WebGL, and 11 E2E flows. Next: R7 below, starting with the user's review of the demo.
+Demo track weeks 1–4 are done (see `docs/milestones/DEMO_TRACK_PROGRESS.md`): photo-first home, studio-look 3D with Focus/Isolate and replace card, white showcase parts with reference-reconstructed models (`reference-models/`, `tools/reference-models/`), one-click white sample, live image recognition verified locally, adaptive scene quality, full 2D fallback without WebGL, and 11 E2E flows. Next: the visual redesign round below (slices A–D, in order), then R7.
 
 R7, after the demo track (in order):
 1. R7 E2E: the remaining §19.3 flows (#2 lookalike correction, #4 replace from the 3D scene, #9 old-format restore, #10 unauthorized access/deletion, an explicit no-WebGL launch).
 2. R7: Focus/Isolate mode, reduced motion, keyboard and mobile support.
 3. R7: the PRD §19.3 curated image fixture set, performance profile and visual regression.
 4. R7: the 8–12 person user study and the local release checklist (§25).
+
+## Visual redesign round (demo track continuation, 2026-10-26)
+
+Problem: the photo is read as "white case, tempered glass side panel, 5 blue-lit fans, white AIO", but the Studio shows green wireframes and orange boxes, so photo and 3D don't match. The review page reads like a form, and the site's colours are inconsistent.
+
+Order: each slice gets the full gate plus E2E, before/after browser screenshots, a local commit (no push) and a note in `docs/milestones/DEMO_TRACK_PROGRESS.md`. **Stop after slice A for the user's review.**
+- **Slice A: the photo's appearance reaches 3D (first).**
+  - **Placeholders.** Unresolved slots that have photo observations draw an appearance placeholder (PRD §9.3 level 2, appearance-informed). It uses the observed colour, the glass side panel, the fan count and light colour, and AIO vs air cooler type. The label reads "Appearance from photo · model not confirmed" and never names a model. Slots without observations keep the empty-slot style.
+  - **"Use suggested parts".** On the review page, it takes the top-ranked candidate in every category at once. It first shows a change list: what each slot becomes, the total price, compatibility, and the effect on appearance. It applies only after the user confirms, through the existing preview/confirm flow. Weak matches still say "Weak visual match · appearance only".
+  - **E2E:** photo sample → use suggested parts → confirm → the Studio's case and GPU are white.
+- **Slice B: review page re-layout (PRD §4.3).**
+  - Desktop: the photo stays fixed on the left, with observation regions outlined when present; the part list is on the right.
+  - Observations collapse to one tag line per category (e.g. "White · Tempered glass · 5 fans · Blue LED"); reasons and confidence show on expand.
+  - Each part shows only the top candidate and one primary "Use this" button. The rest go under "Other options"; Exclude, Keep unknown and the manual note go in a secondary menu.
+  - The "photo similarity is not the exact model" notice appears once at the top, not on every card.
+  - One primary button at the bottom: "Build it in 3D".
+- **Slice C: one dark theme site-wide.**
+  - Home, review, Studio and My Builds move to a deep graphite palette (a Blender / product-studio feel), replacing every light sage-green theme. Define one CSS-variable palette and record it in this file.
+  - One accent colour, cool blue, for clickable and selected states. Amber means only "needs confirmation", grey dashed means only "not selected", and red means only a compatibility failure. No green wireframes in 3D.
+  - Text contrast at least WCAG AA. Status is never shown by colour alone; always add text or an icon.
+- **Slice D: recognisable demo part models.**
+  - Build the models in code from manufacturer millimetre specs; no full img2threejs run.
+  - Parts to model, for the white showcase build: white GPU (three-fan shroud, backplate), white 360 AIO (pump head, radiator fins), case fans (blades, light ring), memory (light bar), motherboard (slots, heatsinks). CPU, PSU and SSD may stay simple.
+  - Rules: no brand logos; outer dimensions only from manufacturer specs; estimated sub-part proportions are written down as assumptions; `geometryAccuracy: "reference_reconstructed"`.
+  - Any ready-made GLB needs the user's approval of its source and licence first.
+  - Keep the adaptive quality tier working on weak GPUs.
 
 ## Demo track (4 weeks)
 

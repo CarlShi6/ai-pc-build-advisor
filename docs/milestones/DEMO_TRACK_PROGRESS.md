@@ -252,3 +252,35 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - E2E grew from 8 to 11 flows: no-WebGL swap, phone width, 3D demo path.
 - Still open after the demo track (R7, per CLAUDE.md): E2E for lookalike correction (#2), old-format restore (#9), unauthorized access/deletion (#10); Focus/Isolate keyboard and mobile review; the curated image fixture set and visual regression; the user study. A real-GPU scene check on weaker hardware than the RTX 5080, and a hosted deployment, are not done.
 
+
+## Visual redesign round
+
+### Slice A: the photo's appearance reaches 3D — 2026-10-26
+
+- **Before:** a photo read as "white case, glass side panel, 5 blue-lit fans, white AIO, white GPU" opened a Studio of amber and green wireframe boxes labelled "Review match". Nothing in 3D looked like the photo.
+- **Photo sample:** `e2e/fixtures/white-build-sketch.png`, a drawing we made (not a photograph, not a product image). It comes with a keyless dev fixture (`createWhiteSketchFixture` in `src/lib/v3/dev-image-fixture.ts`); fixtures are now looked up by file name (`devImageFixtures`).
+- **Appearance placeholders** (PRD §9.3 level 2), in `src/lib/v3/photo-appearance.ts`:
+  - `photoAppearance(document)` reads only visible, non-unknown observations. It covers **unresolved** case, GPU, cooler and motherboard slots that have an observation of their own.
+  - Traits read: body colour (own observation, else the theme colour), glass/window side panel, fan count (digits or words), light colour, and AIO vs air cooler.
+  - Hidden slots and slots without observations keep the empty-slot style. Selected slots never use it.
+  - The scene draws the case placeholder with the observed colour, glass or a solid side, and up to 6 lit fans (3 front, then the shroud). The front mesh turns see-through when fans are present.
+  - GPU and motherboard placeholders are the generic shapes in the observed colour. An AIO is a pump head with a ring plus a radiator under the roof with three lit fans.
+  - Labels (3D callout, 2D card, scene disclosure) say **"Appearance from photo · model not confirmed"** and never a model name. The callout tooltip and 2D card give the trait line (e.g. "White · Glass side panel · 5 fans · Blue light").
+  - Placeholders get no amber wireframe box; the "not confirmed" state is on the label.
+- **Generic part models use the part's catalog colour.** A white catalog cooler is no longer silver, and a selected AIO is drawn as an AIO.
+- **"Use suggested parts"** (`suggestParts` in `src/lib/v3/image-build.ts`):
+  - It takes the top-ranked candidate per category and skips ones the user excluded.
+  - It shows a change list first: what each slot becomes, the match label, price, effect on appearance, total (known + unknown prices, not counted), compatibility (incomplete count and rule findings) and the slots still open.
+  - Confirm goes through the existing `confirmImageBuild` revision check; Cancel changes nothing.
+  - Weak matches still read "Weak visual match · appearance only" (`candidateMatchLabel`, shared with the review cards).
+  - The review component now takes its review state from the flow, so the suggestion and the cards share one state.
+- **Scene lighting found on the way:**
+  - Bloom threshold 1 → 1.6, so lit white panels stop glowing while emissive RGB (2.2+) still blooms.
+  - With a white motherboard, the interior fill light moves towards the glass (z 0.1 → 0.65) at half intensity, because it blew the board out to a white blob.
+  - The front ring lightformer is softer (1.2 → 0.5) because the glass mirrored it over the interior.
+- **Known gaps** for the next slices:
+  - After a case is confirmed, its reference model has no fans, so the photo's 5 fans disappear. Fans are not a Build slot; slice D adds fan models.
+  - Top-ranked white cases tie on colour, so the alphabetical first (Corsair 4000D White) wins. The white showcase cases have no `style` field from the manufacturer pages to break the tie.
+  - The selection outline is still green until slice C.
+- Tests: `src/lib/v3/photo-appearance.test.ts` (4 tests). E2E `e2e/photo-suggested-parts.e2e.ts`: photo sample → change list (weak label, unresolved board, incomplete, unknown price) → confirm → 3/8 selected, case and GPU `data-color="white"` in 3D and 2D, board labelled as from the photo.
+- Gate: lint 0, typecheck passed, 212 tests in 33 files passed, build passed, **E2E 12/12**.

@@ -1,5 +1,6 @@
-import { catalogPartById } from "@/lib/v3/catalog";
+import { catalogPartById, priceCoverage, priceUnknown } from "@/lib/v3/catalog";
 import {
+  completeness,
   createDraft,
   primarySlots,
   slotCategory,
@@ -9,7 +10,14 @@ import {
   type SlotId,
   type VisualPriority,
 } from "@/lib/v3/build-document";
-import { matchVisualCandidates, type CandidateReview } from "@/lib/v3/candidate-matcher";
+import {
+  chooseCandidate,
+  emptyCandidateReview,
+  matchVisualCandidates,
+  type AppearanceCandidate,
+  type CandidateReview,
+} from "@/lib/v3/candidate-matcher";
+import { appearanceSummary, photoAppearance } from "@/lib/v3/photo-appearance";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
 import type { ImageAnalysisResult, VisualObservation } from "@/lib/v3/image-contract";
 import type { Part } from "@/types/parts";
@@ -179,4 +187,125 @@ export function imageBuildPreviewText(proposal: ImageBuildProposal): string[] {
     ...proposal.unresolved.map((item) => `${slotLabel[item.slot]}: ${item.reason}`),
     ...proposal.remaining.map((slot) => `${slotLabel[slot]}: not selected`),
   ];
+}
+
+const reviewLabels: Record<VisibleCatalogCategory, string> = {
+  case: "Case",
+  gpu: "GPU",
+  cooler: "Cooler",
+  fan: "Fans",
+  motherboard: "Motherboard",
+};
+
+/** "Weak visual match · appearance only" and the like, shared by review cards and change lists. */
+export function candidateMatchLabel(candidate: AppearanceCandidate): string {
+  const band = candidate.visualMatchBand;
+  return `${band[0].toUpperCase()}${band.slice(1)} visual match · ${
+    candidate.identityEvidence === "visible_marking" ? "visible marking" : "appearance only"
+  }`;
+}
+
+export interface SuggestedChange {
+  category: VisibleCatalogCategory;
+  label: string;
+  /** Catalog part the category would use, or null when it stays as the photo shows it. */
+  partName: string | null;
+  match: string | null;
+  price: string;
+  appearance: string;
+}
+
+export interface SuggestedParts {
+  reviews: ImageReviews;
+  proposal: ImageBuildProposal;
+  changes: SuggestedChange[];
+  total: { known: number; unknown: number };
+  compatibility: string;
+}
+
+/**
+ * "Use suggested parts": the top-ranked candidate in every category at once (skipping ones the
+ * user excluded), as a full preview. Nothing changes until the proposal is confirmed.
+ */
+export function suggestParts(
+  analysis: ImageAnalysisResult,
+  current: ImageReviews,
+  budget: number,
+  draft: BuildDocumentV3 | null = null,
+): SuggestedParts {
+  const reviews: ImageReviews = { ...current };
+  const picks: Partial<Record<VisibleCatalogCategory, AppearanceCandidate>> = {};
+  for (const set of matchVisualCandidates(analysis)) {
+    const review = current[set.category] ?? emptyCandidateReview();
+    const top = set.candidates.find(
+      (candidate) => !review.excludedPartIds.includes(candidate.partId),
+    );
+    if (!top) continue;
+    reviews[set.category] = chooseCandidate(set, review, top.partId);
+    picks[set.category] = top;
+  }
+  const proposal = proposeImageBuild(analysis, reviews, budget, draft);
+  const observations = analysis.observations.filter(
+    (item) => item.visibleInImage && item.origin !== "unknown",
+  );
+  const looks = photoAppearance(proposal.candidate);
+  const changes: SuggestedChange[] = [];
+  for (const set of matchVisualCandidates(analysis)) {
+    const label = reviewLabels[set.category];
+    const pick = picks[set.category];
+    if (set.status === "not_in_photo") continue;
+    if (!pick) {
+      const look = set.category === "fan" ? undefined : looks[set.category as SlotId];
+      changes.push({
+        category: set.category,
+        label,
+        partName: null,
+        match: null,
+        price: "Not counted",
+        appearance: look
+          ? `No catalog match; drawn from the photo (${appearanceSummary(look)})`
+          : "No catalog match; stays unresolved",
+      });
+      continue;
+    }
+    const part = catalogPartById(pick.partId);
+    const observed = observations
+      .filter((item) => item.category === set.category && /colou?r/.test(item.attribute))
+      .map((item) => item.value.toLowerCase());
+    const partColor = (part?.color ?? (part?.specs.color as string | undefined) ?? "").trim();
+    const appearance =
+      set.category === "fan"
+        ? `Style note only; fans are not a Build slot and add nothing to the total`
+        : !partColor
+          ? "Catalog colour unknown"
+          : !observed.length
+            ? `${partColor} (the photo shows no colour for this part)`
+            : observed.some((value) => value.includes(partColor.toLowerCase()))
+              ? `${partColor}, matches the photo`
+              : `${partColor}; the photo shows ${observed[0]}`;
+    changes.push({
+      category: set.category,
+      label,
+      partName: pick.displayName,
+      match: candidateMatchLabel(pick),
+      price:
+        set.category === "fan" || !part
+          ? "Not counted"
+          : priceUnknown(part)
+            ? "Price unknown"
+            : `$${part.price.toLocaleString()}`,
+      appearance,
+    });
+  }
+  const status = completeness(proposal.candidate);
+  const findings = proposal.candidate.build.compatibilityWarnings.length;
+  return {
+    reviews,
+    proposal,
+    changes,
+    total: priceCoverage(proposal.candidate.build.parts),
+    compatibility: status.complete
+      ? `${proposal.candidate.build.compatibilityStatus} · ${findings} rule finding${findings === 1 ? "" : "s"}`
+      : `Incomplete · ${status.selected} of 8 slots selected · ${findings} rule finding${findings === 1 ? "" : "s"} so far`,
+  };
 }

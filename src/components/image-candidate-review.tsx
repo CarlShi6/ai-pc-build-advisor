@@ -10,6 +10,7 @@ import {
   type CandidateReview,
 } from "@/lib/v3/candidate-matcher";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
+import { candidateMatchLabel, type ImageReviews } from "@/lib/v3/image-build";
 
 const categoryLabels: Record<VisibleCatalogCategory, string> = {
   case: "Case",
@@ -21,22 +22,21 @@ const categoryLabels: Record<VisibleCatalogCategory, string> = {
 
 export function ImageCandidateReview({
   analysis,
+  reviews = {},
   onReviewChange,
 }: {
   analysis: ImageAnalysisResult;
+  /** Owned by the host flow, so "Use suggested parts" and the cards share one review state. */
+  reviews?: ImageReviews;
   onReviewChange?: (category: VisibleCatalogCategory, review: CandidateReview) => void;
 }) {
   const sets = useMemo(() => matchVisualCandidates(analysis), [analysis]);
-  const [reviews, setReviews] = useState<Partial<Record<VisibleCatalogCategory, CandidateReview>>>(
-    {},
-  );
   const [manualInputs, setManualInputs] = useState<Partial<Record<VisibleCatalogCategory, string>>>(
     {},
   );
   const [message, setMessage] = useState("");
 
   function update(category: VisibleCatalogCategory, next: CandidateReview) {
-    setReviews((current) => ({ ...current, [category]: next }));
     onReviewChange?.(category, next);
     setMessage("");
   }
@@ -95,11 +95,8 @@ export function ImageCandidateReview({
                   <div>
                     <strong>{candidate.displayName}</strong>
                     <small>
-                      {candidate.visualMatchBand} visual match ·{" "}
-                      {candidate.identityEvidence === "visible_marking"
-                        ? "visible marking"
-                        : "appearance only"}{" "}
-                      · {candidate.catalogSourceUrl ? "manufacturer page" : "local catalog"}
+                      {candidateMatchLabel(candidate)} ·{" "}
+                      {candidate.catalogSourceUrl ? "manufacturer page" : "local catalog"}
                     </small>
                   </div>
                   <ul>

@@ -4,18 +4,24 @@ import { AlertCircle, ImageUp } from "lucide-react";
 import { ImageCandidateReview } from "@/components/image-candidate-review";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
 import type { CandidateReview } from "@/lib/v3/candidate-matcher";
+import { slotLabel } from "@/lib/v3/build-document";
 import { readDraft, writeDraft } from "@/lib/v3/draft-session";
 import { funnel } from "@/lib/v3/funnel-analytics";
 import {
   confirmImageBuild,
   imageBuildPreviewText,
   proposeImageBuild,
+  suggestParts,
   type ImageBuildProposal,
   type ImageReviews,
+  type SuggestedParts,
 } from "@/lib/v3/image-build";
 import { prepareImageForAnalysis, requestImageAnalysis } from "@/lib/v3/image-client";
 import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import { inspectImage } from "@/lib/v3/image-input";
+
+/** Dev-only sample files with a keyless fixture analysis (`src/lib/v3/dev-image-fixture.ts`). */
+const devFixtureNames = ["og.png", "white-build-sketch.png"];
 
 /**
  * Photo → observations → candidate review → Build preview → confirm. Shared by the home hero and
@@ -35,6 +41,7 @@ export function ImageStartFlow({
   const [ownBudget, setOwnBudget] = useState("2500");
   const budget = budgetProp ?? ownBudget;
   const [file, setFile] = useState<File | null>(null);
+  const [suggested, setSuggested] = useState<SuggestedParts | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [imageError, setImageError] = useState("");
   const [dragging, setDragging] = useState(false);
@@ -76,6 +83,7 @@ export function ImageStartFlow({
     setAnalysisError("");
     setReviews({});
     setImageProposal(null);
+    setSuggested(null);
     setImageError("");
     setError("");
   }
@@ -109,6 +117,7 @@ export function ImageStartFlow({
     setAnalysis(null);
     setReviews({});
     setImageProposal(null);
+    setSuggested(null);
     setAnalysisError("");
     setAnalysisState("preparing");
     funnel.imageSubmitted({ fixture: false });
@@ -137,12 +146,12 @@ export function ImageStartFlow({
   }
 
   async function loadLocalFixture() {
-    if (!import.meta.env.DEV || file?.name !== "og.png") return;
+    if (!import.meta.env.DEV || !file || !devFixtureNames.includes(file.name)) return;
     const requestId = ++requestNumber.current;
     analysisController.current?.abort();
-    const { createOgImageFixture } = await import("@/lib/v3/dev-image-fixture");
+    const { devImageFixtures } = await import("@/lib/v3/dev-image-fixture");
     if (requestId !== requestNumber.current) return;
-    const fixture = createOgImageFixture();
+    const fixture = devImageFixtures[file.name]();
     funnel.imageSubmitted({ fixture: true });
     setAnalysis(fixture);
     setAnalysisState("ready");
@@ -150,11 +159,13 @@ export function ImageStartFlow({
     setAnalysisError("");
     setReviews({});
     setImageProposal(null);
+    setSuggested(null);
   }
 
   function reviewCandidate(category: VisibleCatalogCategory, review: CandidateReview) {
     setReviews((current) => ({ ...current, [category]: review }));
     setImageProposal(null);
+    setSuggested(null);
     funnel.candidateReviewed(category, review);
   }
 
@@ -167,6 +178,38 @@ export function ImageStartFlow({
       setError(
         caught instanceof Error ? caught.message : "The image draft could not be previewed.",
       );
+    }
+  }
+
+  function previewSuggestedParts() {
+    if (!analysis) return;
+    try {
+      setSuggested(suggestParts(analysis, reviews, Number(budget), readDraft()));
+      setImageProposal(null);
+      setError("");
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "The suggested parts could not be previewed.",
+      );
+    }
+  }
+
+  function confirmSuggestedParts() {
+    if (!suggested) return;
+    try {
+      const draft = confirmImageBuild(suggested.proposal, readDraft());
+      setReviews(suggested.reviews);
+      for (const [category, review] of Object.entries(suggested.reviews))
+        if (review && review !== reviews[category as VisibleCatalogCategory])
+          funnel.candidateReviewed(category as VisibleCatalogCategory, review);
+      writeDraft(draft);
+      funnel.draftCreated(draft);
+      void navigate({ to: "/studio" });
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : "The image draft changed. Preview it again.",
+      );
+      setSuggested(null);
     }
   }
 
@@ -259,7 +302,7 @@ export function ImageStartFlow({
           <button type="button" className="v3-text-button" onClick={clearImage}>
             Remove image
           </button>
-          {import.meta.env.DEV && file.name === "og.png" && (
+          {import.meta.env.DEV && devFixtureNames.includes(file.name) && (
             <button
               type="button"
               className="v3-text-button"
@@ -319,6 +362,7 @@ export function ImageStartFlow({
         <ImageCandidateReview
           key={analysis.analysisId}
           analysis={analysis}
+          reviews={reviews}
           onReviewChange={reviewCandidate}
         />
       )}
@@ -340,13 +384,26 @@ export function ImageStartFlow({
                 onChange={(event) => {
                   setOwnBudget(event.target.value);
                   setImageProposal(null);
+                  setSuggested(null);
                 }}
               />
             </label>
           )}
-          <button className="v3-secondary" type="button" onClick={previewImageBuild}>
-            Preview Build draft
-          </button>
+          <div className="v3-image-build-actions">
+            <button className="v3-primary" type="button" onClick={previewSuggestedParts}>
+              Use suggested parts
+            </button>
+            <button className="v3-secondary" type="button" onClick={previewImageBuild}>
+              Preview Build draft
+            </button>
+          </div>
+          {suggested && (
+            <SuggestedChanges
+              suggested={suggested}
+              onConfirm={confirmSuggestedParts}
+              onCancel={() => setSuggested(null)}
+            />
+          )}
           {error && (
             <p className="v3-error" role="alert">
               {error}
@@ -410,5 +467,93 @@ function PrivacyNotes() {
         day.
       </p>
     </>
+  );
+}
+
+/** The change list for "Use suggested parts": nothing is applied until the user confirms. */
+function SuggestedChanges({
+  suggested,
+  onConfirm,
+  onCancel,
+}: {
+  suggested: SuggestedParts;
+  onConfirm: () => void;
+  onCancel: () => void;
+}) {
+  const { changes, total, compatibility, proposal } = suggested;
+  return (
+    <div className="v3-suggested-changes" role="region" aria-label="Suggested parts preview">
+      <h3>Suggested parts · preview, not applied</h3>
+      <p>
+        The top-ranked catalog option in each category. A photo can show what a part looks like, not
+        its exact model, so every row is a planning choice you can change in Studio.
+      </p>
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Slot</th>
+            <th scope="col">Becomes</th>
+            <th scope="col">Price</th>
+            <th scope="col">Appearance</th>
+          </tr>
+        </thead>
+        <tbody>
+          {changes.map((change) => (
+            <tr key={change.category} data-category={change.category}>
+              <th scope="row">{change.label}</th>
+              <td>
+                {change.partName ? (
+                  <>
+                    <strong>{change.partName}</strong>
+                    <small>{change.match}</small>
+                  </>
+                ) : (
+                  <strong>Stays unresolved</strong>
+                )}
+              </td>
+              <td>{change.price}</td>
+              <td>{change.appearance}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <dl className="v3-suggested-summary">
+        <div>
+          <dt>Total</dt>
+          <dd>
+            ${total.known.toLocaleString()}
+            {total.unknown > 0 &&
+              ` + ${total.unknown} unknown price${total.unknown === 1 ? "" : "s"}, not counted`}
+          </dd>
+        </div>
+        <div>
+          <dt>Compatibility</dt>
+          <dd>{compatibility}</dd>
+        </div>
+        <div>
+          <dt>Still open</dt>
+          <dd>
+            {proposal.remaining.length
+              ? `${proposal.remaining.map((slot) => slotLabel[slot]).join(", ")}: not identified from the photo, choose in Studio`
+              : "Nothing"}
+          </dd>
+        </div>
+      </dl>
+      {proposal.visualWarnings.length > 0 && (
+        <ul className="v3-image-build-warnings">
+          {proposal.visualWarnings.map((warning) => (
+            <li key={warning}>{warning}</li>
+          ))}
+        </ul>
+      )}
+      <div className="v3-image-build-actions">
+        <button className="v3-primary" type="button" onClick={onConfirm}>
+          Confirm suggested parts and open Build Studio
+        </button>
+        <button className="v3-text-button" type="button" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </div>
   );
 }
