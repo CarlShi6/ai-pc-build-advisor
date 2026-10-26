@@ -39,6 +39,7 @@ import type { Part } from "@/types/parts";
 import type { BuildSceneProps, SceneMode } from "@/features/build-3d/BuildScene";
 import { SceneBoundary } from "@/features/build-3d/SceneBoundary";
 import { ShoppingPlanPanel } from "@/components/shopping-plan-panel";
+import { PartReplaceCard } from "@/components/part-replace-card";
 import {
   confirmWithLockOverride,
   lockConflicts,
@@ -326,6 +327,18 @@ function StudioPage() {
                     onFocus={setFocusSlot}
                     onClearFocus={clearFocus}
                     partLink={(slot) => partLinkFor(selectedPart(document, slot))}
+                    focusCard={
+                      focusSlot ? (
+                        <PartReplaceCard
+                          key={`${focusSlot}-${document.revision}`}
+                          document={document}
+                          slot={focusSlot}
+                          link={partLinkFor(selectedPart(document, focusSlot))}
+                          onCommit={commit}
+                          onClose={clearFocus}
+                        />
+                      ) : null
+                    }
                   />
                 </SceneBoundary>
               ) : (

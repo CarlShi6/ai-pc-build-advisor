@@ -452,7 +452,8 @@ function ProjectOverlay({
       const width = card.offsetWidth || 320;
       const height = card.offsetHeight || 300;
       // Sit beside the part, on whichever side has room, inside the canvas.
-      const left = px + 40 + width < size.width - 12 ? px + 40 : Math.max(12, px - 40 - width);
+      const gap = 130;
+      const left = px + gap + width < size.width - 12 ? px + gap : Math.max(12, px - gap - width);
       card.style.left = `${left}px`;
       card.style.top = `${Math.max(12, Math.min(size.height - height - 12, py - height / 2))}px`;
     }
