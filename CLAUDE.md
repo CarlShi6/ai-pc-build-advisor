@@ -82,9 +82,9 @@ For each batch: inspect → plan → implement → test → run the full gate �
 Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 draft save and restore); R6 slice 2 (Studio shopping plan with Markdown and JSON report); R6 slice 3 (save revision check: `expectedUpdatedAt` → 409 `SAVE_CONFLICT`, with Studio "Open saved version" / "Overwrite with this tab").
 
 Next, in order:
-0. **Blocked on a license decision.** The 2026-10-25 spike found OpenDB data is now CC BY-NC-SA 4.0 (non-commercial; ODC-By only up to commit `ef7e601`, 2026-10-05). Findings and options are in `docs/milestones/R6_OPENDB_SPIKE.md`. Don't copy OpenDB data until the user picks a path. Original plan: BuildCores OpenDB (github.com/buildcores/buildcores-open-db, no prices). Goal: close the R4 fan-coverage gap and UC-01, and get real dimensions for fit rules. Confirm which categories exist (especially case fans), field units and the attribution wording. Then map a small set of cases, GPUs, coolers and fans into the existing `Part` shape behind an adapter. Keep MPNs as identity evidence and keep catalog provenance (`last_manually_spec_verified_at`). Don't replace `seedParts` yet, and don't import prices. Record findings in `docs/engineering/REUSE_DECISIONS.md` (the candidate table is already there) and a milestone note.
 1. v3 funnel analytics events: image submitted → candidate reviewed → draft created → saved/exported.
-2. Per-session rate limit for image analysis (the current limit is process-wide) and a retention note on the Image page.
-3. "Preserve the Look" and "Balanced" optimization intents. Today only reduce-cost and improve-performance exist (PRD §10.1).
-4. Describe entry: reuse the existing `build-advisor` recommendation logic instead of leaving all part choices to the user.
-5. R7: Focus/Isolate mode, reduced motion and keyboard support, Playwright end-to-end tests, the PRD §19.3 fixture set, and an 8–12 person user study.
+2. Hand-curate a small catalog addition from manufacturer pages, starting with 10–20 common case fans. Each entry records the manufacturer URL, the verification date and dimensions in mm. Don't invent models, specs or prices (BuildCores OpenDB was rejected; see `docs/engineering/REUSE_DECISIONS.md`).
+3. Per-session rate limit for image analysis (the current limit is process-wide) and a retention note on the Image page.
+4. "Preserve the Look" and "Balanced" optimization intents. Today only reduce-cost and improve-performance exist (PRD §10.1).
+5. Describe entry: reuse the existing `build-advisor` recommendation logic instead of leaving all part choices to the user.
+6. R7: Focus/Isolate mode, reduced motion and keyboard support, Playwright end-to-end tests, the PRD §19.3 fixture set, and an 8–12 person user study.

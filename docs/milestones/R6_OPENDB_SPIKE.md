@@ -1,5 +1,7 @@
 # BuildCores OpenDB spike — 2026-10-25
 
+> **Decision (2026-10-25): Rejected.** No commercial license request, no use of the `ef7e601` ODC-By snapshot, and no OpenDB data copied. Case-fan coverage comes from manufacturer pages entered by hand (see the CLAUDE.md next steps). The findings below are kept for the record.
+
 Branch: `rebuild/image-to-build-v3`. Goal (CLAUDE.md step 0): close the R4 fan-coverage gap and UC-01, and get real dimensions for fit rules, by mapping a small set of OpenDB cases, GPUs, coolers and fans into the existing `Part` shape behind an adapter.
 
 **Outcome: stopped at the license check. No OpenDB records were copied into this repository and no adapter was written.** Everything below was read from the public GitHub repository (README, NOTICE, LICENSE history, JSON schemas and directory listings) through the GitHub API.
