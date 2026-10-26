@@ -32,6 +32,16 @@ import { readDraft } from "@/lib/v3/draft-session";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
 import type { CandidateReview } from "@/lib/v3/candidate-matcher";
 import { funnel } from "@/lib/v3/funnel-analytics";
+import { getRecommendedBuild } from "@/lib/apiClient";
+import {
+  describeUseCases,
+  proposeDescribeDraft,
+  recommendationInput,
+  type DescribeProposal,
+  type DescribeRequirements,
+  type DescribeUseCase,
+} from "@/lib/v3/describe-recommendation";
+import type { AppearancePreference, CpuBrandPreference, GpuBrandPreference } from "@/types/api";
 
 export const Route = createFileRoute("/start/$mode")({ component: StartPage });
 const modes = ["image", "describe", "import", "blank"] as const;
@@ -66,7 +76,12 @@ function StartPage() {
   const navigate = useNavigate();
   const [budget, setBudget] = useState("2500");
   const [description, setDescription] = useState("");
-  const [useCase, setUseCase] = useState("");
+  const [useCases, setUseCases] = useState<DescribeUseCase[]>([]);
+  const [appearance, setAppearance] = useState<AppearancePreference | "">("");
+  const [cpuBrand, setCpuBrand] = useState<CpuBrandPreference | "">("");
+  const [gpuBrand, setGpuBrand] = useState<GpuBrandPreference | "">("");
+  const [describeProposal, setDescribeProposal] = useState<DescribeProposal | null>(null);
+  const [recommending, setRecommending] = useState(false);
   const [list, setList] = useState("");
   const [file, setFile] = useState<File | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -199,8 +214,8 @@ function StartPage() {
       setError("Enter a valid budget of $0 or more.");
       return;
     }
-    if (mode === "describe" && !description.trim() && !useCase.trim()) {
-      setError("Add a goal or a short description to continue.");
+    if (mode === "describe" && !description.trim() && !useCases.length) {
+      setError("Choose a use case or add a short description to continue.");
       return;
     }
     if (mode === "import" && !list.trim()) {
@@ -231,7 +246,7 @@ function StartPage() {
               ? "Reference photo draft"
               : "Untitled build",
       budget: parsedBudget,
-      useCases: useCase.trim() ? [useCase.trim()] : [],
+      useCases: mode === "describe" ? [...useCases] : [],
       sourceInput: mode === "import" ? list : mode === "describe" ? description : undefined,
       parts: chosen,
       unresolved: mode === "import" ? unresolvedBySlot(matches) : {},
@@ -239,6 +254,54 @@ function StartPage() {
     writeDraft(draft);
     funnel.draftCreated(draft);
     void navigate({ to: "/studio" });
+  }
+
+  function describeRequirements(): DescribeRequirements | null {
+    const parsedBudget = Number(budget);
+    if (!Number.isFinite(parsedBudget) || parsedBudget < 300 || parsedBudget > 20_000) {
+      setError("Recommendations need a budget between $300 and $20,000.");
+      return null;
+    }
+    return {
+      budget: Math.round(parsedBudget),
+      useCases,
+      appearance: appearance || undefined,
+      cpuBrand: cpuBrand || undefined,
+      gpuBrand: gpuBrand || undefined,
+    };
+  }
+
+  async function previewRecommendation() {
+    const requirements = describeRequirements();
+    if (!requirements) return;
+    setError("");
+    setRecommending(true);
+    try {
+      const recommended = await getRecommendedBuild(recommendationInput(requirements));
+      setDescribeProposal(proposeDescribeDraft(recommended, requirements, description));
+    } catch (caught) {
+      setError(
+        caught instanceof Error
+          ? caught.message
+          : "Recommendations are unavailable. Create a draft and choose parts yourself.",
+      );
+    } finally {
+      setRecommending(false);
+    }
+  }
+
+  function confirmRecommendation() {
+    if (!describeProposal) return;
+    writeDraft(describeProposal.candidate);
+    funnel.draftCreated(describeProposal.candidate);
+    void navigate({ to: "/studio" });
+  }
+
+  function changeRequirements<T>(setter: (value: T) => void) {
+    return (value: T) => {
+      setter(value);
+      setDescribeProposal(null);
+    };
   }
 
   async function onImageChange(next: File | undefined) {
@@ -460,27 +523,139 @@ function StartPage() {
             )}
             {mode === "describe" && (
               <>
+                <fieldset className="v3-field v3-wizard">
+                  <legend>What will you use it for?</legend>
+                  <div className="v3-chip-row">
+                    {describeUseCases.map((item) => (
+                      <label key={item} className="v3-chip">
+                        <input
+                          type="checkbox"
+                          checked={useCases.includes(item)}
+                          onChange={(event) =>
+                            changeRequirements(setUseCases)(
+                              event.target.checked
+                                ? [...useCases, item]
+                                : useCases.filter((value) => value !== item),
+                            )
+                          }
+                        />
+                        {item}
+                      </label>
+                    ))}
+                  </div>
+                </fieldset>
+                <div className="v3-wizard-row">
+                  <label className="v3-field">
+                    Look
+                    <select
+                      value={appearance}
+                      onChange={(event) =>
+                        changeRequirements(setAppearance)(
+                          event.target.value as AppearancePreference | "",
+                        )
+                      }
+                    >
+                      <option value="">No preference</option>
+                      <option value="black">Black</option>
+                      <option value="white">White</option>
+                      <option value="rgb">RGB lighting</option>
+                    </select>
+                  </label>
+                  <label className="v3-field">
+                    CPU brand
+                    <select
+                      value={cpuBrand}
+                      onChange={(event) =>
+                        changeRequirements(setCpuBrand)(
+                          event.target.value as CpuBrandPreference | "",
+                        )
+                      }
+                    >
+                      <option value="">No preference</option>
+                      <option value="amd">AMD</option>
+                      <option value="intel">Intel</option>
+                    </select>
+                  </label>
+                  <label className="v3-field">
+                    GPU brand
+                    <select
+                      value={gpuBrand}
+                      onChange={(event) =>
+                        changeRequirements(setGpuBrand)(
+                          event.target.value as GpuBrandPreference | "",
+                        )
+                      }
+                    >
+                      <option value="">No preference</option>
+                      <option value="nvidia">NVIDIA</option>
+                      <option value="amd">AMD</option>
+                    </select>
+                  </label>
+                </div>
                 <label className="v3-field">
-                  What will you use it for?
-                  <input
-                    value={useCase}
-                    onChange={(event) => setUseCase(event.target.value)}
-                    placeholder="Gaming, video editing, local AI…"
-                  />
-                </label>
-                <label className="v3-field">
-                  Describe the build you want
+                  Anything else? (saved with the draft, not analyzed)
                   <textarea
-                    rows={6}
+                    rows={4}
                     value={description}
                     onChange={(event) => setDescription(event.target.value)}
                     placeholder="I want a quiet white PC for 1440p gaming…"
                   />
                 </label>
-                <p className="v3-inline-note">
-                  Your description is saved with the draft. Part choices remain yours until
-                  recommendation analysis is connected.
-                </p>
+                <section className="v3-image-build" aria-label="Recommended parts preview">
+                  <span className="v3-kicker">RECOMMENDATION · EXPLICIT CONFIRMATION</span>
+                  <h2>Get a starting parts list</h2>
+                  <p>
+                    Rule-based picks for all eight slots from the local catalog, based on your
+                    choices and budget. Nothing is added until you confirm, and you can change any
+                    part in the Studio.
+                  </p>
+                  <button
+                    className="v3-secondary"
+                    type="button"
+                    disabled={recommending}
+                    onClick={() => void previewRecommendation()}
+                  >
+                    {recommending ? "Preparing…" : "Preview recommended parts"}
+                  </button>
+                  {describeProposal && (
+                    <div className="v3-image-build-preview">
+                      <h3>Recommended parts · not applied</h3>
+                      <ul>
+                        {describeProposal.lines.map((line) => (
+                          <li key={line.slot}>
+                            {line.slot}: {line.name}
+                            {line.price === null
+                              ? ""
+                              : ` · $${line.price.toLocaleString()} seed price`}
+                          </li>
+                        ))}
+                      </ul>
+                      <p>
+                        Seed catalog total: $
+                        {describeProposal.candidate.build.totalPrice.toLocaleString()} · Rule
+                        findings: {describeProposal.candidate.build.compatibilityWarnings.length}
+                      </p>
+                      <div className="v3-image-build-warnings">
+                        <strong>Read before confirming</strong>
+                        <ul>
+                          {describeProposal.notes.map((note) => (
+                            <li key={note}>{note}</li>
+                          ))}
+                        </ul>
+                      </div>
+                      <button className="v3-primary" type="button" onClick={confirmRecommendation}>
+                        Use these parts and open Build Studio
+                      </button>
+                      <button
+                        className="v3-text-button"
+                        type="button"
+                        onClick={() => setDescribeProposal(null)}
+                      >
+                        Cancel preview
+                      </button>
+                    </div>
+                  )}
+                </section>
               </>
             )}
             {mode === "import" && (
@@ -536,6 +711,7 @@ function StartPage() {
                 onChange={(event) => {
                   setBudget(event.target.value);
                   setImageProposal(null);
+                  setDescribeProposal(null);
                 }}
               />
             </label>
@@ -550,7 +726,9 @@ function StartPage() {
                   ? "Create reviewed draft"
                   : mode === "image"
                     ? "Continue manually"
-                    : "Create draft"}
+                    : mode === "describe"
+                      ? "Create draft with empty slots"
+                      : "Create draft"}
                 <ArrowRight size={17} />
               </button>
             </div>

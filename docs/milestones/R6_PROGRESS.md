@@ -197,3 +197,31 @@ P0 before R7 (PRD §10, `R6_EXIT_REVIEW.md`).
 
 - Trait matching uses catalog `color`/`style` text only. Lighting, fan layout and placement show "unknown" because catalog parts don't describe them.
 - Performance comparisons use the catalog's gaming score, only where present (mostly GPUs).
+
+# R6 slice 9: EP-06 Describe requirements wizard with recommendation — 2026-10-25
+
+P0 before R7 (PRD §11 "requirements wizard for users with no picture").
+
+## Implemented
+
+- `src/lib/v3/describe-recommendation.ts`: structured requirements (use cases 1440p gaming / 4K gaming / Streaming / Video editing / 3D rendering / Local AI, look, CPU brand, GPU brand, budget $300–$20,000) mapped to the **existing** `RecommendedBuildInput`. `proposeDescribeDraft` turns the recommended Build into a `describe` draft preview covering all eight slots. Empty-slot prices are `null`, never $0.
+- `recommendationNotes` says plainly what wasn't honored: over budget (by how much), white look (the catalog has no white case), black look not met, RGB not verifiable from catalog data, CPU/GPU brand not applied (the recommender doesn't pick GPUs by brand), and no use case chosen. It always adds "rule-based picks from the local seed catalog with seed prices, not live offers or benchmarks; your description isn't analyzed."
+- `src/routes/start.$mode.tsx` (+CSS): use-case chips and three selects replace the free-text use-case field, whose substring matching could misfire. The description stays as saved, uninterpreted text.
+  - **Preview recommended parts** calls the existing server endpoint `POST /api/build/recommend` (validated by `normalizeRecommendedBuildInput`) and shows the eight parts, seed total, rule findings and the notes.
+  - **Use these parts and open Build Studio** is the explicit confirm. **Create draft with empty slots** keeps the manual path.
+  - Changing any requirement or the budget clears the preview. A failed recommendation shows an error and leaves the manual path available. Confirming fires `v3_draft_created`.
+
+## Verification
+
+- `src/lib/v3/describe-recommendation.test.ts` (4 tests):
+  - Eight selected slots, describe source, description and use cases kept.
+  - "Local AI" gets an RTX 4090 and 1440p gaming at $2,000 doesn't.
+  - Unmet budget, white and AMD GPU each get a note.
+  - Met preferences produce no false notes.
+- Gate: lint 0, typecheck passed, **174 tests in 25 files** passed, build passed.
+- Browser (`/start/describe`): Local AI + White + AMD GPU at $2,500 → preview listed eight parts (RTX 4090, i9-14900K…), seed total $3,872, and the notes "$1,372 over your $2,500 budget", "White look not applied…", "AMD GPU preference not applied…". Confirm → Studio "Description draft", 8/8 selected, $3,872.
+
+## Limitations
+
+- The recommender is the pre-v3 rule set. It can exceed the budget (now disclosed) and ignores GPU brand and experience level.
+- The free-text description isn't parsed. An AI planner (PRD §10.4) is not connected.
