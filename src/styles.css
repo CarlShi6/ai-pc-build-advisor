@@ -5990,8 +5990,18 @@
 .v3-scene-callout.dimmed {
   opacity: 0.28;
 }
-.v3-scene-canvas.is-focused .v3-scene-callout.dimmed:hover {
-  opacity: 0.8;
+/* Exploded: labels shrink to name chips on their parts. */
+.v3-scene-canvas[data-scene-mode="exploded"] .v3-scene-callout {
+  min-width: 0;
+}
+.v3-scene-canvas[data-scene-mode="exploded"] .v3-scene-callout small,
+.v3-scene-canvas[data-scene-mode="exploded"] .v3-scene-callout > a,
+.v3-scene-canvas[data-scene-mode="exploded"] .v3-photo-fans-note {
+  display: none;
+}
+/* While a part is shown, labels give way to the part and its card. */
+.v3-scene-canvas.is-focused .v3-scene-callout {
+  display: none;
 }
 .v3-focus-exit {
   position: absolute;
@@ -6033,6 +6043,12 @@
   box-shadow: 0 18px 50px #000000a0;
   backdrop-filter: blur(14px);
   padding: 14px;
+}
+@media (max-width: 760px) {
+  .v3-focus-card {
+    width: calc(100% - 24px);
+    max-height: 48%;
+  }
 }
 .v3-replace-card header {
   display: flex;

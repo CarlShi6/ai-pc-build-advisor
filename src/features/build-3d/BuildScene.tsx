@@ -3,12 +3,13 @@ import {
   useContext,
   useEffect,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
   type RefObject,
 } from "react";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
 import {
   ContactShadows,
   Edges,
@@ -30,6 +31,7 @@ import {
 import { ToneMappingMode } from "postprocessing";
 import type { ThreeEvent } from "@react-three/fiber";
 import {
+  Box3,
   Euler,
   MathUtils,
   Matrix4,
@@ -49,12 +51,38 @@ import {
 } from "@/lib/v3/build-document";
 import { scenePresentation, type ScenePresentation } from "@/lib/v3/scene-presentation";
 import {
+  CAMERA_FOV,
+  DEFAULT_CAMERA,
+  EXPLODED_VIEW,
+  FOCUS_FILL,
+  FOCUS_VIEW,
+  RECEDE,
+  SHOWCASE_POINT,
+  FRAME_BOTTOM,
+  FRAME_TOP,
+  fitBoxes,
+  fitCamera,
+  focusFrame,
   isDimmed,
+  showcaseRotation,
   slotLayout as layout,
-  slotPosition,
+  type CameraPose,
   type Point,
   type SceneMode,
 } from "@/lib/v3/scene-focus";
+import {
+  GENERIC_CASE_WALL,
+  GENERIC_SHROUD_FROM_BOTTOM,
+  casePanelOf,
+  casePanels,
+  explodeDistances,
+  explodeOffset,
+  sceneBoxes,
+  shiftBox,
+  type CasePanel,
+  type ExplodeId,
+  type SceneBox,
+} from "@/lib/v3/scene-explode";
 import {
   PHOTO_APPEARANCE_LABEL,
   appearanceHex,
@@ -129,6 +157,27 @@ function surfaceColor(color?: string, lit = false) {
 
 /** Side panel: removed by the user, or faded while the camera looks straight at it. */
 const SidePanelContext = createContext({ removed: false, faded: false });
+
+/** Exploded offset of each case panel, inside the case slot's group. */
+const PanelOffsetContext = createContext<Partial<Record<CasePanel, Point>>>({});
+
+const ORIGIN: Point = [0, 0, 0];
+
+/** Group that eases to `position`; snaps on the first frame and when motion is reduced. */
+function Eased({ position = ORIGIN, children }: { position?: Point; children: ReactNode }) {
+  const ref = useRef<Group>(null);
+  const placed = useRef(false);
+  useFrame((_, delta) => {
+    const node = ref.current;
+    if (!node) return;
+    const [x, y, z] = position;
+    if (!placed.current || prefersReducedMotion()) {
+      node.position.set(x, y, z);
+      placed.current = true;
+    } else node.position.lerp(new Vector3(x, y, z), 1 - Math.exp(-delta * 9));
+  });
+  return <group ref={ref}>{children}</group>;
+}
 
 /** True inside a slot that is dimmed because another part is focused. */
 const DimContext = createContext(false);
@@ -216,12 +265,17 @@ function GlassMaterial({
   roughness,
   transmission,
   sidePanel = false,
+  panel: casePanel,
 }: {
   color: string;
   roughness: number;
   transmission: number;
   sidePanel?: boolean;
+  /** The case panel this pane belongs to: outlined while exploded, as bare glass barely shows. */
+  panel?: CasePanel | null;
 }) {
+  const offsets = useContext(PanelOffsetContext);
+  const apart = !!casePanel && Math.hypot(...(offsets[casePanel] ?? ORIGIN)) > 0.05;
   const dim = useContext(DimContext);
   const light = useContext(LightTierContext);
   const panel = useContext(SidePanelContext);
@@ -244,20 +298,23 @@ function GlassMaterial({
     material.visible = material.opacity > 0.01;
   });
   return (
-    <meshPhysicalMaterial
-      ref={ref}
-      key={dim ? "dim" : "lit"}
-      color={color}
-      metalness={0}
-      roughness={roughness}
-      transmission={light ? 0 : transmission}
-      thickness={0.05}
-      ior={1.5}
-      envMapIntensity={0.25}
-      specularIntensity={0.4}
-      transparent
-      depthWrite={false}
-    />
+    <>
+      <meshPhysicalMaterial
+        ref={ref}
+        key={dim ? "dim" : "lit"}
+        color={color}
+        metalness={0}
+        roughness={roughness}
+        transmission={light ? 0 : transmission}
+        thickness={0.05}
+        ior={1.5}
+        envMapIntensity={0.25}
+        specularIntensity={0.4}
+        transparent
+        depthWrite={false}
+      />
+      {apart && !dim && <Edges color="#c9d1da" transparent opacity={0.6} />}
+    </>
   );
 }
 
@@ -352,42 +409,63 @@ function CaseModel({
 }) {
   const dim = useContext(DimContext);
   const light = useContext(LightTierContext);
+  const offsets = useContext(PanelOffsetContext);
   const [w, h, d] = size;
-  const t = 0.035;
+  const t = GENERIC_CASE_WALL;
   const white = presentation.caseColor === appearanceHex.white;
   const panel = white
     ? { color: presentation.caseColor, metalness: 0.1, roughness: 0.45 }
     : { color: presentation.caseColor, metalness: 0.55, roughness: 0.42 };
   const fanCount = Math.min(6, Math.max(0, presentation.fanAccentCount));
   const fanFrame = white ? "#dfe3e8" : "#18191c";
+  // Panels match `genericCasePanels`; each moves on its own when exploded. The rest is the frame.
   return (
     <group>
-      <Box size={[w, t, d]} position={[0, h / 2, 0]} material={panel} />
+      <Eased position={offsets.top}>
+        <Box size={[w, t, d]} position={[0, h / 2, 0]} material={panel} />
+      </Eased>
       <Box size={[w, t, d]} position={[0, -h / 2, 0]} material={panel} />
-      <Box size={[w, h, t]} position={[0, 0, -d / 2]} material={panel} />
+      <Eased position={offsets.back}>
+        <Box size={[w, h, t]} position={[0, 0, -d / 2]} material={panel} />
+      </Eased>
       <Box size={[t, h, d]} position={[-w / 2, 0, 0]} material={panel} />
       {/* Front panel: mesh look; see-through enough to show lit front fans. */}
-      <Box
-        size={[t, h, d]}
-        position={[w / 2, 0, 0]}
-        material={{
-          color: white ? "#cfd4da" : "#101113",
-          metalness: 0.3,
-          roughness: 0.8,
-          ...(fanCount > 0 && { transparent: true, opacity: 0.45, depthWrite: false }),
-        }}
-      />
-      {/* PSU shroud. */}
-      <Box size={[w - t * 2, 0.04, d - t * 2]} position={[0, -h / 2 + 0.72, 0]} material={panel} />
+      <Eased position={offsets.front}>
+        <Box
+          size={[t, h, d]}
+          position={[w / 2, 0, 0]}
+          material={{
+            color: white ? "#cfd4da" : "#101113",
+            metalness: 0.3,
+            roughness: 0.8,
+            ...(fanCount > 0 && { transparent: true, opacity: 0.45, depthWrite: false }),
+          }}
+        />
+      </Eased>
+      <Eased position={offsets.shroud}>
+        <Box
+          size={[w - t * 2, 0.04, d - t * 2]}
+          position={[0, -h / 2 + GENERIC_SHROUD_FROM_BOTTOM, 0]}
+          material={panel}
+        />
+      </Eased>
       {/* Tempered glass side panel, facing the default camera. */}
-      {glass ? (
-        <mesh position={[0, 0, d / 2]}>
-          <boxGeometry args={[w, h, 0.02]} />
-          <GlassMaterial color="#d8e2e6" roughness={0.04} transmission={1} sidePanel />
-        </mesh>
-      ) : (
-        <Box size={[w, h, t]} position={[0, 0, d / 2]} material={panel} />
-      )}
+      <Eased position={offsets.glass}>
+        {glass ? (
+          <mesh position={[0, 0, d / 2]}>
+            <boxGeometry args={[w, h, 0.02]} />
+            <GlassMaterial
+              color="#d8e2e6"
+              roughness={0.04}
+              transmission={1}
+              sidePanel
+              panel="glass"
+            />
+          </mesh>
+        ) : (
+          <Box size={[w, h, 0.02]} position={[0, 0, d / 2]} material={panel} />
+        )}
+      </Eased>
       <FanSet size={size} count={fanCount} frameColor={fanFrame} light={presentation.accentColor} />
     </group>
   );
@@ -608,57 +686,85 @@ function ReferencePart({
 }
 
 /** A per-SKU reference reconstruction, drawn 1:1 from its millimetre parts. */
-function ReferenceModelMesh({ model, accent }: { model: ReferenceModel; accent: string }) {
+function ReferenceModelMesh({
+  model,
+  accent,
+  panels = false,
+}: {
+  model: ReferenceModel;
+  accent: string;
+  /** The case slot's model: its panels move on their own when exploded. */
+  panels?: boolean;
+}) {
   const dim = useContext(DimContext);
-  const light = useContext(LightTierContext);
+  const offsets = useContext(PanelOffsetContext);
+  const panelOf = useMemo(
+    () => new Map(model.parts.map((part) => [part.id, panels ? casePanelOf(part, model) : null])),
+    [model, panels],
+  );
   return (
     <group
       rotation={model.frame === "gpu" ? gpuFrameRotation : undefined}
       scale={1 / MM_PER_SCENE_UNIT}
     >
       {model.parts.map((part) => {
-        const material = model.materials[part.material];
-        if (part.shape !== "box" && part.shape !== "disc")
-          return <ReferencePart key={part.id} part={part} material={material} accent={accent} />;
-        const glass = !!material.transmission;
-        // A lit part (a memory light bar) glows in the build's RGB colour.
-        const lit = part.material === "light";
+        const panel = panelOf.get(part.id);
+        const element = referencePartElement(part);
+        if (!panel) return element;
+        const offset = (offsets[panel] ?? ORIGIN).map(
+          (value) => value * MM_PER_SCENE_UNIT,
+        ) as Point;
         return (
-          <mesh
-            key={part.id}
-            position={part.positionMm}
-            scale={part.sizeMm}
-            castShadow={!glass}
-            receiveShadow
-          >
-            {part.shape === "box" ? <boxGeometry /> : <sphereGeometry args={[0.5, 48, 12]} />}
-            {lit ? (
-              <Mat
-                color={accent}
-                emissive={accent}
-                emissiveIntensity={dim ? 0.3 : 2.2}
-                toneMapped={false}
-              />
-            ) : glass ? (
-              <GlassMaterial
-                color={material.color}
-                roughness={material.roughness}
-                transmission={material.transmission ?? 1}
-                // The thin glass pane on the +z face is the side panel.
-                sidePanel={model.frame === "case" && part.positionMm[2] > 0 && part.sizeMm[2] < 10}
-              />
-            ) : (
-              <Mat
-                color={material.color}
-                roughness={material.roughness}
-                metalness={material.metalness}
-              />
-            )}
-          </mesh>
+          <Eased key={part.id} position={offset}>
+            {element}
+          </Eased>
         );
       })}
     </group>
   );
+
+  function referencePartElement(part: ReferenceModelPart) {
+    const material = model.materials[part.material];
+    if (part.shape !== "box" && part.shape !== "disc")
+      return <ReferencePart key={part.id} part={part} material={material} accent={accent} />;
+    const glass = !!material.transmission;
+    // A lit part (a memory light bar) glows in the build's RGB colour.
+    const lit = part.material === "light";
+    return (
+      <mesh
+        key={part.id}
+        position={part.positionMm}
+        scale={part.sizeMm}
+        castShadow={!glass}
+        receiveShadow
+      >
+        {part.shape === "box" ? <boxGeometry /> : <sphereGeometry args={[0.5, 48, 12]} />}
+        {lit ? (
+          <Mat
+            color={accent}
+            emissive={accent}
+            emissiveIntensity={dim ? 0.3 : 2.2}
+            toneMapped={false}
+          />
+        ) : glass ? (
+          <GlassMaterial
+            color={material.color}
+            roughness={material.roughness}
+            transmission={material.transmission ?? 1}
+            // The thin glass pane on the +z face is the side panel.
+            sidePanel={model.frame === "case" && part.positionMm[2] > 0 && part.sizeMm[2] < 10}
+            panel={panelOf.get(part.id)}
+          />
+        ) : (
+          <Mat
+            color={material.color}
+            roughness={material.roughness}
+            metalness={material.metalness}
+          />
+        )}
+      </mesh>
+    );
+  }
 }
 
 function PartModel({
@@ -839,9 +945,11 @@ function SlotMesh({
   document,
   selected,
   mode,
-  explode,
+  target,
+  rotation,
   focusSlot,
   onPick,
+  onGroup,
   presentation,
   look,
   fans,
@@ -850,9 +958,12 @@ function SlotMesh({
   document: BuildDocumentV3;
   selected: boolean;
   mode: SceneMode;
-  explode: number;
+  /** Resting position and turn: assembled, exploded, stepped back or on the showcase spot. */
+  target: Point;
+  rotation: Point;
   focusSlot: SlotId | null;
   onPick: (slot: SlotId) => void;
+  onGroup: (slot: SlotId, group: Group | null) => void;
   presentation: ScenePresentation;
   /** Unresolved slot the photo shows: drawn as a look-alike placeholder (PRD §9.3 level 2). */
   look?: SlotAppearance;
@@ -861,7 +972,6 @@ function SlotMesh({
 }) {
   const group = useRef<Group>(null);
   const occupancy = slotOccupancy(document, slot);
-  const target = slotPosition(slot, mode, explode, focusSlot);
   const dimmed = isDimmed(slot, focusSlot);
   const model =
     occupancy === "selected" ? referenceModelFor(selectedPart(document, slot)?.id) : null;
@@ -871,15 +981,6 @@ function SlotMesh({
     : slot === "case" && presentation.layout === "showcase"
       ? [2.55, 3.05, 1.75]
       : layout[slot].size;
-  // A focused GPU or AIO reference model turns its fans to the viewer; in the case they face down.
-  const rotation: Point =
-    slot === "gpu" && model && focusSlot === slot
-      ? [-1.87, 0, 0]
-      : slot === "cooler" && model && focusSlot === slot
-        ? [-1.15, 0, 0]
-        : slot === "gpu" && presentation.gpuVertical
-          ? [0, 0, Math.PI / 2]
-          : [0, 0, 0];
   const placed = useRef(false);
   // Ease towards the resting pose; snap on the first frame and when the user prefers reduced motion.
   useFrame((_, delta) => {
@@ -917,15 +1018,21 @@ function SlotMesh({
   return (
     <DimContext.Provider value={dimmed}>
       <group
-        ref={group}
-        position={target}
+        ref={(node) => {
+          group.current = node;
+          onGroup(slot, node);
+        }}
         // A dimmed case would swallow clicks meant for the parts around it.
         onClick={dimmed && slot === "case" ? undefined : handleClick}
       >
         {occupancy === "selected" ? (
           model ? (
             <>
-              <ReferenceModelMesh model={model} accent={presentation.accentColor} />
+              <ReferenceModelMesh
+                model={model}
+                accent={presentation.accentColor}
+                panels={slot === "case"}
+              />
               {/* Fans are not Build parts; draw the ones the photo shows on the confirmed case. */}
               {slot === "case" && fans && (
                 <FanSet
@@ -989,70 +1096,190 @@ function SlotMesh({
 }
 
 function SlotCallout({
-  slot,
-  document,
+  from,
+  to,
   selected,
-  mode,
-  explode,
-  focusSlot,
+  unresolved,
 }: {
-  slot: SlotId;
-  document: BuildDocumentV3;
+  from: Point;
+  to: Point;
   selected: boolean;
-  mode: SceneMode;
-  explode: number;
-  focusSlot: SlotId | null;
+  unresolved: boolean;
 }) {
-  const anchor = slotPosition(slot, mode, explode, focusSlot);
-  const occupancy = slotOccupancy(document, slot);
-  const color = selected ? "#6aa6ff" : occupancy === "unresolved" ? "#f2b65f" : "#7d8690";
-  const dimmed = isDimmed(slot, focusSlot);
+  const color = selected ? "#6aa6ff" : unresolved ? "#f2b65f" : "#7d8690";
   return (
     <Line
-      points={[anchor, layout[slot].label]}
+      points={[from, to]}
       color={color}
       lineWidth={1.2}
       dashed
       dashSize={0.1}
       gapSize={0.07}
       transparent
-      opacity={dimmed ? 0.18 : selected ? 1 : 0.7}
+      opacity={selected ? 1 : 0.7}
     />
   );
 }
 
 function ProjectOverlay({
   labelRefs,
-  cardRef,
-  cardAnchor,
+  labels,
 }: {
   labelRefs: RefObject<Partial<Record<SlotId, HTMLElement | null>>>;
-  cardRef: RefObject<HTMLDivElement | null>;
-  cardAnchor: Point | null;
+  labels: Record<SlotId, Point>;
 }) {
   useFrame(({ camera, size }) => {
     for (const slot of primarySlots) {
       const element = labelRefs.current?.[slot];
       if (!element) continue;
-      const point = new Vector3(...layout[slot].label).project(camera);
+      const point = new Vector3(...labels[slot]).project(camera);
       const x = Math.max(78, Math.min(size.width - 78, ((point.x + 1) * size.width) / 2));
       const y = Math.max(25, Math.min(size.height - 25, ((1 - point.y) * size.height) / 2));
       element.style.left = `${x}px`;
       element.style.top = `${y}px`;
     }
+  });
+  return null;
+}
+
+const rigBox = new Box3();
+const rigCorner = new Vector3();
+const rigGoal = new Vector3();
+
+function boxOf(box: Box3): SceneBox {
+  const centre = box.getCenter(new Vector3());
+  const size = box.getSize(new Vector3());
+  return { centre: [centre.x, centre.y, centre.z], size: [size.x, size.y, size.z] };
+}
+
+interface OrbitLike {
+  target: Vector3;
+  update: () => void;
+  addEventListener: (type: "start", listener: () => void) => void;
+  removeEventListener: (type: "start", listener: () => void) => void;
+}
+
+/**
+ * Camera rig (E2): frames the shown part in the free area beside the replace card, frames the
+ * whole exploded layout, or goes back to where the camera was before a part was shown. It hands
+ * control back as soon as the user orbits or zooms. It also places the card and reports the
+ * shown part's on-screen rectangle as `data-focus-rect` ("left top right bottom", canvas px).
+ */
+function CameraRig({
+  focusSlot,
+  mode,
+  explode,
+  groups,
+  explodedBoxes,
+  cardRef,
+  sceneRef,
+}: {
+  focusSlot: SlotId | null;
+  mode: SceneMode;
+  explode: number;
+  groups: RefObject<Partial<Record<SlotId, Group | null>>>;
+  explodedBoxes: SceneBox[];
+  cardRef: RefObject<HTMLDivElement | null>;
+  sceneRef: RefObject<HTMLDivElement | null>;
+}) {
+  const camera = useThree((state) => state.camera);
+  const size = useThree((state) => state.size);
+  const controls = useThree((state) => state.controls) as unknown as OrbitLike | null;
+  const active = useRef(true);
+  const saved = useRef<CameraPose | null>(null);
+  const previousFocus = useRef<SlotId | null>(null);
+  const frames = useRef(0);
+  useEffect(() => {
+    // Remember where the camera was when a part is first shown, to come back to it.
+    if (!previousFocus.current && focusSlot && controls)
+      saved.current = {
+        position: camera.position.toArray() as Point,
+        target: controls.target.toArray() as Point,
+      };
+    previousFocus.current = focusSlot;
+    active.current = true;
+  }, [focusSlot, camera, controls]);
+  useEffect(() => {
+    saved.current = null;
+    active.current = true;
+  }, [mode]);
+  useEffect(() => {
+    active.current = true;
+  }, [explode]);
+  useEffect(() => {
+    if (!controls) return;
+    const release = () => {
+      active.current = false;
+    };
+    controls.addEventListener("start", release);
+    return () => controls.removeEventListener("start", release);
+  }, [controls]);
+  useFrame((_, delta) => {
     const card = cardRef.current;
-    if (card && cardAnchor) {
-      const point = new Vector3(...cardAnchor).project(camera);
-      const px = ((point.x + 1) * size.width) / 2;
-      const py = ((1 - point.y) * size.height) / 2;
-      const width = card.offsetWidth || 320;
-      const height = card.offsetHeight || 300;
-      // Sit beside the part, on whichever side has room, inside the canvas.
-      const gap = 130;
-      const left = px + gap + width < size.width - 12 ? px + gap : Math.max(12, px - gap - width);
-      card.style.left = `${left}px`;
-      card.style.top = `${Math.max(12, Math.min(size.height - height - 12, py - height / 2))}px`;
+    const frame = focusFrame(
+      size.width,
+      size.height,
+      card?.offsetWidth || 320,
+      card?.offsetHeight || 300,
+    );
+    if (card) {
+      card.style.left = `${frame.card.left}px`;
+      card.style.top = `${frame.card.top}px`;
+      card.style.maxHeight = `${frame.card.maxHeight}px`;
     }
+    const shown = focusSlot ? groups.current?.[focusSlot] : null;
+    let goal: CameraPose;
+    if (shown) {
+      rigBox.setFromObject(shown);
+      const box = boxOf(rigBox);
+      // The case is shown from the default side-front view; a part straight on.
+      goal = fitCamera(
+        box,
+        focusSlot === "case" ? DEFAULT_CAMERA : FOCUS_VIEW,
+        CAMERA_FOV,
+        size,
+        frame.free,
+        FOCUS_FILL,
+      );
+      frames.current += 1;
+      if (sceneRef.current && frames.current % 5 === 0) {
+        const xs: number[] = [];
+        const ys: number[] = [];
+        for (const x of [rigBox.min.x, rigBox.max.x])
+          for (const y of [rigBox.min.y, rigBox.max.y])
+            for (const z of [rigBox.min.z, rigBox.max.z]) {
+              rigCorner.set(x, y, z).project(camera);
+              xs.push(((rigCorner.x + 1) * size.width) / 2);
+              ys.push(((1 - rigCorner.y) * size.height) / 2);
+            }
+        sceneRef.current.dataset.focusRect = [
+          Math.min(...xs),
+          Math.min(...ys),
+          Math.max(...xs),
+          Math.max(...ys),
+        ]
+          .map((value) => Math.round(value))
+          .join(" ");
+      }
+    } else {
+      if (sceneRef.current) delete sceneRef.current.dataset.focusRect;
+      goal =
+        mode === "exploded"
+          ? fitBoxes(
+              explodedBoxes,
+              EXPLODED_VIEW,
+              CAMERA_FOV,
+              size,
+              { x0: 24, y0: FRAME_TOP - 40, x1: size.width - 24, y1: size.height - FRAME_BOTTOM },
+              0.92,
+            )
+          : (saved.current ?? { position: DEFAULT_CAMERA, target: ORIGIN });
+    }
+    if (!active.current || !controls) return;
+    const step = prefersReducedMotion() ? 1 : 1 - Math.exp(-delta * 4);
+    camera.position.lerp(rigGoal.set(...goal.position), step);
+    controls.target.lerp(rigGoal.set(...goal.target), step);
+    controls.update();
   });
   return null;
 }
@@ -1123,7 +1350,69 @@ export default function BuildScene({
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [focusSlot, onClearFocus]);
-  const cardAnchor = focusSlot ? slotPosition(focusSlot, mode, explode, focusSlot) : null;
+  const sceneRef = useRef<HTMLDivElement | null>(null);
+  const groups = useRef<Partial<Record<SlotId, Group | null>>>({});
+  const registerGroup = (slot: SlotId, group: Group | null) => {
+    groups.current[slot] = group;
+  };
+  // E1: every part and case panel moves along its own direction; distances come from the boxes.
+  const boxes = useMemo(() => sceneBoxes(document), [document]);
+  const distances = useMemo(() => explodeDistances(boxes), [boxes]);
+  const amount = mode === "exploded" ? Math.max(0, Math.min(100, explode)) / 100 : 0;
+  const explodedBoxes = (Object.keys(boxes) as ExplodeId[]).map((id) =>
+    shiftBox(boxes[id], explodeOffset(id, distances, amount)),
+  );
+  const floorY = Math.min(
+    FLOOR_Y,
+    Math.min(...explodedBoxes.map((box) => box.centre[1] - box.size[1] / 2)) - 0.06,
+  );
+  // E2: a shown part goes to the showcase spot, best face forward; the rest dims and steps back.
+  // Showing the case keeps everything in place, panels closed, and fades the parts inside.
+  const showing = focusSlot && focusSlot !== "case" ? focusSlot : null;
+  const placements = Object.fromEntries(
+    primarySlots.map((slot) => {
+      const anchor = layout[slot].anchor;
+      if (slot === showing) {
+        const rotation = showcaseRotation(slot);
+        // Put the part's own centre (off its origin for case-frame models) on the spot.
+        const centre = new Vector3(
+          ...boxes[slot].centre.map((value, k) => value - anchor[k]),
+        ).applyEuler(new Euler(...rotation));
+        return [
+          slot,
+          {
+            target: SHOWCASE_POINT.map((value, k) => value - centre.getComponent(k)) as Point,
+            rotation,
+          },
+        ];
+      }
+      const offset = explodeOffset(slot, distances, amount);
+      const step = showing ? RECEDE : ORIGIN;
+      return [
+        slot,
+        {
+          target: anchor.map((value, k) => value + offset[k] + step[k]) as Point,
+          rotation: (slot === "gpu" && presentation.gpuVertical
+            ? [0, 0, Math.PI / 2]
+            : [0, 0, 0]) as Point,
+        },
+      ];
+    }),
+  ) as Record<SlotId, { target: Point; rotation: Point }>;
+  const panelOffsets = Object.fromEntries(
+    casePanels.map((panel) => [
+      panel,
+      focusSlot === "case" ? ORIGIN : explodeOffset(panel, distances, amount),
+    ]),
+  ) as Record<CasePanel, Point>;
+  // Labels sit above each exploded part; otherwise in their side columns.
+  const labels = Object.fromEntries(
+    primarySlots.map((slot) => {
+      if (mode !== "exploded") return [slot, layout[slot].label];
+      const box = shiftBox(boxes[slot], explodeOffset(slot, distances, amount));
+      return [slot, [box.centre[0], box.centre[1] + box.size[1] / 2 + 0.25, box.centre[2]]];
+    }),
+  ) as Record<SlotId, Point>;
   // Adaptive quality: a device that can't hold ~30 fps drops to the light tier for the session.
   const [quality, setQuality] = useState<"high" | "low">("high");
   const lowerQuality = () => setQuality("low");
@@ -1131,7 +1420,10 @@ export default function BuildScene({
   // Bloom only above 1.6: lit white panels stay below it, emissive RGB (2.2+) glows.
   return (
     <div
+      ref={sceneRef}
       className={`v3-scene-canvas ${focusSlot ? "is-focused" : ""}`}
+      data-scene-mode={mode}
+      data-focus-slot={focusSlot ?? undefined}
       data-scene-quality={quality}
       data-reference-models={referenceModelSlots(document).join(" ")}
       data-side-panel={sidePanelRemoved ? "removed" : panelFaded ? "faded" : "shown"}
@@ -1141,7 +1433,7 @@ export default function BuildScene({
       <Canvas
         key={resetKey}
         // Side-front: the camera looks in through the glass side panel (+z), past the front edge.
-        camera={{ position: [3.4, 1.2, 8.6], fov: 38 }}
+        camera={{ position: DEFAULT_CAMERA, fov: CAMERA_FOV }}
         dpr={quality === "high" ? [1, 1.5] : 1}
         gl={{ antialias: false, powerPreference: "high-performance" }}
         // The AgX pass in the effect chain reads this; slightly under 1 keeps white panels off the clip.
@@ -1160,7 +1452,7 @@ export default function BuildScene({
             />
             <SidePanelWatch onChange={setPanelFaded} />
             <color attach="background" args={["#17191c"]} />
-            <fog attach="fog" args={["#17191c", 11, 22]} />
+            <fog attach="fog" args={["#17191c", 16, 40]} />
             <StudioEnvironment />
             <ambientLight intensity={0.25} />
             <directionalLight position={[3, 6, 6]} intensity={1.6} castShadow />
@@ -1185,41 +1477,46 @@ export default function BuildScene({
               distance={1.6}
               color={presentation.accentColor}
             />
-            {primarySlots.map((slot) => (
-              <SlotMesh
-                key={slot}
-                slot={slot}
-                document={document}
-                selected={selectedSlot === slot}
-                mode={mode}
-                explode={explode}
-                focusSlot={focusSlot}
-                onPick={pick}
-                presentation={presentation}
-                look={looks[slot]}
-                fans={slot === "case" ? fans : null}
-              />
-            ))}
-            {primarySlots.map((slot) => (
-              <SlotCallout
-                key={`${slot}-callout`}
-                slot={slot}
-                document={document}
-                selected={selectedSlot === slot}
-                mode={mode}
-                explode={explode}
-                focusSlot={focusSlot}
-              />
-            ))}
+            <PanelOffsetContext.Provider value={panelOffsets}>
+              {primarySlots.map((slot) => (
+                <SlotMesh
+                  key={slot}
+                  slot={slot}
+                  document={document}
+                  selected={selectedSlot === slot}
+                  mode={mode}
+                  target={placements[slot].target}
+                  rotation={placements[slot].rotation}
+                  focusSlot={focusSlot}
+                  onPick={pick}
+                  onGroup={registerGroup}
+                  presentation={presentation}
+                  look={looks[slot]}
+                  fans={slot === "case" ? fans : null}
+                />
+              ))}
+            </PanelOffsetContext.Provider>
+            {/* Dashed callouts to the side labels; exploded labels sit on their parts instead. */}
+            {!focusSlot &&
+              mode !== "exploded" &&
+              primarySlots.map((slot) => (
+                <SlotCallout
+                  key={`${slot}-callout`}
+                  from={placements[slot].target}
+                  to={labels[slot]}
+                  selected={selectedSlot === slot}
+                  unresolved={slotOccupancy(document, slot) === "unresolved"}
+                />
+              ))}
             <ContactShadows
               frames={quality === "low" ? 1 : Infinity}
-              position={[0, FLOOR_Y + 0.005, 0]}
+              position={[0, floorY + 0.005, 0]}
               opacity={0.65}
               scale={9}
               blur={2.6}
               far={3.2}
             />
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]}>
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]}>
               <planeGeometry args={[40, 40]} />
               {quality === "low" ? (
                 <meshStandardMaterial color="#151619" metalness={0.5} roughness={0.9} />
@@ -1239,20 +1536,37 @@ export default function BuildScene({
                 />
               )}
             </mesh>
-            <ProjectOverlay labelRefs={labelRefs} cardRef={cardRef} cardAnchor={cardAnchor} />
+            <ProjectOverlay labelRefs={labelRefs} labels={labels} />
             <OrbitControls
+              makeDefault
               enablePan
               enableZoom
-              minDistance={5}
-              maxDistance={15}
+              minDistance={0.8}
+              maxDistance={30}
               maxPolarAngle={Math.PI / 2 - 0.05}
               target={[0, 0, 0]}
+            />
+            <CameraRig
+              focusSlot={focusSlot}
+              mode={mode}
+              explode={explode}
+              groups={groups}
+              explodedBoxes={explodedBoxes}
+              cardRef={cardRef}
+              sceneRef={sceneRef}
             />
             {quality === "high" ? (
               <EffectComposer multisampling={4}>
                 <N8AO aoRadius={0.6} intensity={2.2} distanceFalloff={1} halfRes />
                 <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
-                <DepthOfField target={[0, 0, 0.6]} focalLength={0.2} bokehScale={0.7} />
+                {/* Depth of field follows the shown part; off for the wide exploded layout. */}
+                {mode !== "exploded" && focusSlot !== "case" && (
+                  <DepthOfField
+                    target={showing ? SHOWCASE_POINT : [0, 0, 0.6]}
+                    focalLength={0.2}
+                    bokehScale={0.7}
+                  />
+                )}
                 <Vignette eskil={false} offset={0.25} darkness={0.55} />
                 <ToneMapping mode={ToneMappingMode.AGX} />
               </EffectComposer>

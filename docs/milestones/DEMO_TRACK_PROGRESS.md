@@ -434,3 +434,52 @@ Before: the white case and parts blew out to flat white in the whole-build view,
 - **Limit:** the AIO and GPU fans face down, as they are mounted, so from the side their blades are not visible. They read as the radiator stack and its RGB glow. Focus still turns them to the viewer.
 - **Radiator thickness:** Corsair's TITAN RX RGB quick start guide (the only manual on corsair.com, checked 2026-10-27) and the product page give no thickness, so 27 mm stays an estimate.
 - Tests: the 3D E2E checks the default `shown` state and that the toggle gives `removed` and back.
+
+### Slice E1: case split and true 3D explode (2026-10-27)
+
+Review: in Exploded the case stayed closed, half the board stayed hidden, and some parts left the case while others did not.
+
+- **Pure layout** in `src/lib/v3/scene-explode.ts`:
+  - `sceneBoxes(document)` gives the assembled box of every slot and case panel.
+  - `explodeDistances(boxes)` gives how far each one moves.
+  - `explodeOffset(id, distances, amount)` interpolates linearly from 0 to 100%.
+  - Nothing touches the Build.
+- **Case split** into glass side, solid (back) side, front, top, PSU shroud and main frame:
+  - For reference cases, `casePanelOf` assigns a thin part on a face to that face's panel; a part named shroud or bottom tray goes to the shroud. On the O11 this assigns side glass, solid side, front glass with its trims, top panel and bottom tray; everything else is frame.
+  - The generic case draws the same panels (`genericCasePanels`).
+- **Directions.** Front = +x, so seen from the front the glass side is on the left.
+  - Panels: top up, glass side left (+z), solid side right (-z), front forward, shroud out the rear and low.
+  - Parts: board backwards (-x), GPU forward and down, AIO up, memory and CPU pulled straight off the board (+z), storage to the side (+z).
+  - PSU: down, angled slightly out the glass side. Straight down hid it under the case floor from every raised camera.
+- **Distances from boxes.** The frame stays put, and its box is the whole case. Parts are placed first, then panels. Each moves at least 0.2 units, and as far as needed to keep a 0.12-unit gap from every item placed before it. So at 100% every part is outside the case and no two boxes touch.
+- **Scene.**
+  - Panels ease to their offsets.
+  - The floor drops under the lowest exploded box.
+  - Exploded labels shrink to name chips on their parts.
+  - Exploded glass panels get a faint outline.
+  - The camera fits the whole layout from about 30° off the glass side, where the board moving out the rear stays visible.
+- **Tests:** `scene-explode.test.ts`, 11 tests. Four builds are covered: the showcase sample, a spec-envelope case with a shroud, an empty build and generic catalog parts.
+  - At 100%, no two boxes intersect, including the gap.
+  - At 0%, every box is back in its assembled place.
+  - Every part ends up outside the frame, and moved along its direction.
+  - Interpolation is linear and clamped.
+  - The O11 panel split is checked.
+
+### Slice E2: one click behaviour, framed showcase (2026-10-27)
+
+- **Same action everywhere.** In Standard, Exploded and Review, clicking any part moves it fully out of the case to a fixed showcase spot and turns its best face to the camera; everything else dims and steps back.
+  - The board faces the camera flat on.
+  - The GPU's fans face forward.
+  - Memory turns its side forward, laid flat with the long edge across.
+  - The AIO's pump face points forward.
+  - Clicking the case keeps it in place with its panels closed, and the parts inside fade.
+- **Camera rig** (`fitCamera` / `fitBoxes` in `scene-focus.ts`, the equivalent of drei Bounds):
+  - It fits the shown part's measured bounding box to 66% of the free area. The free area is the canvas minus the card, the header and the footer controls.
+  - It eases there, then hands control back as soon as the user orbits or zooms.
+  - Closing (Esc, clicking empty space, "Show full build") eases the part home and the camera back to where it was.
+  - With reduced motion, everything snaps.
+- **Card:** fixed beside the free area (under it on narrow canvases), top-aligned, and capped above the mode buttons. Labels hide while a part is shown.
+- **The scene reports** `data-focus-slot`, `data-scene-mode`, and `data-focus-rect` (the shown part's projected box in canvas pixels).
+- **Tests:**
+  - `scene-focus.test.ts`: board, GPU, AIO, memory, CPU and case fill 55–75% of the free area at 1264 and 390 px wide, stay inside it, and stay clear of the card. Also checks the best-face turns.
+  - New E2E `showcase-framing.e2e.ts`: in Standard and then Exploded, clicks board, GPU, memory and AIO, then the case. For each, the projected box fills 50–80% of the free area and over 30% of the canvas, stays on the canvas and clear of the card. Esc clears it.

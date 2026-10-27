@@ -28,7 +28,7 @@ test("3D Studio: click a part, swap it in the focus card, and see it in the shop
     "Case, Motherboard, Cooler, GPU and Memory: Reference reconstruction",
   );
 
-  // Click the GPU's 3D label: the part is isolated and the focus card opens beside it.
+  // Click the GPU's 3D label: the part is shown on its own and the focus card opens beside it.
   await page.locator('.v3-scene-callout[data-scene-slot="gpu"] button').click();
   await expect(page.getByRole("button", { name: /Show full build/ })).toBeVisible();
   const card = page.locator(".v3-focus-card .v3-replace-card");
@@ -39,11 +39,12 @@ test("3D Studio: click a part, swap it in the focus card, and see it in the shop
     .first()
     .click();
 
+  // Labels step aside while a part is shown; after closing, the GPU label names the swap.
+  await page.keyboard.press("Escape");
+  await expect(page.getByRole("button", { name: /Show full build/ })).toHaveCount(0);
   await expect(
     page.locator('.v3-scene-callout[data-scene-slot="gpu"]').getByText(/PRIME GeForce RTX 5070/),
   ).toBeVisible();
-  await page.keyboard.press("Escape");
-  await expect(page.getByRole("button", { name: /Show full build/ })).toHaveCount(0);
 
   const gpuRow = page.locator(".v3-plan-row").filter({ hasText: "GPU" }).first();
   await gpuRow.scrollIntoViewIfNeeded();
