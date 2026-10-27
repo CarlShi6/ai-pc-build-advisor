@@ -278,6 +278,8 @@ export interface CandidateReview {
   chosenEvidence?: { observationIds: string[]; photoEvidence: string[]; catalogSourceId: string };
   excludedPartIds: string[];
   manualText?: string;
+  /** The user said "keep unknown": nothing is suggested for this category. */
+  kept?: true;
 }
 
 /**
@@ -305,6 +307,7 @@ export function chooseCandidate(
     ...review,
     status: "chosen",
     chosenPartId: partId,
+    kept: undefined,
     chosenEvidence: {
       observationIds: [...candidate.matchedObservationIds],
       photoEvidence: [...candidate.observationEvidence],
@@ -328,6 +331,7 @@ export function keepCandidateUnknown(review: CandidateReview): CandidateReview {
   return {
     ...review,
     status: "unknown",
+    kept: true,
     chosenPartId: undefined,
     chosenEvidence: undefined,
     manualText: undefined,
@@ -340,6 +344,7 @@ export function noteManualModel(review: CandidateReview, text: string): Candidat
   return {
     ...review,
     status: "manual",
+    kept: undefined,
     chosenPartId: undefined,
     chosenEvidence: undefined,
     manualText,

@@ -53,11 +53,16 @@ describe("R4 visual catalog review", () => {
       }),
     );
     expect(html).toContain("Photo evidence: Visible color: black");
-    expect(html).toContain("Compatibility: not checked");
-    expect(html).toContain("Confirm planned option");
+    // One similarity disclaimer at the top instead of one per card.
+    expect(html.match(/Visual similarity only/g)).toHaveLength(1);
+    expect(html).toContain("compatibility is checked");
+    expect(html).toContain("Use this");
     expect(html).toContain("Keep unknown");
     expect(html).toContain("Specs from manufacturer page");
-    expect(html).toContain("Not a Build slot; no compatibility check");
+    expect(html).toContain("Not a Build slot");
+    // Tag line of what the photo shows, with the reason on expand.
+    expect(html).toContain('<span class="v3-tag-line">Black</span>');
+    expect(html).toContain("4 options equally likely");
   });
 
   it("ranks only canonical catalog IDs with separate evidence signals", () => {

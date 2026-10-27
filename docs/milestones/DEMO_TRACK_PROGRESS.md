@@ -323,3 +323,29 @@ Asked for after the slice A review: the three white cases tied on colour and the
     - glass front → O11 first → GPU "2 options equally likely" → pick MSI → change list → confirm → 3/8, white case and GPU, "5 fans · Appearance from photo".
     - side sketch → case "3 options equally likely" in the review and the change list.
 - Gate: lint 0, typecheck passed, 216 tests in 33 files passed, build passed, **E2E 13/13**.
+
+### Slice B: review page re-layout (PRD §4.3, 2026-10-26)
+
+Before: upload, a long list of every observation with reasons, a candidate list where every card repeated the same disclaimers, then two build buttons ("Use suggested parts", "Preview Build draft").
+
+- **Two columns** (`.v3-review-layout`):
+  - The photo sits on the left (sticky) with its observation regions outlined. Hovering or focusing a part card outlines that part's regions in blue.
+  - The parts are on the right. Below 900 px the columns stack.
+  - On the home page the hero collapses to one column while a review is showing (CSS `:has`).
+- **One tag line per part** (`observationTagLine` in `src/lib/v3/observation-tags.ts`), e.g. "5 fans · White · Blue LED rings". "Why" expands each observation's evidence, origin and confidence. Theme and lighting share an "Overall look" card.
+- **Part cards** (`src/components/image-candidate-review.tsx`):
+  - A text state chip, so status is not colour alone: Top match, Your choice, Choose one, Kept unknown, Your note, Not in photo, No catalog match.
+  - The top option has one primary "Use this"; "Why this match" holds the signals and the manufacturer source.
+  - The rest sit under "Other options (n)". A tie of 2 or 3 is listed with secondary buttons only; a longer tie is folded, so it doesn't read like a ranking.
+  - Exclude / Restore, Keep unknown and the manual note are in a "More" menu.
+- **The similarity disclaimer appears once**, at the top of the parts column (not per card).
+- **One bottom button, "Build it in 3D".**
+  - It opens the change list (`suggestParts`): the user's "Use this" choices are kept, open parts get the top match filled in, and ties, "keep unknown" and manual notes are never filled.
+  - Rows say "Your choice" or "Top match, filled in"; confirm reads "Confirm and open Build Studio".
+  - The old "Preview Build draft" path is gone; its rules live on in the change list.
+  - `CandidateReview` gained `kept`, so an explicit "keep unknown" differs from "not decided yet".
+- Tests:
+  - New `src/lib/v3/review-layout.test.ts` (4): tag lines; your choice / top match / tie / none; kept and noted parts never filled; card shape (one Use this up front, Other options, More menu, a folded 5-way tie, a single disclaimer).
+  - `candidate-matcher.test.ts` was updated to the new card.
+  - E2E: `image-to-build.e2e.ts` now opens the folded 5-way GPU tie and uses "Use this" → "Build it in 3D". `photo-suggested-parts.e2e.ts` checks the photo regions, the single disclaimer, the tag line, "Top match", "Why this match", the hover outline and the change-list decision labels.
+- Gate: lint 0, typecheck passed, 220 tests in 34 files passed, build passed, **E2E 13/13**. At 390 px wide the review has no sideways scroll.

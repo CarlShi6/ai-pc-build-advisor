@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
+import type { ImageAnalysisResult, VisualObservation } from "@/lib/v3/image-contract";
 import {
   chooseCandidate,
   emptyCandidateReview,
@@ -8,10 +8,18 @@ import {
   keepCandidateUnknown,
   matchVisualCandidates,
   noteManualModel,
+  type AppearanceCandidate,
   type CandidateReview,
+  type CandidateSet,
 } from "@/lib/v3/candidate-matcher";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
+import { catalogPartById, priceUnknown } from "@/lib/v3/catalog";
 import { candidateMatchLabel, type ImageReviews } from "@/lib/v3/image-build";
+import {
+  observationGroup,
+  observationTagLine,
+  type ObservationGroup,
+} from "@/lib/v3/observation-tags";
 
 const categoryLabels: Record<VisibleCatalogCategory, string> = {
   case: "Case",
@@ -21,21 +29,39 @@ const categoryLabels: Record<VisibleCatalogCategory, string> = {
   motherboard: "Motherboard",
 };
 
+type CardState = "yours" | "suggested" | "tie" | "kept" | "note" | "absent" | "none";
+
+const stateLabels: Record<CardState, string> = {
+  yours: "Your choice",
+  suggested: "Top match",
+  tie: "Choose one",
+  kept: "Kept unknown",
+  note: "Your note",
+  absent: "Not in photo",
+  none: "No catalog match",
+};
+
+/**
+ * The right-hand column of the photo review (PRD §4.3): one card per visible part with a tag line
+ * of what the photo shows, the top catalog option and one "Use this" button. Other options sit in a
+ * fold; exclude, keep unknown and a manual note sit in a secondary menu.
+ */
 export function ImageCandidateReview({
   analysis,
   reviews = {},
   onReviewChange,
+  onActiveGroup,
 }: {
   analysis: ImageAnalysisResult;
-  /** Owned by the host flow, so "Use suggested parts" and the cards share one review state. */
+  /** Owned by the host flow, so "Build it in 3D" and the cards share one review state. */
   reviews?: ImageReviews;
   onReviewChange?: (category: VisibleCatalogCategory, review: CandidateReview) => void;
+  /** Hover / focus on a card, so the photo can outline that part's regions. */
+  onActiveGroup?: (group: ObservationGroup | null) => void;
 }) {
   const sets = useMemo(() => matchVisualCandidates(analysis), [analysis]);
-  const [manualInputs, setManualInputs] = useState<Partial<Record<VisibleCatalogCategory, string>>>(
-    {},
-  );
   const [message, setMessage] = useState("");
+  const look = observationTagLine(analysis.observations, "look");
 
   function update(category: VisibleCatalogCategory, next: CandidateReview) {
     onReviewChange?.(category, next);
@@ -44,186 +70,340 @@ export function ImageCandidateReview({
 
   return (
     <section className="v3-candidate-review" aria-label="Catalog candidate review">
-      <span className="v3-kicker">CATALOG CANDIDATES · YOUR REVIEW</span>
-      <h2>Possible parts, with the evidence beside them</h2>
-      <p>
-        These are options from the existing local catalog. Choosing one records a planning
-        preference on this page only; it does not identify the exact part in the photo or change
-        your Build.
+      <span className="v3-kicker">PARTS FROM YOUR PHOTO</span>
+      <h2>Pick the parts to build</h2>
+      <p className="v3-similarity-note" role="note">
+        <strong>Visual similarity only.</strong> A photo shows what a part looks like, not its exact
+        model, size or price. Every option here is a planning choice you can change in the Studio,
+        where compatibility is checked. Hidden parts (CPU, memory, storage, power supply) stay open
+        for you to choose.
       </p>
       {sets.length === 0 && (
         <p>
-          No visible part category has enough information for a catalog search. Keep the build
-          manual.
+          No visible part category has enough information for a catalog search. Build it in 3D to
+          choose every part yourself.
         </p>
       )}
-      {sets.map((set) => {
-        const review = reviews[set.category] ?? emptyCandidateReview();
-        const chosen = set.candidates.find((candidate) => candidate.partId === review.chosenPartId);
-        const tied = equallyLikelyCandidates(set, review);
-        return (
-          <div className="v3-candidate-set" key={set.category} data-category={set.category}>
-            <div className="v3-candidate-heading">
-              <h3>{categoryLabels[set.category]}</h3>
-              <small>
-                {set.status === "no_catalog_coverage"
-                  ? "No catalog coverage"
-                  : set.status === "unresolved"
-                    ? "Unresolved"
-                    : set.status === "not_in_photo"
-                      ? "Not in photo"
-                      : `${set.candidates.length} alternatives`}
-              </small>
-            </div>
-            <p>{set.explanation}</p>
-            {tied.length > 0 && !chosen && (
-              <p className="v3-equally-likely" role="note">
-                <strong>{tied.length} options equally likely.</strong> The photo cannot tell{" "}
-                {tied.map((candidate) => candidate.displayName).join(", ")} apart, so none is picked
-                for you. Choose one, or keep it unknown.
-              </p>
-            )}
-            {chosen && (
-              <p className="v3-review-choice">
-                Planned option: {chosen.displayName}. Original photo identity remains unverified.
-              </p>
-            )}
-            {review.status === "manual" && (
-              <p className="v3-review-choice">
-                Manual note: {review.manualText}. This is not a catalog match.
-              </p>
-            )}
-            {set.candidates.map((candidate) => {
-              const excluded = review.excludedPartIds.includes(candidate.partId);
-              const selected = review.chosenPartId === candidate.partId;
-              return (
-                <article
-                  key={candidate.partId}
-                  className={`v3-candidate-card ${selected ? "chosen" : ""} ${excluded ? "excluded" : ""}`}
-                >
-                  <div>
-                    <strong>{candidate.displayName}</strong>
-                    <small>
-                      {candidateMatchLabel(candidate)} ·{" "}
-                      {candidate.catalogSourceUrl ? "manufacturer page" : "local catalog"}
-                    </small>
-                  </div>
-                  <ul>
-                    {candidate.matchedSignals.map((signal) => (
-                      <li key={signal}>{signal}</li>
-                    ))}
-                    {candidate.observationEvidence.map((evidence, index) => (
-                      <li key={`${index}:${evidence}`}>Photo evidence: {evidence}</li>
-                    ))}
-                    {candidate.missingEvidence.map((missing) => (
-                      <li key={missing}>{missing}</li>
-                    ))}
-                  </ul>
-                  <p className="v3-candidate-meta">
-                    Catalog specs: {candidate.catalogSpecFields} fields ·{" "}
-                    {set.category === "fan"
-                      ? "Not a Build slot; no compatibility check"
-                      : "Compatibility: not checked until added to a Build"}
-                    {candidate.catalogSourceUrl && (
-                      <>
-                        {" "}
-                        ·{" "}
-                        <a
-                          href={candidate.catalogSourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          Specs from manufacturer page
-                        </a>
-                        , verified {candidate.catalogVerifiedAt}
-                      </>
-                    )}
-                  </p>
-                  <div className="v3-candidate-actions">
-                    <button
-                      type="button"
-                      disabled={excluded || selected}
-                      onClick={() =>
-                        update(set.category, chooseCandidate(set, review, candidate.partId))
-                      }
-                    >
-                      {selected
-                        ? "Chosen for plan"
-                        : review.chosenPartId
-                          ? "Choose alternative"
-                          : "Confirm planned option"}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        update(
-                          set.category,
-                          excluded
-                            ? {
-                                ...review,
-                                excludedPartIds: review.excludedPartIds.filter(
-                                  (id) => id !== candidate.partId,
-                                ),
-                              }
-                            : excludeCandidate(review, candidate.partId),
-                        )
-                      }
-                    >
-                      {excluded ? "Restore" : "Exclude"}
-                    </button>
-                  </div>
-                </article>
-              );
-            })}
-            <div className="v3-review-other">
-              {/* Nothing to keep unknown when the photo shows the part isn't there. */}
-              {set.status !== "not_in_photo" && (
-                <button
-                  type="button"
-                  onClick={() => update(set.category, keepCandidateUnknown(review))}
-                >
-                  Keep unknown
-                </button>
-              )}
-              <label>
-                Enter model manually
-                <input
-                  value={manualInputs[set.category] ?? ""}
-                  maxLength={180}
-                  onChange={(event) =>
-                    setManualInputs((current) => ({
-                      ...current,
-                      [set.category]: event.target.value,
-                    }))
-                  }
-                  placeholder="Your own model note"
-                />
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  try {
-                    update(set.category, noteManualModel(review, manualInputs[set.category] ?? ""));
-                  } catch {
-                    setMessage("Enter a model note before recording it.");
-                  }
-                }}
-              >
-                Record note
-              </button>
-            </div>
+      {look && (
+        <article
+          className="v3-candidate-set v3-look-card"
+          data-category="look"
+          onMouseEnter={() => onActiveGroup?.("look")}
+          onMouseLeave={() => onActiveGroup?.(null)}
+        >
+          <div className="v3-candidate-heading">
+            <h3>Overall look</h3>
           </div>
-        );
-      })}
+          <ObservationTags observations={analysis.observations} group="look" />
+        </article>
+      )}
+      {sets.map((set) => (
+        <PartCard
+          key={set.category}
+          set={set}
+          observations={analysis.observations}
+          review={reviews[set.category] ?? emptyCandidateReview()}
+          onChange={(next) => update(set.category, next)}
+          onMessage={setMessage}
+          onActive={(active) => onActiveGroup?.(active ? set.category : null)}
+        />
+      ))}
       {message && (
         <p className="v3-error" role="alert">
           {message}
         </p>
       )}
-      <p className="v3-review-disclosure">
-        Review decisions stay on this page until you preview and confirm the Build draft below. You
-        can continue manually without applying any image candidate.
-      </p>
     </section>
+  );
+}
+
+function cardState(set: CandidateSet, review: CandidateReview, tied: AppearanceCandidate[]) {
+  if (set.status === "not_in_photo") return "absent";
+  if (review.status === "manual") return "note";
+  if (review.kept) return "kept";
+  if (review.status === "chosen") return "yours";
+  if (!set.candidates.some((item) => !review.excludedPartIds.includes(item.partId))) return "none";
+  return tied.length ? "tie" : "suggested";
+}
+
+function PartCard({
+  set,
+  observations,
+  review,
+  onChange,
+  onMessage,
+  onActive,
+}: {
+  set: CandidateSet;
+  observations: VisualObservation[];
+  review: CandidateReview;
+  onChange: (review: CandidateReview) => void;
+  onMessage: (message: string) => void;
+  onActive: (active: boolean) => void;
+}) {
+  const label = categoryLabels[set.category];
+  const open = set.candidates.filter((item) => !review.excludedPartIds.includes(item.partId));
+  const tied = equallyLikelyCandidates(set, review);
+  const state: CardState = cardState(set, review, tied);
+  const chosen = open.find((item) => item.partId === review.chosenPartId);
+  // The options shown up front: the user's pick, the tied options, or the single top match.
+  const main =
+    state === "kept" || state === "note"
+      ? []
+      : chosen
+        ? [chosen]
+        : tied.length
+          ? // A long tie folds away; listing it would read like a ranking.
+            tied.length > 3
+            ? []
+            : tied
+          : open.slice(0, 1);
+  const others = open.filter((item) => !main.includes(item));
+  const use = (candidate: AppearanceCandidate) =>
+    onChange(chooseCandidate(set, review, candidate.partId));
+  return (
+    <article
+      className="v3-candidate-set"
+      data-category={set.category}
+      data-state={state}
+      onMouseEnter={() => onActive(true)}
+      onMouseLeave={() => onActive(false)}
+      onFocus={() => onActive(true)}
+    >
+      <div className="v3-candidate-heading">
+        <h3>{label}</h3>
+        <span className="v3-state-chip" data-state={state}>
+          {stateLabels[state]}
+        </span>
+        <PartMenu
+          set={set}
+          review={review}
+          label={label}
+          main={state === "suggested" || state === "yours" ? main[0] : undefined}
+          onChange={onChange}
+          onMessage={onMessage}
+        />
+      </div>
+      <ObservationTags observations={observations} group={set.category} />
+      {(state === "absent" || state === "none") && (
+        <p className="v3-candidate-explanation">{set.explanation}</p>
+      )}
+      {state === "note" && (
+        <p className="v3-review-choice">
+          Your note: {review.manualText}. This is not a catalog match; the slot stays open.
+        </p>
+      )}
+      {state === "kept" && (
+        <p className="v3-review-choice">
+          Kept unknown: nothing is suggested here. Choose an option to undo.
+        </p>
+      )}
+      {state === "tie" && (
+        <p className="v3-equally-likely" role="note">
+          <strong>{tied.length} options equally likely.</strong> The photo cannot tell them apart,
+          so none is picked for you. Use one, or keep it unknown.
+        </p>
+      )}
+      {set.category === "fan" && main.length > 0 && (
+        <p className="v3-candidate-explanation">
+          Fans are a style note, not one of the eight Build slots, and add nothing to the total.
+        </p>
+      )}
+      {main.map((candidate) => (
+        <CandidateOption
+          key={candidate.partId}
+          candidate={candidate}
+          selected={candidate.partId === review.chosenPartId}
+          primary={!tied.length || !!chosen}
+          onUse={() => use(candidate)}
+        />
+      ))}
+      {others.length > 0 && (
+        <details className="v3-other-options">
+          <summary>
+            {main.length ? "Other options" : "Options"} ({others.length})
+          </summary>
+          {others.map((candidate) => (
+            <CandidateOption
+              key={candidate.partId}
+              candidate={candidate}
+              selected={candidate.partId === review.chosenPartId}
+              onUse={() => use(candidate)}
+            />
+          ))}
+        </details>
+      )}
+    </article>
+  );
+}
+
+function CandidateOption({
+  candidate,
+  selected,
+  primary = false,
+  onUse,
+}: {
+  candidate: AppearanceCandidate;
+  selected: boolean;
+  primary?: boolean;
+  onUse: () => void;
+}) {
+  const part = catalogPartById(candidate.partId);
+  const price =
+    candidate.category === "fan"
+      ? "Not a Build slot"
+      : !part || priceUnknown(part)
+        ? "Price unknown"
+        : `$${part.price.toLocaleString()}`;
+  return (
+    <div className={`v3-candidate-card ${selected ? "chosen" : ""}`}>
+      <div className="v3-candidate-main">
+        <strong>{candidate.displayName}</strong>
+        <small>
+          {candidateMatchLabel(candidate)} · {price}
+        </small>
+      </div>
+      <button
+        type="button"
+        className={primary ? "v3-primary" : "v3-secondary"}
+        aria-pressed={selected}
+        disabled={selected}
+        onClick={onUse}
+      >
+        {selected ? "Using this ✓" : "Use this"}
+      </button>
+      <details className="v3-candidate-why">
+        <summary>Why this match</summary>
+        <ul>
+          {candidate.matchedSignals.map((signal) => (
+            <li key={signal}>{signal}</li>
+          ))}
+          {candidate.observationEvidence.map((evidence, index) => (
+            <li key={`${index}:${evidence}`}>Photo evidence: {evidence}</li>
+          ))}
+        </ul>
+        <p className="v3-candidate-meta">
+          Catalog specs: {candidate.catalogSpecFields} fields
+          {candidate.catalogSourceUrl && (
+            <>
+              {" "}
+              ·{" "}
+              <a href={candidate.catalogSourceUrl} target="_blank" rel="noopener noreferrer">
+                Specs from manufacturer page
+              </a>
+              , verified {candidate.catalogVerifiedAt}
+            </>
+          )}
+        </p>
+      </details>
+    </div>
+  );
+}
+
+/** Tag line of what the photo shows; each observation's reason and confidence on expand. */
+function ObservationTags({
+  observations,
+  group,
+}: {
+  observations: VisualObservation[];
+  group: ObservationGroup;
+}) {
+  const line = observationTagLine(observations, group);
+  const items = observations.filter((item) => observationGroup(item) === group);
+  if (!items.length) return null;
+  return (
+    <details className="v3-observation-tags">
+      <summary>
+        <span className="v3-tag-line">{line || "Not clearly visible"}</span>
+        <span className="v3-tag-more">Why</span>
+      </summary>
+      <ul>
+        {items.map((item) => (
+          <li key={item.id}>
+            <strong>
+              {item.attribute}: {item.value}
+            </strong>{" "}
+            {item.evidence}{" "}
+            <small>
+              {item.visibleInImage ? item.origin : "not visible"} ·{" "}
+              {item.confidenceBand === "unknown" ? "unknown" : item.confidenceBand} confidence
+            </small>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
+/** Secondary actions: exclude or restore options, keep unknown, or a manual model note. */
+function PartMenu({
+  set,
+  review,
+  label,
+  main,
+  onChange,
+  onMessage,
+}: {
+  set: CandidateSet;
+  review: CandidateReview;
+  label: string;
+  main?: AppearanceCandidate;
+  onChange: (review: CandidateReview) => void;
+  onMessage: (message: string) => void;
+}) {
+  const [note, setNote] = useState("");
+  const excluded = set.candidates.filter((item) => review.excludedPartIds.includes(item.partId));
+  return (
+    <details className="v3-part-menu">
+      <summary aria-label={`More options for ${label}`}>More</summary>
+      <div className="v3-part-menu-body">
+        {main && (
+          <button type="button" onClick={() => onChange(excludeCandidate(review, main.partId))}>
+            Exclude {main.displayName}
+          </button>
+        )}
+        {excluded.map((item) => (
+          <button
+            key={item.partId}
+            type="button"
+            onClick={() =>
+              onChange({
+                ...review,
+                excludedPartIds: review.excludedPartIds.filter((id) => id !== item.partId),
+              })
+            }
+          >
+            Restore {item.displayName}
+          </button>
+        ))}
+        {/* Nothing to keep unknown when the photo shows the part isn't there. */}
+        {set.status !== "not_in_photo" && !review.kept && (
+          <button type="button" onClick={() => onChange(keepCandidateUnknown(review))}>
+            Keep unknown
+          </button>
+        )}
+        <label>
+          Enter model manually
+          <input
+            value={note}
+            maxLength={180}
+            onChange={(event) => setNote(event.target.value)}
+            placeholder="Your own model note"
+          />
+        </label>
+        <button
+          type="button"
+          onClick={() => {
+            try {
+              onChange(noteManualModel(review, note));
+            } catch {
+              onMessage("Enter a model note before recording it.");
+            }
+          }}
+        >
+          Record note
+        </button>
+      </div>
+    </details>
   );
 }

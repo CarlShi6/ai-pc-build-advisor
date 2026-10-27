@@ -6375,3 +6375,248 @@
   white-space: normal;
   color: #f2d3a4;
 }
+
+/* Visual redesign slice B: review page, photo on the left and parts on the right (PRD §4.3). */
+.v3-hero-upload:has(.v3-review-layout) {
+  grid-template-columns: 1fr;
+}
+.v3-hero-upload:has(.v3-review-layout) .v3-hero-copy {
+  display: none;
+}
+.v3-review-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);
+  gap: 24px;
+  align-items: start;
+}
+.v3-review-photo {
+  position: sticky;
+  top: 16px;
+  display: grid;
+  gap: 8px;
+}
+.v3-review-photo .v3-image-preview-wrap {
+  width: 100%;
+}
+.v3-review-photo .v3-image-preview-wrap .v3-preview-image {
+  width: 100%;
+  max-height: none;
+  border-radius: 10px;
+}
+.v3-review-summary {
+  margin: 0;
+  color: #24412d;
+  font-size: 14px;
+  line-height: 1.5;
+}
+.v3-review-quality {
+  margin: 0;
+  color: #657c69;
+  font-size: 11px;
+}
+.v3-evidence-region {
+  border-color: #b4e69388;
+  background: transparent;
+  transition:
+    border-color 0.15s,
+    background 0.15s;
+}
+.v3-evidence-region.active {
+  border-color: #6fb0ff;
+  background: #6fb0ff22;
+  border-width: 3px;
+}
+.v3-review-parts {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+.v3-review-parts .v3-candidate-review,
+.v3-review-parts .v3-image-build {
+  margin-top: 0;
+}
+.v3-similarity-note {
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #fff;
+  border: 1px solid #dce9d8;
+}
+.v3-candidate-set {
+  gap: 8px;
+  padding: 13px 15px;
+}
+.v3-candidate-heading {
+  align-items: center;
+  justify-content: flex-start;
+}
+.v3-state-chip {
+  padding: 2px 8px;
+  border: 1px solid #c9d9c5;
+  border-radius: 999px;
+  color: #4b6650;
+  font-size: 10px;
+  font-weight: 700;
+}
+.v3-state-chip[data-state="yours"] {
+  border-color: #75ac76;
+  background: #e6f4e1;
+}
+.v3-state-chip[data-state="tie"],
+.v3-state-chip[data-state="kept"],
+.v3-state-chip[data-state="note"] {
+  border-color: #e1b16b;
+  background: #fbf2e4;
+  color: #7a5520;
+}
+.v3-state-chip[data-state="absent"],
+.v3-state-chip[data-state="none"] {
+  border-style: dashed;
+}
+.v3-part-menu {
+  position: relative;
+  margin-left: auto;
+}
+.v3-part-menu > summary {
+  list-style: none;
+  padding: 4px 9px;
+  border: 1px solid #c9d9c5;
+  border-radius: 7px;
+  color: #4b6650;
+  font-size: 11px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.v3-part-menu > summary::-webkit-details-marker {
+  display: none;
+}
+.v3-part-menu-body {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  z-index: 5;
+  display: grid;
+  gap: 6px;
+  width: 240px;
+  padding: 10px;
+  border: 1px solid #c9d9c5;
+  border-radius: 9px;
+  background: #fff;
+  box-shadow: 0 10px 24px #1a2a1e26;
+}
+.v3-part-menu-body button {
+  padding: 7px 9px;
+  border: 1px solid #d5e3d1;
+  border-radius: 7px;
+  background: #f5faf2;
+  color: #31593a;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+.v3-part-menu-body label {
+  display: grid;
+  gap: 4px;
+  color: #647968;
+  font-size: 10px;
+}
+.v3-part-menu-body input {
+  padding: 7px 9px;
+  border: 1px solid #c9d9c5;
+  border-radius: 7px;
+  font-size: 11px;
+}
+.v3-observation-tags > summary {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  list-style: none;
+  cursor: pointer;
+}
+.v3-observation-tags > summary::-webkit-details-marker {
+  display: none;
+}
+.v3-tag-line {
+  color: #2f4c35;
+  font-size: 12px;
+  font-weight: 600;
+}
+.v3-tag-more {
+  color: #5f8a66;
+  font-size: 10px;
+  text-decoration: underline;
+}
+.v3-observation-tags ul {
+  display: grid;
+  gap: 5px;
+  margin: 8px 0 0;
+  padding-left: 18px;
+  color: #556d59;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.v3-observation-tags small {
+  color: #7a8c7c;
+}
+.v3-candidate-explanation {
+  margin: 0;
+  color: #617765;
+  font-size: 12px;
+}
+.v3-candidate-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 11px 13px;
+}
+.v3-candidate-card > button {
+  padding: 8px 14px;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.v3-candidate-card > button:disabled {
+  opacity: 1;
+  cursor: default;
+}
+.v3-candidate-card small {
+  text-transform: none;
+}
+.v3-candidate-why {
+  grid-column: 1 / -1;
+}
+.v3-candidate-why > summary {
+  color: #5f8a66;
+  font-size: 10px;
+  cursor: pointer;
+}
+.v3-candidate-why ul {
+  margin-top: 6px;
+}
+.v3-other-options > summary {
+  color: #3f6b47;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.v3-other-options[open] > summary {
+  margin-bottom: 8px;
+}
+.v3-other-options .v3-candidate-card + .v3-candidate-card {
+  margin-top: 8px;
+}
+.v3-build-3d {
+  justify-self: stretch;
+  padding: 14px 18px;
+  font-size: 15px;
+}
+.v3-build-3d-note {
+  text-align: center;
+}
+@media (max-width: 900px) {
+  .v3-review-layout {
+    grid-template-columns: 1fr;
+  }
+  .v3-review-photo {
+    position: static;
+  }
+}

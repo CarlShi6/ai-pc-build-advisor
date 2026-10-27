@@ -216,6 +216,11 @@ export interface SuggestedChange {
   appearance: string;
   /** Names of the top candidates the photo cannot tell apart; the user picks one. */
   equallyLikely: string[];
+  /**
+   * Where the row comes from: the user's "Use this", the top match filled in, a tie left open,
+   * "keep unknown", a manual note, or no catalog match.
+   */
+  decision: "yours" | "suggested" | "tie" | "kept" | "note" | "none";
 }
 
 export interface SuggestedParts {
@@ -227,9 +232,9 @@ export interface SuggestedParts {
 }
 
 /**
- * "Use suggested parts": the top-ranked candidate in every category at once (skipping ones the
- * user excluded), as a full preview. Nothing changes until the proposal is confirmed. When two or
- * more candidates tie, none is picked unless the user already chose one of them.
+ * "Build it in 3D": the user's own decisions, with the top-ranked candidate filled in for every
+ * category they left open (skipping ones they excluded), as a full preview. Nothing changes until
+ * the proposal is confirmed. A tie, "keep unknown" or a manual note is never filled in.
  */
 export function suggestParts(
   analysis: ImageAnalysisResult,
@@ -240,22 +245,35 @@ export function suggestParts(
   const reviews: ImageReviews = { ...current };
   const picks: Partial<Record<VisibleCatalogCategory, AppearanceCandidate>> = {};
   const ties: Partial<Record<VisibleCatalogCategory, AppearanceCandidate[]>> = {};
+  const decisions: Partial<Record<VisibleCatalogCategory, SuggestedChange["decision"]>> = {};
   for (const set of matchVisualCandidates(analysis)) {
     const review = current[set.category] ?? emptyCandidateReview();
+    if (review.status === "manual" || review.kept) {
+      decisions[set.category] = review.status === "manual" ? "note" : "kept";
+      continue;
+    }
+    const yours =
+      review.status === "chosen"
+        ? set.candidates.find((candidate) => candidate.partId === review.chosenPartId)
+        : undefined;
+    if (yours) {
+      picks[set.category] = yours;
+      decisions[set.category] = "yours";
+      continue;
+    }
     const top = set.candidates.find(
       (candidate) => !review.excludedPartIds.includes(candidate.partId),
     );
     if (!top) continue;
     const tied = equallyLikelyCandidates(set, review);
-    const pick = tied.length
-      ? set.candidates.find((candidate) => candidate.partId === review.chosenPartId)
-      : top;
-    if (!pick) {
+    if (tied.length) {
       ties[set.category] = tied;
+      decisions[set.category] = "tie";
       continue;
     }
-    reviews[set.category] = chooseCandidate(set, review, pick.partId);
-    picks[set.category] = pick;
+    reviews[set.category] = chooseCandidate(set, review, top.partId);
+    picks[set.category] = top;
+    decisions[set.category] = "suggested";
   }
   const proposal = proposeImageBuild(analysis, reviews, budget, draft);
   const observations = analysis.observations.filter(
@@ -270,11 +288,18 @@ export function suggestParts(
     if (!pick) {
       const look = set.category === "fan" ? undefined : looks[set.category as SlotId];
       const tied = ties[set.category] ?? [];
-      const reason = tied.length ? "Choose one in the review" : "No catalog match";
+      const decision = decisions[set.category] ?? "none";
+      const reason = {
+        tie: "Choose one in the review",
+        kept: "Kept unknown",
+        note: `Your note: ${current[set.category]?.manualText ?? ""}`,
+        none: "No catalog match",
+      }[decision as "tie" | "kept" | "note" | "none"];
       const until = tied.length ? " until then" : "";
       changes.push({
         category: set.category,
         label,
+        decision,
         partName: null,
         match: tied.length ? `${tied.length} options equally likely` : null,
         price: "Not counted",
@@ -305,6 +330,7 @@ export function suggestParts(
     changes.push({
       category: set.category,
       label,
+      decision: decisions[set.category] ?? "suggested",
       partName: pick.displayName,
       match: candidateMatchLabel(pick),
       equallyLikely: [],

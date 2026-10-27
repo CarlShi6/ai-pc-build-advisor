@@ -9,13 +9,11 @@ import { readDraft, writeDraft } from "@/lib/v3/draft-session";
 import { funnel } from "@/lib/v3/funnel-analytics";
 import {
   confirmImageBuild,
-  imageBuildPreviewText,
-  proposeImageBuild,
   suggestParts,
-  type ImageBuildProposal,
   type ImageReviews,
   type SuggestedParts,
 } from "@/lib/v3/image-build";
+import { observationGroup, type ObservationGroup } from "@/lib/v3/observation-tags";
 import { prepareImageForAnalysis, requestImageAnalysis } from "@/lib/v3/image-client";
 import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import { inspectImage } from "@/lib/v3/image-input";
@@ -24,7 +22,7 @@ import { inspectImage } from "@/lib/v3/image-input";
 const devFixtureNames = ["og.png", "white-build-sketch.png", "white-build-glass-front.png"];
 
 /**
- * Photo → observations → candidate review → Build preview → confirm. Shared by the home hero and
+ * Photo → observations → part review → "Build it in 3D" change list → confirm. Shared by the home hero and
  * `/start/image`, so both run the same privacy, limit and confirmation rules.
  */
 export function ImageStartFlow({
@@ -51,7 +49,7 @@ export function ImageStartFlow({
   >("idle");
   const [analysisError, setAnalysisError] = useState("");
   const [reviews, setReviews] = useState<ImageReviews>({});
-  const [imageProposal, setImageProposal] = useState<ImageBuildProposal | null>(null);
+  const [activeGroup, setActiveGroup] = useState<ObservationGroup | null>(null);
   const [error, setError] = useState("");
   const analysisController = useRef<AbortController | null>(null);
   const requestNumber = useRef(0);
@@ -82,7 +80,6 @@ export function ImageStartFlow({
     setAnalysisState("idle");
     setAnalysisError("");
     setReviews({});
-    setImageProposal(null);
     setSuggested(null);
     setImageError("");
     setError("");
@@ -116,7 +113,6 @@ export function ImageStartFlow({
     analysisController.current = controller;
     setAnalysis(null);
     setReviews({});
-    setImageProposal(null);
     setSuggested(null);
     setAnalysisError("");
     setAnalysisState("preparing");
@@ -158,34 +154,19 @@ export function ImageStartFlow({
     funnel.imageAnalysisCompleted(fixture);
     setAnalysisError("");
     setReviews({});
-    setImageProposal(null);
     setSuggested(null);
   }
 
   function reviewCandidate(category: VisibleCatalogCategory, review: CandidateReview) {
     setReviews((current) => ({ ...current, [category]: review }));
-    setImageProposal(null);
     setSuggested(null);
     funnel.candidateReviewed(category, review);
-  }
-
-  function previewImageBuild() {
-    if (!analysis) return;
-    try {
-      setImageProposal(proposeImageBuild(analysis, reviews, Number(budget), readDraft()));
-      setError("");
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "The image draft could not be previewed.",
-      );
-    }
   }
 
   function previewSuggestedParts() {
     if (!analysis) return;
     try {
       setSuggested(suggestParts(analysis, reviews, Number(budget), readDraft()));
-      setImageProposal(null);
       setError("");
     } catch (caught) {
       setError(
@@ -210,21 +191,6 @@ export function ImageStartFlow({
         caught instanceof Error ? caught.message : "The image draft changed. Preview it again.",
       );
       setSuggested(null);
-    }
-  }
-
-  function confirmImageDraft() {
-    if (!imageProposal) return;
-    try {
-      const draft = confirmImageBuild(imageProposal, readDraft());
-      writeDraft(draft);
-      funnel.draftCreated(draft);
-      void navigate({ to: "/studio" });
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "The image draft changed. Preview it again.",
-      );
-      setImageProposal(null);
     }
   }
 
@@ -258,24 +224,9 @@ export function ImageStartFlow({
             : "JPEG, PNG, or WebP · up to 10 MB · private browser preview"}
         </span>
       </label>
-      {imageUrl && (
+      {imageUrl && !analysis && (
         <div className="v3-image-preview-wrap">
           <img className="v3-preview-image" src={imageUrl} alt="Selected PC reference preview" />
-          {analysis?.observations
-            .filter((item) => item.region && item.visibleInImage)
-            .map((item) => (
-              <span
-                key={item.id}
-                className="v3-evidence-region"
-                title={`${item.category}: ${item.evidence}`}
-                style={{
-                  left: `${item.region!.x * 100}%`,
-                  top: `${item.region!.y * 100}%`,
-                  width: `${item.region!.width * 100}%`,
-                  height: `${item.region!.height * 100}%`,
-                }}
-              />
-            ))}
         </div>
       )}
       {imageError && <p className="v3-error">{imageError}</p>}
@@ -326,125 +277,99 @@ export function ImageStartFlow({
         </p>
       )}
       {analysis && (
-        <section className="v3-observations" aria-label="Image observations">
-          <span className="v3-kicker">
-            {analysis.provider === "fixture"
-              ? "LOCAL TEST FIXTURE · NO AI CALL"
-              : "AI VISUAL OBSERVATIONS · REVIEW REQUIRED"}
-          </span>
-          <h2>{analysis.summary}</h2>
-          <p>
-            Image quality: {analysis.quality}
-            {analysis.qualityIssues.length ? ` · ${analysis.qualityIssues.join(", ")}` : ""}
-          </p>
-          {analysis.observations.length ? (
-            analysis.observations.map((item) => (
-              <article key={item.id}>
-                <strong>
-                  {item.category} · {item.attribute}: {item.value}
-                </strong>
-                <small>
-                  {item.origin} · {item.confidenceBand} confidence
-                </small>
-                <p>{item.evidence}</p>
-              </article>
-            ))
-          ) : (
-            <p>No reliable visual details were found. Continue manually or try a clearer photo.</p>
-          )}
-          <p>
-            Exact identity remains unknown until you review catalog candidates. Hidden CPU, storage,
-            and power supply cannot be identified from this image.
-          </p>
-        </section>
-      )}
-      {analysis && (
-        <ImageCandidateReview
-          key={analysis.analysisId}
-          analysis={analysis}
-          reviews={reviews}
-          onReviewChange={reviewCandidate}
-        />
-      )}
-      {analysis && (
-        <section className="v3-image-build" aria-label="Image to Build preview">
-          <span className="v3-kicker">IMAGE → BUILD · EXPLICIT CONFIRMATION</span>
-          <h2>Turn your reviewed choices into a Build</h2>
-          <p>
-            Only candidates you chose become planned parts. Other visible identities stay
-            unresolved; hidden hardware remains unselected. The source image is not saved.
-          </p>
-          {budgetProp === undefined && (
-            <label className="v3-field v3-inline-budget">
-              Target budget (USD)
-              <input
-                type="number"
-                min="0"
-                value={ownBudget}
-                onChange={(event) => {
-                  setOwnBudget(event.target.value);
-                  setImageProposal(null);
-                  setSuggested(null);
-                }}
-              />
-            </label>
-          )}
-          <div className="v3-image-build-actions">
-            <button className="v3-primary" type="button" onClick={previewSuggestedParts}>
-              Use suggested parts
-            </button>
-            <button className="v3-secondary" type="button" onClick={previewImageBuild}>
-              Preview Build draft
-            </button>
-          </div>
-          {suggested && (
-            <SuggestedChanges
-              suggested={suggested}
-              onConfirm={confirmSuggestedParts}
-              onCancel={() => setSuggested(null)}
-            />
-          )}
-          {error && (
-            <p className="v3-error" role="alert">
-              {error}
+        <div className="v3-review-layout">
+          <aside className="v3-review-photo" aria-label="Image observations">
+            {imageUrl && (
+              <div className="v3-image-preview-wrap">
+                <img
+                  className="v3-preview-image"
+                  src={imageUrl}
+                  alt="Selected PC reference preview"
+                />
+                {analysis.observations
+                  .filter((item) => item.region && item.visibleInImage)
+                  .map((item) => (
+                    <span
+                      key={item.id}
+                      className={`v3-evidence-region ${activeGroup === observationGroup(item) ? "active" : ""}`}
+                      data-group={observationGroup(item)}
+                      title={`${item.category}: ${item.evidence}`}
+                      style={{
+                        left: `${item.region!.x * 100}%`,
+                        top: `${item.region!.y * 100}%`,
+                        width: `${item.region!.width * 100}%`,
+                        height: `${item.region!.height * 100}%`,
+                      }}
+                    />
+                  ))}
+              </div>
+            )}
+            <span className="v3-kicker">
+              {analysis.provider === "fixture"
+                ? "LOCAL TEST FIXTURE · NO AI CALL"
+                : "AI VISUAL OBSERVATIONS · REVIEW REQUIRED"}
+            </span>
+            <p className="v3-review-summary">{analysis.summary}</p>
+            <p className="v3-review-quality">
+              Image quality: {analysis.quality}
+              {analysis.qualityIssues.length ? ` · ${analysis.qualityIssues.join(", ")}` : ""}
+              {analysis.observations.length === 0 &&
+                " · No reliable visual details were found. Choose parts yourself or try a clearer photo."}
             </p>
-          )}
-          {imageProposal && (
-            <div className="v3-image-build-preview">
-              <h3>Full draft preview · not applied</h3>
-              <ul>
-                {imageBuildPreviewText(imageProposal).map((line) => (
-                  <li key={line}>{line}</li>
-                ))}
-              </ul>
-              <p>
-                Seed catalog total: ${imageProposal.candidate.build.totalPrice.toLocaleString()} ·
-                Rule findings: {imageProposal.candidate.build.compatibilityWarnings.length} ·
-                Incomplete until required slots are reviewed.
-              </p>
-              {imageProposal.visualWarnings.length > 0 && (
-                <div className="v3-image-build-warnings">
-                  <strong>Appearance differences to review</strong>
-                  <ul>
-                    {imageProposal.visualWarnings.map((warning) => (
-                      <li key={warning}>{warning}</li>
-                    ))}
-                  </ul>
-                </div>
+          </aside>
+          <div className="v3-review-parts">
+            <ImageCandidateReview
+              key={analysis.analysisId}
+              analysis={analysis}
+              reviews={reviews}
+              onReviewChange={reviewCandidate}
+              onActiveGroup={setActiveGroup}
+            />
+            <section className="v3-image-build" aria-label="Image to Build preview">
+              {budgetProp === undefined && (
+                <label className="v3-field v3-inline-budget">
+                  Target budget (USD)
+                  <input
+                    type="number"
+                    min="0"
+                    value={ownBudget}
+                    onChange={(event) => {
+                      setOwnBudget(event.target.value);
+                      setSuggested(null);
+                    }}
+                  />
+                </label>
               )}
-              <button className="v3-primary" type="button" onClick={confirmImageDraft}>
-                Confirm and open Build Studio
-              </button>
-              <button
-                className="v3-text-button"
-                type="button"
-                onClick={() => setImageProposal(null)}
-              >
-                Cancel preview
-              </button>
-            </div>
-          )}
-        </section>
+              {!suggested && (
+                <>
+                  <button
+                    className="v3-primary v3-build-3d"
+                    type="button"
+                    onClick={previewSuggestedParts}
+                  >
+                    Build it in 3D
+                  </button>
+                  <p className="v3-build-3d-note">
+                    Uses your choices and fills open parts with the top match. You see every change
+                    first; nothing is applied until you confirm. The photo itself is not saved.
+                  </p>
+                </>
+              )}
+              {suggested && (
+                <SuggestedChanges
+                  suggested={suggested}
+                  onConfirm={confirmSuggestedParts}
+                  onCancel={() => setSuggested(null)}
+                />
+              )}
+              {error && (
+                <p className="v3-error" role="alert">
+                  {error}
+                </p>
+              )}
+            </section>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -470,7 +395,7 @@ function PrivacyNotes() {
   );
 }
 
-/** The change list for "Use suggested parts": nothing is applied until the user confirms. */
+/** The change list behind "Build it in 3D": nothing is applied until the user confirms. */
 function SuggestedChanges({
   suggested,
   onConfirm,
@@ -483,10 +408,10 @@ function SuggestedChanges({
   const { changes, total, compatibility, proposal } = suggested;
   return (
     <div className="v3-suggested-changes" role="region" aria-label="Suggested parts preview">
-      <h3>Suggested parts · preview, not applied</h3>
+      <h3>Your Build · preview, not applied</h3>
       <p>
-        The top-ranked catalog option in each category. A photo can show what a part looks like, not
-        its exact model, so every row is a planning choice you can change in Studio.
+        Your choices, with the top match filled in where you left a part open. Every row is a
+        planning choice you can change in the Studio.
       </p>
       <table>
         <thead>
@@ -505,7 +430,10 @@ function SuggestedChanges({
                 {change.partName ? (
                   <>
                     <strong>{change.partName}</strong>
-                    <small>{change.match}</small>
+                    <small>
+                      {change.decision === "yours" ? "Your choice" : "Top match, filled in"} ·{" "}
+                      {change.match}
+                    </small>
                   </>
                 ) : change.equallyLikely.length ? (
                   <>
@@ -516,7 +444,13 @@ function SuggestedChanges({
                     </small>
                   </>
                 ) : (
-                  <strong>Stays unresolved</strong>
+                  <strong>
+                    {change.decision === "kept"
+                      ? "Kept unknown"
+                      : change.decision === "note"
+                        ? "Your note, stays open"
+                        : "Stays unresolved"}
+                  </strong>
                 )}
               </td>
               <td>{change.price}</td>
@@ -556,7 +490,7 @@ function SuggestedChanges({
       )}
       <div className="v3-image-build-actions">
         <button className="v3-primary" type="button" onClick={onConfirm}>
-          Confirm suggested parts and open Build Studio
+          Confirm and open Build Studio
         </button>
         <button className="v3-text-button" type="button" onClick={onCancel}>
           Cancel

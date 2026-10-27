@@ -21,17 +21,18 @@ test("image → observations → review → draft → Studio → save keeps unkn
     await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
   });
 
-  // Choose a GPU candidate only; the visible case stays unresolved, hidden parts unselected.
-  const gpuSet = page.locator(".v3-candidate-set", {
-    has: page.getByRole("heading", { name: "GPU" }),
-  });
-  await gpuSet.getByRole("button", { name: "Confirm planned option" }).first().click();
-  await expect(
-    gpuSet.getByText(/Planned option: .*Original photo identity remains unverified/),
-  ).toBeVisible();
+  // Choose a GPU from the tie; the cases also tie, so the visible case stays unresolved and the
+  // hidden parts unselected.
+  const gpuSet = page.locator('.v3-candidate-set[data-category="gpu"]');
+  // Five GPUs tie on this photo, so they sit folded instead of ranked.
+  await expect(gpuSet).toContainText("5 options equally likely");
+  await gpuSet.getByText("Options (5)").click();
+  await gpuSet.getByRole("button", { name: "Use this" }).first().click();
+  await expect(gpuSet.locator(".v3-state-chip")).toHaveText("Your choice");
+  await expect(gpuSet.getByRole("button", { name: "Using this ✓" })).toBeDisabled();
 
-  await page.getByRole("button", { name: "Preview Build draft" }).click();
-  await expect(page.getByText("Full draft preview · not applied")).toBeVisible();
+  await page.getByRole("button", { name: "Build it in 3D" }).click();
+  await expect(page.getByText("Your Build · preview, not applied")).toBeVisible();
   await page.getByRole("button", { name: "Confirm and open Build Studio" }).click();
 
   await expect(page).toHaveURL(/\/studio$/);
@@ -71,7 +72,7 @@ test("home hero upload runs the same image → Build flow", async ({ page }) => 
       await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
     },
   );
-  await page.getByRole("button", { name: "Preview Build draft" }).click();
+  await page.getByRole("button", { name: "Build it in 3D" }).click();
   await page.getByRole("button", { name: "Confirm and open Build Studio" }).click();
   await expect(page).toHaveURL(/\/studio$/);
   await expect(page.getByText("Reference-photo draft")).toBeVisible();

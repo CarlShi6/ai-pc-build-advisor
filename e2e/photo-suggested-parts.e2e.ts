@@ -26,11 +26,23 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
 }) => {
   test.setTimeout(90_000);
   const review = await loadSample(page, "white-build-glass-front.png");
+  // Slice B layout: photo with outlined regions on the left, one disclaimer, tag lines.
+  await expect(page.locator(".v3-review-photo .v3-evidence-region").first()).toBeVisible();
+  await expect(review.getByRole("note").filter({ hasText: "Visual similarity only" })).toHaveCount(
+    1,
+  );
   const cases = review.locator('.v3-candidate-set[data-category="case"]');
+  await expect(cases.locator(".v3-tag-line")).toHaveText("Tempered glass · White");
+  await expect(cases.locator(".v3-state-chip")).toHaveText("Top match");
   await expect(cases.locator(".v3-candidate-card").first()).toContainText(
     "Lian Li O11 Dynamic EVO (White)",
   );
+  await cases.getByText("Why this match").first().click();
   await expect(cases).toContainText("Front panel: glass (manufacturer page, verified 2026-10-26)");
+  await expect(cases.getByText("Other options (1)")).toBeVisible();
+  // Hovering a part outlines its regions on the photo.
+  await cases.hover();
+  await expect(page.locator('.v3-evidence-region.active[data-group="case"]').first()).toBeVisible();
   await expect(cases.locator(".v3-equally-likely")).toHaveCount(0);
 
   // The two white GPUs look the same in the photo: the user picks one.
@@ -38,18 +50,20 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   await expect(gpus.locator(".v3-equally-likely")).toContainText("2 options equally likely");
   await gpus
     .locator(".v3-candidate-card", { hasText: "MSI" })
-    .getByRole("button", { name: "Confirm planned option" })
+    .getByRole("button", { name: "Use this" })
     .click();
   await expect(gpus.locator(".v3-equally-likely")).toHaveCount(0);
 
   // The change list comes first; nothing is applied yet.
-  await page.getByRole("button", { name: "Use suggested parts" }).click();
+  await page.getByRole("button", { name: "Build it in 3D" }).click();
   const changes = page.getByRole("region", { name: "Suggested parts preview" });
-  await expect(changes).toContainText("Suggested parts · preview, not applied");
+  await expect(changes).toContainText("Your Build · preview, not applied");
   const caseRow = changes.locator('tr[data-category="case"]');
   await expect(caseRow).toContainText("Lian Li O11 Dynamic EVO (White)");
+  await expect(caseRow).toContainText("Top match, filled in");
   await expect(caseRow).toContainText("White, matches the photo");
   await expect(changes.locator('tr[data-category="gpu"]')).toContainText("MSI");
+  await expect(changes.locator('tr[data-category="gpu"]')).toContainText("Your choice");
   await expect(changes.locator('tr[data-category="motherboard"]')).toContainText(
     "Stays unresolved",
   );
@@ -57,9 +71,7 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   await expect(changes).toContainText("unknown price, not counted");
   await expect(page).toHaveURL(/\/$/);
 
-  await changes
-    .getByRole("button", { name: "Confirm suggested parts and open Build Studio" })
-    .click();
+  await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
   await expect(page).toHaveURL(/\/studio$/);
   await expect(selectedCount(page)).toHaveText("3 / 8");
 
@@ -101,8 +113,9 @@ test("a sample that cannot separate the cases shows them as equally likely", asy
   const cases = review.locator('.v3-candidate-set[data-category="case"]');
   await expect(cases.locator(".v3-equally-likely")).toContainText("3 options equally likely");
   await expect(cases.locator(".v3-candidate-card.chosen")).toHaveCount(0);
+  await expect(cases.locator(".v3-state-chip")).toHaveText("Choose one");
 
-  await page.getByRole("button", { name: "Use suggested parts" }).click();
+  await page.getByRole("button", { name: "Build it in 3D" }).click();
   const caseRow = page
     .getByRole("region", { name: "Suggested parts preview" })
     .locator('tr[data-category="case"]');
