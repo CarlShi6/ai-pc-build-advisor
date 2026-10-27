@@ -525,3 +525,6 @@ The user chose code over GLBs. The search found no CC0 PC parts and no CC BY mod
   - Removed "Need the current workspace?" from `/start/$mode`, and "Open current workspace" from My Builds (the guided-advisor link stays).
   - My Builds copy no longer mentions the current workspace: "Open a saved build in the Build Studio." and "Create a draft to save a build."
   - `navigation.e2e.ts` now checks `/`, `/my-builds`, `/studio` and `/start/blank`: the nav has exactly the three links, and nothing on the page links to `/legacy-workspace` or says "current workspace". With the old page code it fails on `/my-builds`.
+- Second follow-up: "Open guided advisor" (to `/consult`, the old light advisor page) is gone from My Builds too, along with its now-unused `.v3-legacy-link` styles. The `/consult` route stays.
+  - `navigation.e2e.ts` checks both old pages: no v3 page links to `/legacy-workspace` or `/consult` or mentions "current workspace" / "guided advisor", and both routes still return 200 with their titles. With the old My Builds code it fails on `/my-builds → /consult`.
+  - Old pages still link to `/consult` among themselves: the old top bar ("Configuration"), checkout success/cancel ("Back to /consult") and the dashboard ("Open Advisor"). None of them is a v3 page; left as they are.

@@ -162,11 +162,6 @@ function MyBuildsPage() {
             ))}
           </div>
         )}
-        <div className="v3-legacy-link">
-          <Link to="/consult">
-            Open guided advisor <span aria-hidden="true">↗</span>
-          </Link>
-        </div>
       </main>
     </V3Shell>
   );

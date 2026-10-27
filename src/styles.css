@@ -4750,16 +4750,6 @@
 .v3-saved-list strong {
   font-size: 18px;
 }
-.v3-legacy-link {
-  display: flex;
-  gap: 24px;
-  margin-top: 25px;
-}
-.v3-legacy-link a {
-  font-size: 12px;
-  color: var(--g-text);
-  font-weight: 700;
-}
 .v3-scene-panel {
   overflow: hidden;
   margin: 0 0 19px;
