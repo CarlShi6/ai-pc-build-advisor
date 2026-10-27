@@ -31,12 +31,14 @@ async function framing(page: Page) {
 
 async function expectFramed(page: Page, slot: string) {
   await expect(page.locator(".v3-scene-canvas")).toHaveAttribute("data-focus-slot", slot);
-  // The camera eases in; wait until the part fills about two thirds of the free area.
-  await expect
-    .poll(async () => (await framing(page))?.fill ?? 0, { timeout: 20_000, message: slot })
-    .toBeGreaterThan(0.5);
+  // The camera eases in (and the case's panels close when it comes from Exploded); wait until the
+  // part settles at about two thirds of the free area.
+  await expect(async () => {
+    const fill = (await framing(page))?.fill ?? 0;
+    expect(fill, slot).toBeGreaterThan(0.5);
+    expect(fill, slot).toBeLessThan(0.8);
+  }).toPass({ timeout: 20_000 });
   const result = (await framing(page))!;
-  expect(result.fill, slot).toBeLessThan(0.8);
   expect(result.ofCanvas, `${slot} is big enough to see`).toBeGreaterThan(0.3);
   expect(result.onCanvas, `${slot} stays on the canvas`).toBe(true);
   expect(result.clearOfCard, `${slot} is not covered by the card`).toBe(true);

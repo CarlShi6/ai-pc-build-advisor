@@ -1,11 +1,11 @@
 import { Link, useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
 
+// The old workspace keeps its /legacy-workspace route but has no entry in the main navigation.
 const links = [
   { to: "/" as const, label: "Explore" },
   { to: "/my-builds" as const, label: "My Builds" },
   { to: "/studio" as const, label: "Build Studio" },
-  { to: "/legacy-workspace" as const, label: "Current Workspace" },
 ];
 
 export function V3Shell({ children }: { children: ReactNode }) {

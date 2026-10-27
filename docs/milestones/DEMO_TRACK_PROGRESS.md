@@ -513,3 +513,12 @@ The user chose code over GLBs. The search found no CC0 PC parts and no CC BY mod
   - each memory module stacking to 44 mm;
   - each hose bending between two fittings, inside its own box;
   - radii fitting their boxes, never on glass, case panels rounded.
+
+### Navigation: old workspace hidden (2026-10-27)
+
+- The main navigation (`v3-shell.tsx`) now lists only Explore, My Builds and Build Studio. "Current Workspace" is gone from it; the `/legacy-workspace` route is unchanged.
+- New E2E `navigation.e2e.ts`:
+  - On `/`, `/my-builds` and `/studio`, the nav shows exactly those three links and none to `/legacy-workspace`.
+  - `/legacy-workspace` still returns 200 with its title.
+- `showcase-framing.e2e.ts` now waits until the framing settles inside 50–80%. Coming from Exploded, the case's panels are still closing while the camera eases in; one full run caught that at 86%.
+- Still linking to the old workspace, outside the nav: "Need the current workspace?" on `/start/$mode`, and "Open current workspace" on My Builds. Both left as they were.
