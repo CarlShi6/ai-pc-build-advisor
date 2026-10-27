@@ -77,7 +77,7 @@ function MyBuildsPage() {
           </span>
           <span className="v3-kicker">YOUR WORK</span>
           <h1>My Builds</h1>
-          <p>Open a saved build in the new 2D Studio or continue in the current workspace.</p>
+          <p>Open a saved build in the Build Studio.</p>
         </div>
         {loading && <p className="v3-inline-note">Loading saved builds…</p>}
         {notice && (
@@ -93,7 +93,7 @@ function MyBuildsPage() {
         {!loading && !error && builds.length === 0 && (
           <div className="v3-form-card v3-empty-saved">
             <h2>No saved builds yet.</h2>
-            <p>Create a draft or continue with the current workspace to save a build.</p>
+            <p>Create a draft to save a build.</p>
             <Link className="v3-primary" to="/start/$mode" params={{ mode: "blank" }}>
               Start a build <ArrowRight size={16} />
             </Link>
@@ -163,9 +163,6 @@ function MyBuildsPage() {
           </div>
         )}
         <div className="v3-legacy-link">
-          <Link to="/legacy-workspace">
-            Open current workspace <span aria-hidden="true">↗</span>
-          </Link>
           <Link to="/consult">
             Open guided advisor <span aria-hidden="true">↗</span>
           </Link>

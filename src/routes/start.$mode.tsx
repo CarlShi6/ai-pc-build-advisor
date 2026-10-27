@@ -406,9 +406,6 @@ function StartPage() {
             <div>
               <span>03</span> Check the whole build
             </div>
-            <Link to="/legacy-workspace">
-              Need the current workspace? <span aria-hidden="true">↗</span>
-            </Link>
           </aside>
         </div>
       </main>

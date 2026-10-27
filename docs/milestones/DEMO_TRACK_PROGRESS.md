@@ -521,4 +521,7 @@ The user chose code over GLBs. The search found no CC0 PC parts and no CC BY mod
   - On `/`, `/my-builds` and `/studio`, the nav shows exactly those three links and none to `/legacy-workspace`.
   - `/legacy-workspace` still returns 200 with its title.
 - `showcase-framing.e2e.ts` now waits until the framing settles inside 50–80%. Coming from Exploded, the case's panels are still closing while the camera eases in; one full run caught that at 86%.
-- Still linking to the old workspace, outside the nav: "Need the current workspace?" on `/start/$mode`, and "Open current workspace" on My Builds. Both left as they were.
+- Follow-up, same day: the in-page links are gone too.
+  - Removed "Need the current workspace?" from `/start/$mode`, and "Open current workspace" from My Builds (the guided-advisor link stays).
+  - My Builds copy no longer mentions the current workspace: "Open a saved build in the Build Studio." and "Create a draft to save a build."
+  - `navigation.e2e.ts` now checks `/`, `/my-builds`, `/studio` and `/start/blank`: the nav has exactly the three links, and nothing on the page links to `/legacy-workspace` or says "current workspace". With the old page code it fails on `/my-builds`.
