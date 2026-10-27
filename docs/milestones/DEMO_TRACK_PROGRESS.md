@@ -420,3 +420,17 @@ Before: only the case and GPU were reference models; the AIO, memory and motherb
     - No page errors.
 - Adaptive quality: under SwiftShader, the scene drops to the light tier; flat rotors and a solid radiator still read as an AIO.
 - Gate: lint 0, typecheck, 226 unit tests, build, **E2E 15/15**.
+
+### Slice D follow-up: whole-build exposure (2026-10-27)
+
+Before: the white case and parts blew out to flat white in the whole-build view, so the interior only read in focus or exploded views. Cause: the effect composer sets the renderer to no tone mapping and the chain had no tone mapping pass, so bright surfaces clipped.
+
+- **Tone mapping:** an AgX pass ends both effect chains (high and light tier); exposure 0.9. Environment, key and rim lights are lower.
+- **Grey white:** any near-white surface colour is scaled so its brightest channel is at most #E6, in one place (`surfaceColor` in `Mat`). Emissive lights are untouched. Model data is unchanged.
+- **Glass:** environment reflections at 0.25 and specular at 0.4 on every glass pane, so the side panel no longer mirrors the studio lights over the parts.
+- **Side panel:** a "Remove side panel" checkbox in the scene footer. The panel also fades out while the camera looks within 15° of straight at it (back at 18°). The scene reports `data-side-panel` (`shown`, `faded`, `removed`).
+- **Default camera:** from the side front, about 22° off the glass normal and nearer eye level, so it looks in through the glass.
+- **Interior light:** a low fill just inside the glass replaces the bright interior point light. A soft spill in the build's RGB colour sits under the top fans.
+- **Limit:** the AIO and GPU fans face down, as they are mounted, so from the side their blades are not visible. They read as the radiator stack and its RGB glow. Focus still turns them to the viewer.
+- **Radiator thickness:** Corsair's TITAN RX RGB quick start guide (the only manual on corsair.com, checked 2026-10-27) and the product page give no thickness, so 27 mm stays an estimate.
+- Tests: the 3D E2E checks the default `shown` state and that the toggle gives `removed` and back.

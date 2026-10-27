@@ -71,6 +71,14 @@ test("3D Studio: the white showcase AIO, memory and board render as labeled refe
     "case motherboard cooler gpu memory",
   );
 
+  // The default camera looks in past the glass; the toggle removes the side panel.
+  await expect(scene).toHaveAttribute("data-side-panel", "shown");
+  const panelToggle = page.getByRole("checkbox", { name: "Remove side panel" });
+  await panelToggle.check();
+  await expect(scene).toHaveAttribute("data-side-panel", "removed");
+  await panelToggle.uncheck();
+  await expect(scene).toHaveAttribute("data-side-panel", "shown");
+
   // Each focused model says what it is: a reference reconstruction, never a real model.
   for (const slot of ["cooler", "memory", "motherboard"]) {
     await page.locator(`.v3-scene-callout[data-scene-slot="${slot}"] button`).click();

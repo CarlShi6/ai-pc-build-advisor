@@ -19,9 +19,26 @@ import {
   OrbitControls,
   PerformanceMonitor,
 } from "@react-three/drei";
-import { Bloom, DepthOfField, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
+import {
+  Bloom,
+  DepthOfField,
+  EffectComposer,
+  N8AO,
+  ToneMapping,
+  Vignette,
+} from "@react-three/postprocessing";
+import { ToneMappingMode } from "postprocessing";
 import type { ThreeEvent } from "@react-three/fiber";
-import { Euler, Matrix4, Quaternion, Vector3, type Group, type InstancedMesh } from "three";
+import {
+  Euler,
+  MathUtils,
+  Matrix4,
+  Quaternion,
+  Vector3,
+  type Group,
+  type InstancedMesh,
+  type MeshPhysicalMaterial,
+} from "three";
 import {
   primarySlots,
   selectedPart,
@@ -78,6 +95,8 @@ export interface BuildSceneProps {
   focusCard?: ReactNode;
   /** Label link for a part: a manufacturer page, or a clearly labeled retailer search. */
   partLink?: (slot: SlotId) => { href: string; label: string } | null;
+  /** Hide the case's glass side panel to look straight in. */
+  sidePanelRemoved?: boolean;
 }
 
 const FLOOR_Y = -1.7;
@@ -87,6 +106,29 @@ const metal = { color: "#c3c8cf", metalness: 1, roughness: 0.3 };
 const darkMetal = { color: "#2a2d32", metalness: 0.75, roughness: 0.36 };
 const pcb = { color: "#15201a", metalness: 0.2, roughness: 0.78 };
 const plastic = { color: "#18191c", metalness: 0.05, roughness: 0.55 };
+
+/**
+ * Brightest surface colour: pure white panels clip under the studio lights and hide the parts in
+ * front of them, so near-white surfaces render as a slightly grey white (#E6E6E6 at most).
+ */
+const SURFACE_WHITE = 0xe6;
+
+function surfaceColor(color?: string, lit = false) {
+  if (lit || !color || !/^#[0-9a-f]{6}$/i.test(color)) return color;
+  const channels = [1, 3, 5].map((at) => parseInt(color.slice(at, at + 2), 16));
+  const top = Math.max(...channels);
+  if (top <= SURFACE_WHITE) return color;
+  return `#${channels
+    .map((value) =>
+      Math.round((value * SURFACE_WHITE) / top)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
+/** Side panel: removed by the user, or faded while the camera looks straight at it. */
+const SidePanelContext = createContext({ removed: false, faded: false });
 
 /** True inside a slot that is dimmed because another part is focused. */
 const DimContext = createContext(false);
@@ -109,6 +151,7 @@ function Mat(props: Record<string, unknown> & { opacity?: number; transparent?: 
       // three.js needs a recompile when `transparent` flips, so remount on dim changes.
       key={dim ? "dim" : "lit"}
       {...props}
+      color={surfaceColor(props.color as string | undefined, !!props.emissive)}
       transparent={dim || props.transparent}
       opacity={dim ? Math.min(0.1, opacity) : opacity}
       depthWrite={!dim && props.depthWrite !== false}
@@ -162,6 +205,82 @@ function RgbStrip({ size, position, color }: { size: Point; position: Point; col
       <Mat color={color} emissive={color} emissiveIntensity={dim ? 0.3 : 2.2} toneMapped={false} />
     </mesh>
   );
+}
+
+/**
+ * Tempered glass with weak reflections, so the panel doesn't mirror the studio lights over the
+ * interior. A side panel fades out when the user removes it or looks straight through it.
+ */
+function GlassMaterial({
+  color,
+  roughness,
+  transmission,
+  sidePanel = false,
+}: {
+  color: string;
+  roughness: number;
+  transmission: number;
+  sidePanel?: boolean;
+}) {
+  const dim = useContext(DimContext);
+  const light = useContext(LightTierContext);
+  const panel = useContext(SidePanelContext);
+  const ref = useRef<MeshPhysicalMaterial>(null);
+  const goal = sidePanel && (panel.removed || panel.faded) ? 0 : dim ? 0.04 : 0.22;
+  const snap = panel.removed || !sidePanel;
+  // A remount (dim flips `transparent`) starts at the goal; afterwards opacity eases towards it.
+  useLayoutEffect(() => {
+    const material = ref.current;
+    if (!material) return;
+    material.opacity = goal;
+    material.visible = goal > 0.01;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dim]);
+  useFrame((_, delta) => {
+    const material = ref.current;
+    if (!material) return;
+    material.opacity =
+      snap || prefersReducedMotion() ? goal : MathUtils.damp(material.opacity, goal, 7, delta);
+    material.visible = material.opacity > 0.01;
+  });
+  return (
+    <meshPhysicalMaterial
+      ref={ref}
+      key={dim ? "dim" : "lit"}
+      color={color}
+      metalness={0}
+      roughness={roughness}
+      transmission={light ? 0 : transmission}
+      thickness={0.05}
+      ior={1.5}
+      envMapIntensity={0.25}
+      specularIntensity={0.4}
+      transparent
+      depthWrite={false}
+    />
+  );
+}
+
+/**
+ * Fades the side panel while the camera looks at it nearly head-on (within 15° of its normal,
+ * back at 18°), so a straight side view shows the parts instead of glass glare.
+ */
+function SidePanelWatch({ onChange }: { onChange: (faded: boolean) => void }) {
+  const faded = useRef(false);
+  const direction = useRef(new Vector3());
+  useFrame(({ camera }) => {
+    const view = camera.getWorldDirection(direction.current);
+    const flat = Math.hypot(view.x, view.z);
+    const facing = flat > 0 ? -view.z / flat : 0;
+    const next = faded.current
+      ? facing > Math.cos((18 * Math.PI) / 180)
+      : facing > Math.cos((15 * Math.PI) / 180);
+    if (next !== faded.current) {
+      faded.current = next;
+      onChange(next);
+    }
+  });
+  return null;
 }
 
 /**
@@ -264,18 +383,7 @@ function CaseModel({
       {glass ? (
         <mesh position={[0, 0, d / 2]}>
           <boxGeometry args={[w, h, 0.02]} />
-          <meshPhysicalMaterial
-            key={dim ? "dim" : "lit"}
-            color="#d8e2e6"
-            metalness={0}
-            roughness={0.04}
-            transmission={light ? 0 : 1}
-            thickness={0.05}
-            ior={1.5}
-            transparent
-            opacity={dim ? 0.04 : 0.22}
-            depthWrite={false}
-          />
+          <GlassMaterial color="#d8e2e6" roughness={0.04} transmission={1} sidePanel />
         </mesh>
       ) : (
         <Box size={[w, h, t]} position={[0, 0, d / 2]} material={panel} />
@@ -532,17 +640,12 @@ function ReferenceModelMesh({ model, accent }: { model: ReferenceModel; accent: 
                 toneMapped={false}
               />
             ) : glass ? (
-              <meshPhysicalMaterial
-                key={dim ? "dim" : "lit"}
+              <GlassMaterial
                 color={material.color}
-                metalness={0}
                 roughness={material.roughness}
-                transmission={light ? 0 : material.transmission}
-                thickness={0.05}
-                ior={1.5}
-                transparent
-                opacity={dim ? 0.04 : 0.22}
-                depthWrite={false}
+                transmission={material.transmission ?? 1}
+                // The thin glass pane on the +z face is the side panel.
+                sidePanel={model.frame === "case" && part.positionMm[2] > 0 && part.sizeMm[2] < 10}
               />
             ) : (
               <Mat
@@ -957,7 +1060,7 @@ function ProjectOverlay({
 /** Studio light rig built from lightformers, so no HDRI file is downloaded at runtime. */
 function StudioEnvironment() {
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={1.5}>
+    <Environment resolution={256} frames={1} environmentIntensity={1}>
       <Lightformer
         form="rect"
         intensity={3}
@@ -997,6 +1100,7 @@ export default function BuildScene({
   onClearFocus,
   focusCard,
   partLink,
+  sidePanelRemoved = false,
 }: BuildSceneProps) {
   const labelRefs = useRef<Partial<Record<SlotId, HTMLElement | null>>>({});
   const cardRef = useRef<HTMLDivElement | null>(null);
@@ -1023,125 +1127,144 @@ export default function BuildScene({
   // Adaptive quality: a device that can't hold ~30 fps drops to the light tier for the session.
   const [quality, setQuality] = useState<"high" | "low">("high");
   const lowerQuality = () => setQuality("low");
+  const [panelFaded, setPanelFaded] = useState(false);
   // Bloom only above 1.6: lit white panels stay below it, emissive RGB (2.2+) glows.
   return (
     <div
       className={`v3-scene-canvas ${focusSlot ? "is-focused" : ""}`}
       data-scene-quality={quality}
       data-reference-models={referenceModelSlots(document).join(" ")}
+      data-side-panel={sidePanelRemoved ? "removed" : panelFaded ? "faded" : "shown"}
       role="region"
       aria-label="Illustrative interactive PC scene. The eight 2D slot buttons below provide keyboard access."
     >
       <Canvas
         key={resetKey}
-        camera={{ position: [5.8, 3.2, 7.2], fov: 38 }}
+        // Side-front: the camera looks in through the glass side panel (+z), past the front edge.
+        camera={{ position: [3.4, 1.2, 8.6], fov: 38 }}
         dpr={quality === "high" ? [1, 1.5] : 1}
         gl={{ antialias: false, powerPreference: "high-performance" }}
+        // The AgX pass in the effect chain reads this; slightly under 1 keeps white panels off the clip.
+        onCreated={({ gl }) => {
+          gl.toneMappingExposure = 0.9;
+        }}
         shadows
         onPointerMissed={() => onClearFocus?.()}
       >
         <LightTierContext.Provider value={quality === "low"}>
-          <PerformanceMonitor
-            bounds={() => [30, 55]}
-            onDecline={lowerQuality}
-            onFallback={lowerQuality}
-          />
-          <color attach="background" args={["#17191c"]} />
-          <fog attach="fog" args={["#17191c", 11, 22]} />
-          <StudioEnvironment />
-          <ambientLight intensity={0.15} />
-          <directionalLight position={[3, 6, 6]} intensity={2.4} castShadow />
-          <directionalLight position={[-5, 3, -4]} intensity={1.2} color="#cfd8ff" />
-          {/* Interior fill so parts read through the glass, plus a soft accent glow. */}
-          <pointLight
-            position={[0, 0.3, whiteBoard ? 0.65 : 0.1]}
-            intensity={(focusSlot ? 2 : 4) * (whiteBoard ? 0.5 : 1)}
-            distance={4.5}
-            decay={1.6}
-          />
-          <pointLight
-            position={[0.6, -0.2, 0.7]}
-            intensity={2.5}
-            distance={3}
-            color={presentation.accentColor}
-          />
-          {primarySlots.map((slot) => (
-            <SlotMesh
-              key={slot}
-              slot={slot}
-              document={document}
-              selected={selectedSlot === slot}
-              mode={mode}
-              explode={explode}
-              focusSlot={focusSlot}
-              onPick={pick}
-              presentation={presentation}
-              look={looks[slot]}
-              fans={slot === "case" ? fans : null}
+          <SidePanelContext.Provider value={{ removed: sidePanelRemoved, faded: panelFaded }}>
+            <PerformanceMonitor
+              bounds={() => [30, 55]}
+              onDecline={lowerQuality}
+              onFallback={lowerQuality}
             />
-          ))}
-          {primarySlots.map((slot) => (
-            <SlotCallout
-              key={`${slot}-callout`}
-              slot={slot}
-              document={document}
-              selected={selectedSlot === slot}
-              mode={mode}
-              explode={explode}
-              focusSlot={focusSlot}
+            <SidePanelWatch onChange={setPanelFaded} />
+            <color attach="background" args={["#17191c"]} />
+            <fog attach="fog" args={["#17191c", 11, 22]} />
+            <StudioEnvironment />
+            <ambientLight intensity={0.25} />
+            <directionalLight position={[3, 6, 6]} intensity={1.6} castShadow />
+            <directionalLight position={[-5, 3, -4]} intensity={0.8} color="#cfd8ff" />
+            {/* Low interior fill just inside the glass so parts read through it, plus a soft accent glow. */}
+            <pointLight
+              position={[0.2, 0.4, whiteBoard ? 0.7 : 0.55]}
+              intensity={(focusSlot ? 0.8 : 1.4) * (whiteBoard ? 0.6 : 1)}
+              distance={3.5}
+              decay={1.6}
             />
-          ))}
-          <ContactShadows
-            frames={quality === "low" ? 1 : Infinity}
-            position={[0, FLOOR_Y + 0.005, 0]}
-            opacity={0.65}
-            scale={9}
-            blur={2.6}
-            far={3.2}
-          />
-          <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]}>
-            <planeGeometry args={[40, 40]} />
-            {quality === "low" ? (
-              <meshStandardMaterial color="#151619" metalness={0.5} roughness={0.9} />
-            ) : (
-              <MeshReflectorMaterial
-                resolution={512}
-                blur={[300, 80]}
-                mixBlur={1}
-                mixStrength={18}
-                mirror={0.35}
-                depthScale={1}
-                minDepthThreshold={0.6}
-                maxDepthThreshold={1.4}
-                color="#151619"
-                metalness={0.5}
-                roughness={0.9}
+            <pointLight
+              position={[0.6, -0.9, 0.2]}
+              intensity={1.5}
+              distance={3}
+              color={presentation.accentColor}
+            />
+            {/* RGB spill under the top fans: from the side, down-facing fans read as their glow. */}
+            <pointLight
+              position={[-0.25, 0.85, 0.45]}
+              intensity={focusSlot ? 0 : 0.8}
+              distance={1.6}
+              color={presentation.accentColor}
+            />
+            {primarySlots.map((slot) => (
+              <SlotMesh
+                key={slot}
+                slot={slot}
+                document={document}
+                selected={selectedSlot === slot}
+                mode={mode}
+                explode={explode}
+                focusSlot={focusSlot}
+                onPick={pick}
+                presentation={presentation}
+                look={looks[slot]}
+                fans={slot === "case" ? fans : null}
               />
+            ))}
+            {primarySlots.map((slot) => (
+              <SlotCallout
+                key={`${slot}-callout`}
+                slot={slot}
+                document={document}
+                selected={selectedSlot === slot}
+                mode={mode}
+                explode={explode}
+                focusSlot={focusSlot}
+              />
+            ))}
+            <ContactShadows
+              frames={quality === "low" ? 1 : Infinity}
+              position={[0, FLOOR_Y + 0.005, 0]}
+              opacity={0.65}
+              scale={9}
+              blur={2.6}
+              far={3.2}
+            />
+            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, FLOOR_Y, 0]}>
+              <planeGeometry args={[40, 40]} />
+              {quality === "low" ? (
+                <meshStandardMaterial color="#151619" metalness={0.5} roughness={0.9} />
+              ) : (
+                <MeshReflectorMaterial
+                  resolution={512}
+                  blur={[300, 80]}
+                  mixBlur={1}
+                  mixStrength={18}
+                  mirror={0.35}
+                  depthScale={1}
+                  minDepthThreshold={0.6}
+                  maxDepthThreshold={1.4}
+                  color="#151619"
+                  metalness={0.5}
+                  roughness={0.9}
+                />
+              )}
+            </mesh>
+            <ProjectOverlay labelRefs={labelRefs} cardRef={cardRef} cardAnchor={cardAnchor} />
+            <OrbitControls
+              enablePan
+              enableZoom
+              minDistance={5}
+              maxDistance={15}
+              maxPolarAngle={Math.PI / 2 - 0.05}
+              target={[0, 0, 0]}
+            />
+            {quality === "high" ? (
+              <EffectComposer multisampling={4}>
+                <N8AO aoRadius={0.6} intensity={2.2} distanceFalloff={1} halfRes />
+                <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
+                <DepthOfField target={[0, 0, 0.6]} focalLength={0.2} bokehScale={0.7} />
+                <Vignette eskil={false} offset={0.25} darkness={0.55} />
+                <ToneMapping mode={ToneMappingMode.AGX} />
+              </EffectComposer>
+            ) : (
+              // Light tier: no SSAO or depth of field, no multisampling; RGB glow, vignette and tone mapping stay.
+              <EffectComposer multisampling={0}>
+                <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
+                <Vignette eskil={false} offset={0.25} darkness={0.55} />
+                <ToneMapping mode={ToneMappingMode.AGX} />
+              </EffectComposer>
             )}
-          </mesh>
-          <ProjectOverlay labelRefs={labelRefs} cardRef={cardRef} cardAnchor={cardAnchor} />
-          <OrbitControls
-            enablePan
-            enableZoom
-            minDistance={5}
-            maxDistance={15}
-            maxPolarAngle={Math.PI / 2 - 0.05}
-            target={[0, 0, 0]}
-          />
-          {quality === "high" ? (
-            <EffectComposer multisampling={4}>
-              <N8AO aoRadius={0.6} intensity={2.2} distanceFalloff={1} halfRes />
-              <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
-              <DepthOfField target={[0, 0, 0.6]} focalLength={0.2} bokehScale={0.7} />
-              <Vignette eskil={false} offset={0.25} darkness={0.55} />
-            </EffectComposer>
-          ) : (
-            // Light tier: no SSAO or depth of field, no multisampling; RGB glow and vignette stay.
-            <EffectComposer multisampling={0}>
-              <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
-              <Vignette eskil={false} offset={0.25} darkness={0.55} />
-            </EffectComposer>
-          )}
+          </SidePanelContext.Provider>
         </LightTierContext.Provider>
       </Canvas>
       <div className="v3-scene-overlay">

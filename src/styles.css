@@ -4879,7 +4879,11 @@
   font-size: 11px;
   color: var(--g-text-muted);
 }
-.v3-scene-footer input {
+.v3-scene-footer .v3-scene-toggle input {
+  accent-color: var(--g-accent);
+  width: auto;
+}
+.v3-scene-footer input[type="range"] {
   accent-color: var(--g-accent);
   width: 120px;
 }

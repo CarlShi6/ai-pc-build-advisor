@@ -117,6 +117,7 @@ function StudioPage() {
   const [mode, setMode] = useState<SceneMode>("standard");
   const [explode, setExplode] = useState(55);
   const [resetKey, setResetKey] = useState(0);
+  const [sidePanelRemoved, setSidePanelRemoved] = useState(false);
   const [focusSlot, setFocusSlot] = useState<SlotId | null>(null);
   const clearFocus = useCallback(() => setFocusSlot(null), []);
   const [saving, setSaving] = useState(false);
@@ -370,6 +371,7 @@ function StudioPage() {
                     onClearFocus={clearFocus}
                     partLink={(slot) => partLinkFor(selectedPart(document, slot))}
                     focusCard={replaceCard}
+                    sidePanelRemoved={sidePanelRemoved}
                   />
                 </SceneBoundary>
               ) : (
@@ -401,6 +403,14 @@ function StudioPage() {
                     {explode}%
                   </label>
                 )}
+                <label className="v3-scene-toggle">
+                  <input
+                    type="checkbox"
+                    checked={sidePanelRemoved}
+                    onChange={(event) => setSidePanelRemoved(event.target.checked)}
+                  />{" "}
+                  Remove side panel
+                </label>
                 <button type="button" onClick={() => setResetKey((value) => value + 1)}>
                   Reset camera
                 </button>
