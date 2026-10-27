@@ -218,9 +218,10 @@ export interface SuggestedChange {
   equallyLikely: string[];
   /**
    * Where the row comes from: the user's "Use this", the top match filled in, a tie left open,
-   * "keep unknown", a manual note, or no catalog match.
+   * "keep unknown", a manual note, or no catalog match. "declined" is a filled-in top match the
+   * user unticked in the change list: shown, but its slot stays unconfirmed.
    */
-  decision: "yours" | "suggested" | "tie" | "kept" | "note" | "none";
+  decision: "yours" | "suggested" | "declined" | "tie" | "kept" | "note" | "none";
 }
 
 export interface SuggestedParts {
@@ -234,18 +235,21 @@ export interface SuggestedParts {
 /**
  * "Build it in 3D": the user's own decisions, with the top-ranked candidate filled in for every
  * category they left open (skipping ones they excluded), as a full preview. Nothing changes until
- * the proposal is confirmed. A tie, "keep unknown" or a manual note is never filled in.
+ * the proposal is confirmed. A tie, "keep unknown" or a manual note is never filled in, and a
+ * category in `declined` (a filled-in row the user unticked) stays unconfirmed.
  */
 export function suggestParts(
   analysis: ImageAnalysisResult,
   current: ImageReviews,
   budget: number,
   draft: BuildDocumentV3 | null = null,
+  declined: readonly VisibleCatalogCategory[] = [],
 ): SuggestedParts {
   const reviews: ImageReviews = { ...current };
   const picks: Partial<Record<VisibleCatalogCategory, AppearanceCandidate>> = {};
   const ties: Partial<Record<VisibleCatalogCategory, AppearanceCandidate[]>> = {};
   const decisions: Partial<Record<VisibleCatalogCategory, SuggestedChange["decision"]>> = {};
+  const declinedTop: Partial<Record<VisibleCatalogCategory, AppearanceCandidate>> = {};
   for (const set of matchVisualCandidates(analysis)) {
     const review = current[set.category] ?? emptyCandidateReview();
     if (review.status === "manual" || review.kept) {
@@ -271,6 +275,11 @@ export function suggestParts(
       decisions[set.category] = "tie";
       continue;
     }
+    if (declined.includes(set.category)) {
+      declinedTop[set.category] = top;
+      decisions[set.category] = "declined";
+      continue;
+    }
     reviews[set.category] = chooseCandidate(set, review, top.partId);
     picks[set.category] = top;
     decisions[set.category] = "suggested";
@@ -287,6 +296,22 @@ export function suggestParts(
     if (set.status === "not_in_photo") continue;
     if (!pick) {
       const look = set.category === "fan" ? undefined : looks[set.category as SlotId];
+      const skipped = declinedTop[set.category];
+      if (skipped) {
+        changes.push({
+          category: set.category,
+          label,
+          decision: "declined",
+          partName: skipped.displayName,
+          match: candidateMatchLabel(skipped),
+          price: "Not counted",
+          appearance: look
+            ? `Not filled in; stays unconfirmed, drawn from the photo (${appearanceSummary(look)})`
+            : "Not filled in; stays unconfirmed",
+          equallyLikely: [],
+        });
+        continue;
+      }
       const tied = ties[set.category] ?? [];
       const decision = decisions[set.category] ?? "none";
       const reason = {

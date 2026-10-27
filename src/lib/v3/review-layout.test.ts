@@ -10,6 +10,7 @@ import {
   noteManualModel,
 } from "@/lib/v3/candidate-matcher";
 import { createGlassFrontFixture } from "@/lib/v3/dev-image-fixture";
+import { slotOccupancy } from "@/lib/v3/build-document";
 import { suggestParts } from "@/lib/v3/image-build";
 import { observationTagLine } from "@/lib/v3/observation-tags";
 
@@ -62,6 +63,26 @@ describe("Build it in 3D decisions", () => {
     expect(rows.cooler).toMatchObject({ decision: "note", partName: null });
     expect(rows.cooler.appearance).toMatch(/^Your note: My old AIO/);
     expect(result.reviews.case?.chosenPartId).toBeUndefined();
+  });
+});
+
+describe("unticking a filled-in row", () => {
+  it("keeps that slot unconfirmed and leaves the other rows as they were", () => {
+    const analysis = createGlassFrontFixture();
+    const all = suggestParts(analysis, {}, 2500);
+    const declined = suggestParts(analysis, {}, 2500, null, ["case"]);
+    const row = declined.changes.find((item) => item.category === "case")!;
+    expect(row).toMatchObject({
+      decision: "declined",
+      partName: "Lian Li O11 Dynamic EVO (White)",
+      price: "Not counted",
+    });
+    expect(row.appearance).toMatch(/^Not filled in; stays unconfirmed, drawn from the photo/);
+    expect(declined.reviews.case).toBeUndefined();
+    expect(slotOccupancy(declined.proposal.candidate, "case")).toBe("unresolved");
+    expect(declined.changes.find((item) => item.category === "cooler")?.decision).toBe("suggested");
+    // Without the untick, the same case is filled in.
+    expect(all.changes.find((item) => item.category === "case")?.decision).toBe("suggested");
   });
 });
 

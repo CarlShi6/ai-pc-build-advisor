@@ -6620,3 +6620,21 @@
     position: static;
   }
 }
+
+/* Change list: filled-in top matches can be unticked before confirming. */
+.v3-fill-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+}
+.v3-fill-toggle input {
+  color-scheme: light;
+  width: 16px;
+  height: 16px;
+  accent-color: #3d7be0;
+}
+.v3-suggested-changes tr[data-decision="declined"] td strong {
+  text-decoration: line-through;
+  opacity: 0.7;
+}

@@ -163,10 +163,11 @@ export function ImageStartFlow({
     funnel.candidateReviewed(category, review);
   }
 
-  function previewSuggestedParts() {
+  /** `declined`: filled-in rows the user unticked in the change list; they stay unconfirmed. */
+  function previewSuggestedParts(declined: VisibleCatalogCategory[] = []) {
     if (!analysis) return;
     try {
-      setSuggested(suggestParts(analysis, reviews, Number(budget), readDraft()));
+      setSuggested(suggestParts(analysis, reviews, Number(budget), readDraft(), declined));
       setError("");
     } catch (caught) {
       setError(
@@ -345,7 +346,7 @@ export function ImageStartFlow({
                   <button
                     className="v3-primary v3-build-3d"
                     type="button"
-                    onClick={previewSuggestedParts}
+                    onClick={() => previewSuggestedParts()}
                   >
                     Build it in 3D
                   </button>
@@ -359,6 +360,15 @@ export function ImageStartFlow({
                 <SuggestedChanges
                   suggested={suggested}
                   onConfirm={confirmSuggestedParts}
+                  onToggle={(category, filled) =>
+                    previewSuggestedParts(
+                      suggested.changes
+                        .filter((row) =>
+                          row.category === category ? !filled : row.decision === "declined",
+                        )
+                        .map((row) => row.category),
+                    )
+                  }
                   onCancel={() => setSuggested(null)}
                 />
               )}
@@ -399,10 +409,13 @@ function PrivacyNotes() {
 function SuggestedChanges({
   suggested,
   onConfirm,
+  onToggle,
   onCancel,
 }: {
   suggested: SuggestedParts;
   onConfirm: () => void;
+  /** Tick or untick a filled-in top match; an unticked slot stays unconfirmed. */
+  onToggle: (category: VisibleCatalogCategory, filled: boolean) => void;
   onCancel: () => void;
 }) {
   const { changes, total, compatibility, proposal } = suggested;
@@ -424,15 +437,37 @@ function SuggestedChanges({
         </thead>
         <tbody>
           {changes.map((change) => (
-            <tr key={change.category} data-category={change.category}>
-              <th scope="row">{change.label}</th>
+            <tr
+              key={change.category}
+              data-category={change.category}
+              data-decision={change.decision}
+            >
+              <th scope="row">
+                {change.decision === "suggested" || change.decision === "declined" ? (
+                  <label className="v3-fill-toggle">
+                    <input
+                      type="checkbox"
+                      checked={change.decision === "suggested"}
+                      onChange={(event) => onToggle(change.category, event.target.checked)}
+                      aria-label={`Fill in ${change.label} with ${change.partName}`}
+                    />
+                    {change.label}
+                  </label>
+                ) : (
+                  change.label
+                )}
+              </th>
               <td>
                 {change.partName ? (
                   <>
                     <strong>{change.partName}</strong>
                     <small>
-                      {change.decision === "yours" ? "Your choice" : "Top match, filled in"} ·{" "}
-                      {change.match}
+                      {change.decision === "yours"
+                        ? "Your choice"
+                        : change.decision === "declined"
+                          ? "Top match, not filled in"
+                          : "Top match, filled in"}{" "}
+                      · {change.match}
                     </small>
                   </>
                 ) : change.equallyLikely.length ? (

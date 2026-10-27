@@ -71,9 +71,20 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   await expect(changes).toContainText("unknown price, not counted");
   await expect(page).toHaveURL(/\/$/);
 
+  // Filled-in rows can be unticked; the user's own choice has no checkbox.
+  await expect(changes.locator('tr[data-category="gpu"] input[type=checkbox]')).toHaveCount(0);
+  const coolerRow = changes.locator('tr[data-category="cooler"]');
+  const coolerBox = coolerRow.getByRole("checkbox");
+  await expect(coolerBox).toBeChecked();
+  await coolerBox.uncheck();
+  await expect(coolerRow).toContainText("Top match, not filled in");
+  await expect(coolerRow).toContainText("Not filled in; stays unconfirmed");
+  await expect(changes).toContainText("Incomplete · 2 of 8 slots selected");
+  await expect(caseRow.getByRole("checkbox")).toBeChecked();
+
   await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
   await expect(page).toHaveURL(/\/studio$/);
-  await expect(selectedCount(page)).toHaveText("3 / 8");
+  await expect(selectedCount(page)).toHaveText("2 / 8");
 
   // 3D: white catalog case and GPU; the confirmed case still shows the photo's five fans.
   const scene = page.locator(".v3-scene-canvas");
@@ -87,12 +98,17 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
     "data-color",
     "white",
   );
+  // The unticked cooler stays unconfirmed and is drawn from the photo.
+  await expect(page.locator('.v3-scene-callout[data-scene-slot="cooler"]')).toHaveAttribute(
+    "data-look",
+    "photo",
+  );
   const board = page.locator('.v3-scene-callout[data-scene-slot="motherboard"]');
   await expect(board).toHaveAttribute("data-look", "photo");
   await expect(board).toContainText("Appearance from photo · model not confirmed");
   const disclosure = page.locator(".v3-scene-disclosure");
   await expect(disclosure).toContainText(
-    "Motherboard: Appearance from photo · model not confirmed",
+    "Cooler, Motherboard: Appearance from photo · model not confirmed",
   );
   await expect(disclosure).toContainText("Fans (5): Appearance from photo");
 

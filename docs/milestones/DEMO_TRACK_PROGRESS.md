@@ -349,3 +349,14 @@ Before: upload, a long list of every observation with reasons, a candidate list 
   - `candidate-matcher.test.ts` was updated to the new card.
   - E2E: `image-to-build.e2e.ts` now opens the folded 5-way GPU tie and uses "Use this" → "Build it in 3D". `photo-suggested-parts.e2e.ts` checks the photo regions, the single disclaimer, the tag line, "Top match", "Why this match", the hover outline and the change-list decision labels.
 - Gate: lint 0, typecheck passed, 220 tests in 34 files passed, build passed, **E2E 13/13**. At 390 px wide the review has no sideways scroll.
+
+### Slice B follow-up: untick a filled-in row (2026-10-26)
+
+The user accepted "Build it in 3D" filling open parts, and asked for a safeguard.
+- Every change-list row marked "Top match, filled in" has a checkbox, ticked by default.
+- Unticking re-runs `suggestParts(…, declined)`. The row stays in the list, struck through, and reads "Top match, not filled in" and "Not filled in; stays unconfirmed, drawn from the photo (…)". The total and compatibility update; confirming leaves that slot unconfirmed.
+- Rows from the user's own "Use this" have no checkbox.
+- Tests:
+  - `review-layout.test.ts` adds the declined case: unresolved slot, other rows unchanged.
+  - The glass-front E2E unticks the cooler: 2 of 8 in the list, "2 / 8" in the Studio, and the cooler is drawn from the photo.
+- Gate: lint 0, typecheck, 221 tests, build, E2E 13/13.
