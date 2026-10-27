@@ -116,6 +116,26 @@ Order: each slice gets the full gate plus E2E, before/after browser screenshots,
   - Home, review, Studio and My Builds move to a deep graphite palette (a Blender / product-studio feel), replacing every light sage-green theme. Define one CSS-variable palette and record it in this file.
   - One accent colour, cool blue, for clickable and selected states. Amber means only "needs confirmation", grey dashed means only "not selected", and red means only a compatibility failure. No green wireframes in 3D.
   - Text contrast at least WCAG AA. Status is never shown by colour alone; always add text or an icon.
+  - **Palette (done 2026-10-26; tokens in `src/styles.css` at the top of the v3 section).** Use these tokens for any new v3 colour; never add a raw hex.
+
+    | Token | Value | Use |
+    | --- | --- | --- |
+    | `--g-bg` | `#121417` | Page background |
+    | `--g-surface-1` | `#1a1d21` | Cards and panels |
+    | `--g-surface-2` | `#22262b` | Raised surfaces and inputs |
+    | `--g-surface-3` | `#2b3036` | Hover |
+    | `--g-line` | `#363c43` | Lines |
+    | `--g-line-strong` | `#4c545d` | Strong lines |
+    | `--g-text` | `#e8ebee` | Text |
+    | `--g-text-muted` | `#b0b8c1` | Muted text |
+    | `--g-text-faint` | `#939ca6` | Faint text, kickers |
+    | `--g-accent` | `#6aa6ff` | Clickable or selected: links, outlines, selected chips, 3D selection |
+    | `--g-accent-strong` | `#2f6fd6` | Primary button fill (white text 4.8:1) |
+    | `--g-pending` | `#f2b65f` | Amber: needs confirmation only |
+    | `--g-danger` | `#ff8178` | Red: compatibility failure only |
+    | `--g-unselected` | `#7d8690` | Grey dashed: not selected only |
+
+    Every text token passes AA on every surface. The 3D scene uses the same hexes for its selection, pending and unselected edges.
 - **Slice D: recognisable demo part models.**
   - Build the models in code from manufacturer millimetre specs; no full img2threejs run.
   - Parts to model, for the white showcase build: white GPU (three-fan shroud, backplate), white 360 AIO (pump head, radiator fins), case fans (blades, light ring), memory (light bar), motherboard (slots, heatsinks). CPU, PSU and SSD may stay simple.

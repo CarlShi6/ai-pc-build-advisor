@@ -45,7 +45,7 @@ export function scenePresentation(document: BuildDocumentV3): ScenePresentation 
   return {
     layout: /showcase|panoramic|dual.chamber/.test(caseStyle) ? "showcase" : "tower",
     caseColor: swatch(caseColor, "#2a2d31"),
-    accentColor: swatch(lighting, "#78bb86"),
+    accentColor: swatch(lighting, "#6aa6ff"),
     gpuVertical: !!placement && /vertical|upright/.test(placement.toLowerCase()),
     fanAccentCount: count ? Number(count) : 0,
     geometryAccuracy: "illustrative",

@@ -593,11 +593,11 @@ function SlotMesh({
     );
   // A photo look-alike already reads as a part; its "not confirmed" state is on the label.
   const edgeColor = selected
-    ? "#c4f59f"
+    ? "#6aa6ff"
     : (occupancy === "unresolved" && !look) || flagged
-      ? "#edba75"
+      ? "#f2b65f"
       : occupancy === "unselected"
-        ? "#6d7c74"
+        ? "#7d8690"
         : null;
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
@@ -694,7 +694,7 @@ function SlotCallout({
 }) {
   const anchor = slotPosition(slot, mode, explode, focusSlot);
   const occupancy = slotOccupancy(document, slot);
-  const color = selected ? "#c4f59f" : occupancy === "unresolved" ? "#edba75" : "#8f9a94";
+  const color = selected ? "#6aa6ff" : occupancy === "unresolved" ? "#f2b65f" : "#7d8690";
   const dimmed = isDimmed(slot, focusSlot);
   return (
     <Line

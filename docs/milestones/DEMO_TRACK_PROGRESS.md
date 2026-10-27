@@ -360,3 +360,31 @@ The user accepted "Build it in 3D" filling open parts, and asked for a safeguard
   - `review-layout.test.ts` adds the declined case: unresolved slot, other rows unchanged.
   - The glass-front E2E unticks the cooler: 2 of 8 in the list, "2 / 8" in the Studio, and the cooler is drawn from the photo.
 - Gate: lint 0, typecheck, 221 tests, build, E2E 13/13.
+
+### Slice C: one graphite theme (2026-10-26)
+
+Before: light sage-green pages around a dark 3D panel, with green as the accent, the selection outline, the default RGB light and the photo region boxes.
+
+- **Palette:** `--g-*` tokens at the top of the v3 section in `src/styles.css`; the values and their meanings are recorded in CLAUDE.md.
+- **Colour conversion:**
+  - A one-off script mapped every hard-coded v3 colour by role and lightness: light backgrounds to graphite surfaces, dark ink to light text, mid-tones to muted text, borders to line tokens, saturated greens to the cool-blue accent, and ambers and reds to pending and failure. 289 declarations changed.
+  - Colours already on dark panels (the 3D overlays) were left alone.
+  - Six greens the regex missed (multi-line shadows, `accent-color`) were fixed by hand, and the CSS block structure was checked unchanged (same rule count plus one `:root`).
+- **Hand fixes** in the "slice C" block at the end of `styles.css`:
+  - Links and text buttons are blue; part names and headings are plain text.
+  - Photo regions are neutral, and blue only while their card is hovered.
+  - State chips: tie, kept and note are amber; yours is blue; absent and none are grey dashed.
+  - The 2D grid: selected is a blue outline on a tinted card, unresolved is solid amber, empty is grey dashed.
+  - Inputs are graphite, focus rings are blue, and native checkboxes use the blue accent.
+  - The callout fan note and the change-list match labels are muted, not amber.
+- **3D** (`BuildScene.tsx`, `scene-presentation.ts`):
+  - The selection edges and callout lines are blue (`#6aa6ff`, was green `#c4f59f`).
+  - Pending is `#f2b65f`, and unselected is `#7d8690`.
+  - The default accent light is blue (was green `#78bb86`); a photo that shows green lighting still renders green.
+  - The PCB material stays dark green as a material, not a wireframe.
+- **Contrast:**
+  - Token pairs were checked by script (text, muted, faint, accent, pending and danger on every surface; all at least 4.5:1, and unselected grey at least 3:1).
+  - A live audit of every visible text element on home, review with the change list, Studio 3D and 2D, My Builds and the three start pages found 0 below AA. The audit was checked against a planted 1.74:1 element, which it caught. Elements on gradient backgrounds are skipped.
+- **Status never relies on colour alone:** chips, slot rows, the 2D cards and callouts all carry text (Top match, Choose one, Review, Add part, Appearance from photo…).
+- Tests: new `e2e/graphite-theme.e2e.ts` (no WebGL) checks the graphite background on home and My Builds, the strong-blue primary button, the amber tie chip with its text, a blue selected 2D card, an amber photo-only card and a grey dashed empty card.
+- Gate: lint 0, typecheck, 221 unit tests, build, **E2E 14/14**.
