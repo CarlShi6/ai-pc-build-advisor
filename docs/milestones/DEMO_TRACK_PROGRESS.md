@@ -483,3 +483,33 @@ Review: in Exploded the case stayed closed, half the board stayed hidden, and so
 - **Tests:**
   - `scene-focus.test.ts`: board, GPU, AIO, memory, CPU and case fill 55–75% of the free area at 1264 and 390 px wide, stay inside it, and stay clear of the card. Also checks the best-face turns.
   - New E2E `showcase-framing.e2e.ts`: in Standard and then Exploded, clicks board, GPU, memory and AIO, then the case. For each, the projected box fills 50–80% of the free area and over 30% of the canvas, stays on the canvas and clear of the card. Esc clears it.
+
+### Slice E3: model detail, in code (2026-10-27)
+
+The user chose code over GLBs. The search found no CC0 PC parts and no CC BY model of the exact SKUs. The closest were a white AM4 board and an MSI RTX 3080 Gaming X Trio; their logos are baked in and their layouts differ.
+
+- **New part fields** (`reference-models.ts`):
+  - `roundMm`: a box corner radius, drawn with drei `RoundedBox`, capped below half the thinnest side.
+  - `tube` shape with `pathMm` and `diameterMm`: a hose drawn as a `TubeGeometry` along a Catmull-Rom curve.
+  - In the light tier, rounded boxes are plain boxes and hoses use 12 x 6 segments instead of 48 x 14.
+- **Edges:** case panels (O11 and spec-envelope cases), GPU shrouds, the pump, end tanks, fan frames, board heatsinks, connectors and latches are rounded. Glass is never rounded. All radii are estimates.
+- **Motherboard (ROG Maximus Z790 Hero):** the counts below are from the rog.asus.com spec page, read on 2026-10-27. Every size and position is an estimate.
+  - Power: 24-pin, 2 x 8-pin +12V and the 6-pin PCIe connector ("1 x 24-pin", "2 x 8-pin +12V", "1 x 6-pin PCIe").
+  - "Pre-mounted I/O shield": a plate on the rear edge.
+  - Finned VRM heatsinks left of and above the socket.
+  - Socket frame and lever.
+  - A latch at each end of the 4 DIMM slots, and a release latch on each of the 3 x16 slots.
+  - Two of the three M.2 slots drawn with covers.
+- **GPUs:**
+  - Both cards: 3 DisplayPort and 1 HDMI openings on the bracket, three bracket vent slots, and one 16-pin connector on the top edge, flush inside the published card height. Counts come from msi.com ("DisplayPort x 3", "HDMI x 1", "16-pin x 1") and asus.com tech specs ("3 x Native DisplayPort 2.1b", "1 x Native HDMI 2.1b", "1 x 16-pin").
+  - Rounded shrouds and backplates.
+  - A bracket top tab was left out: it would make the card longer than its published length.
+- **Memory:** each module stacks a 4 mm PCB edge with gold contacts, the heatspreader and the light bar, together exactly the published 44 mm.
+- **AIO:** each hose is one bent tube from a fitting on the pump to a fitting under the rear end tank (four steel fittings). The route stays an estimate.
+- **Showcase:** a soft key light hits the shown part from the camera side. Board heatsinks are a lighter gunmetal, `#40444B`, so detail reads; that colour is not from a spec.
+- **Tests:** `reference-models.test.ts` adds 5:
+  - the board's latches, finned VRMs, I/O shield and the page's connector counts;
+  - every GPU's outputs, and its 16-pin inside the card height;
+  - each memory module stacking to 44 mm;
+  - each hose bending between two fittings, inside its own box;
+  - radii fitting their boxes, never on glass, case panels rounded.

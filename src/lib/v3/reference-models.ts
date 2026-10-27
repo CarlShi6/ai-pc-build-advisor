@@ -37,9 +37,10 @@ export type ReferenceFrame = "case" | "gpu";
  * - `rotor`: fan blades around a hub, inside a `sizeMm` envelope.
  * - `fins`: a radiator core, fin plates stacked along `axis`.
  * - `ring`: a light ring of the build's RGB colour; `sizeMm` is its outer diameter.
+ * - `tube`: a bent tube (an AIO hose) through `pathMm`; `sizeMm` is the box around it.
  * `axis` (default x) is the axis a cylinder, rotor or ring faces along.
  */
-export type ReferenceShape = "box" | "disc" | "cylinder" | "rotor" | "fins" | "ring";
+export type ReferenceShape = "box" | "disc" | "cylinder" | "rotor" | "fins" | "ring" | "tube";
 export type ReferenceAxis = "x" | "y" | "z";
 
 export interface ReferenceModelPart {
@@ -49,6 +50,11 @@ export interface ReferenceModelPart {
   positionMm: Point;
   material: string;
   axis?: ReferenceAxis;
+  /** Boxes: corner radius in millimetres (drawn square in the light quality tier). */
+  roundMm?: number;
+  /** Tubes: centreline points relative to `positionMm`, and the tube's outer diameter. */
+  pathMm?: Point[];
+  diameterMm?: number;
 }
 
 export interface ReferenceMaterial {
@@ -91,9 +97,12 @@ const sharedMaterials: Record<string, ReferenceMaterial> = {
   "hose-white": { color: "#DDE1E6", roughness: 0.75, metalness: 0 },
   "cold-plate": { color: "#B87F57", roughness: 0.3, metalness: 1 },
   pcb: { color: "#15201A", roughness: 0.78, metalness: 0.2 },
-  "heatsink-board": { color: "#2A2D32", roughness: 0.36, metalness: 0.75 },
+  "heatsink-board": { color: "#40444B", roughness: 0.4, metalness: 0.5 },
   "slot-plastic": { color: "#18191C", roughness: 0.55, metalness: 0.05 },
   "slot-steel": { color: "#9EA4AB", roughness: 0.35, metalness: 0.9 },
+  "slot-latch": { color: "#3A3D42", roughness: 0.5, metalness: 0.05 },
+  "port-dark": { color: "#0E0F11", roughness: 0.6, metalness: 0.2 },
+  "fitting-steel": { color: "#B9BEC5", roughness: 0.3, metalness: 0.9 },
   light: { color: "#FFFFFF", roughness: 0.4, metalness: 0 },
 };
 
@@ -101,8 +110,58 @@ function pick(ids: string[]) {
   return Object.fromEntries(ids.map((id) => [id, sharedMaterials[id]]));
 }
 
-function box(id: string, sizeMm: Point, positionMm: Point, material: string): ReferenceModelPart {
-  return { id, shape: "box", sizeMm, positionMm, material };
+function box(
+  id: string,
+  sizeMm: Point,
+  positionMm: Point,
+  material: string,
+  roundMm?: number,
+): ReferenceModelPart {
+  return { id, shape: "box", sizeMm, positionMm, material, ...(roundMm ? { roundMm } : {}) };
+}
+
+/** Largest corner radius a box can take: just under half its thinnest side. */
+export function cornerRadius(part: ReferenceModelPart): number {
+  return part.roundMm ? Math.min(part.roundMm, Math.min(...part.sizeMm) * 0.45) : 0;
+}
+
+/**
+ * Softened edges for a whole model: every box at least `minSideMm` thick gets `radiusMm`
+ * (glass panes and thin trims stay square). Edge radii are a visual estimate.
+ */
+function withRounding(model: ReferenceModel, radiusMm: number, minSideMm = 4): ReferenceModel {
+  return {
+    ...model,
+    parts: model.parts.map((part) =>
+      part.shape === "box" &&
+      !part.roundMm &&
+      !model.materials[part.material]?.transmission &&
+      Math.min(...part.sizeMm) >= minSideMm
+        ? { ...part, roundMm: radiusMm }
+        : part,
+    ),
+  };
+}
+
+/** A hose through `points` (absolute, model frame): position and size are its bounding box. */
+function tube(
+  id: string,
+  points: Point[],
+  diameterMm: number,
+  material: string,
+): ReferenceModelPart {
+  const lo = [0, 1, 2].map((k) => Math.min(...points.map((point) => point[k])) - diameterMm / 2);
+  const hi = [0, 1, 2].map((k) => Math.max(...points.map((point) => point[k])) + diameterMm / 2);
+  const centre = lo.map((value, k) => (value + hi[k]) / 2) as Point;
+  return {
+    id,
+    shape: "tube",
+    sizeMm: lo.map((value, k) => hi[k] - value) as Point,
+    positionMm: centre,
+    material,
+    pathMm: points.map((point) => point.map((value, k) => value - centre[k]) as Point),
+    diameterMm,
+  };
 }
 
 /** A case from its published millimetre envelope; panel, foot and shroud sizes are visual estimates. */
@@ -165,18 +224,81 @@ function caseEnvelope(options: {
       ),
     );
   }
-  return {
-    partId: options.partId,
-    slug: options.slug,
-    frame: "case",
-    geometryAccuracy: "reference_reconstructed",
-    source: "spec-envelope",
-    envelopeMm: [D, H, W],
-    assumptions: ["Panel, foot and PSU-shroud sizes are visual estimates inside the envelope."],
-    parts,
-    materials: pick(["panel-white", "front-mesh", "clear-glass"]),
-  };
+  return withRounding(
+    {
+      partId: options.partId,
+      slug: options.slug,
+      frame: "case",
+      geometryAccuracy: "reference_reconstructed",
+      source: "spec-envelope",
+      envelopeMm: [D, H, W],
+      assumptions: [
+        "Panel, foot and PSU-shroud sizes are visual estimates inside the envelope.",
+        "Panel edge radii are visual estimates.",
+      ],
+      parts,
+      materials: pick(["panel-white", "front-mesh", "clear-glass"]),
+    },
+    2.5,
+  );
 }
+
+/**
+ * GPU details shared by both GPU kinds, in the GPU frame: vent slots and display outputs on the
+ * bracket and the power connector on the top edge. Output and connector counts
+ * come from the manufacturer pages; sizes and positions are visual estimates.
+ */
+function gpuDetailParts(options: {
+  bracketCentre: Point;
+  bracketHeightMm: number;
+  pcbX: number;
+  topY: number;
+  centreZ: number;
+  lengthMm: number;
+  displayPorts: number;
+  hdmiPorts: number;
+}): ReferenceModelPart[] {
+  const { bracketCentre: b, bracketHeightMm: bh } = options;
+  const outer = b[2] + 0.75 + 1.25;
+  // Vent slots in the bracket above the outputs.
+  const parts: ReferenceModelPart[] = [0, 1, 2].map((index) =>
+    box(
+      `io-bracket-vent-${index + 1}`,
+      [4, 28, 1.8],
+      [b[0] + 6 + index * 8, b[1] + bh / 2 - 26, outer - 0.4],
+      "port-dark",
+    ),
+  );
+  // Outputs stack along the bracket from its lower end; DisplayPort first, then HDMI.
+  const ports = [
+    ...Array.from({ length: options.displayPorts }, (_, index) => `dp-${index + 1}`),
+    ...Array.from({ length: options.hdmiPorts }, (_, index) => `hdmi-${index + 1}`),
+  ];
+  ports.forEach((name, index) =>
+    parts.push(
+      box(
+        `port-${name}`,
+        [5.5, name.startsWith("hdmi") ? 15 : 16, 2.5],
+        [options.pcbX, b[1] - bh / 2 + 16 + index * 20, outer],
+        "port-dark",
+      ),
+    ),
+  );
+  parts.push(
+    box(
+      "power-16-pin",
+      [9, 10, 20],
+      // Flush with the top edge, inside the published card height.
+      [options.pcbX + 4, options.topY - 5, options.centreZ - options.lengthMm * 0.08],
+      "slot-plastic",
+      1,
+    ),
+  );
+  return parts;
+}
+
+const GPU_DETAIL_ASSUMPTION =
+  "Bracket vents, display-output openings and the 16-pin connector are drawn at estimated sizes and positions; their counts are from the manufacturer page.";
 
 /**
  * A graphics card from its published length x height x thickness. Fans are evenly spaced (the
@@ -190,6 +312,8 @@ function gpuEnvelope(options: {
   heightMm: number;
   thicknessMm: number;
   fans: number;
+  displayPorts: number;
+  hdmiPorts: number;
 }): ReferenceModel {
   const { lengthMm: L, heightMm: H, thicknessMm: T, fans } = options;
   const fingers = 11;
@@ -198,8 +322,8 @@ function gpuEnvelope(options: {
   const front = T / 2;
   const parts: ReferenceModelPart[] = [
     box("heatsink-core", [T - 10, shroudH - 4, L - 4], [-1, shroudY, 0], "heatsink-dark"),
-    box("front-shroud", [6, shroudH, L], [front - 5, shroudY, 0], "shroud-white"),
-    box("backplate", [3, shroudH, L], [-front + 1.5, shroudY, 0], "backplate-white"),
+    box("front-shroud", [6, shroudH, L], [front - 5, shroudY, 0], "shroud-white", 3),
+    box("backplate", [3, shroudH, L], [-front + 1.5, shroudY, 0], "backplate-white", 1.2),
     box(
       "pcie-fingers",
       [1.6, fingers, 82.7],
@@ -207,6 +331,16 @@ function gpuEnvelope(options: {
       "gold-contacts",
     ),
     box("io-bracket", [40, 120, 1.5], [-2, H / 2 - 30 - 60, L / 2 + 3], "bracket-steel"),
+    ...gpuDetailParts({
+      bracketCentre: [-2, H / 2 - 30 - 60, L / 2 + 3],
+      bracketHeightMm: 120,
+      pcbX: -10,
+      topY: H / 2,
+      centreZ: 0,
+      lengthMm: L,
+      displayPorts: options.displayPorts,
+      hdmiPorts: options.hdmiPorts,
+    }),
   ];
   const pitch = L / fans;
   const diameter = Math.min(shroudH * 0.76, pitch - 8);
@@ -239,6 +373,7 @@ function gpuEnvelope(options: {
     assumptions: [
       "Fans evenly spaced; the page states the fan count, not the pitch.",
       "Heatsink, shroud, backplate, PCIe-finger and bracket proportions are visual estimates.",
+      GPU_DETAIL_ASSUMPTION,
       GPU_ROTOR_ASSUMPTION,
     ],
     parts: withRotors(parts),
@@ -249,6 +384,8 @@ function gpuEnvelope(options: {
       "gold-contacts",
       "bracket-steel",
       "backplate-white",
+      "port-dark",
+      "slot-plastic",
     ]),
   };
 }
@@ -298,7 +435,7 @@ function fanParts(
     size[inPlane] = rail;
     const position = [...centre] as Point;
     position[inPlane] += sign * half;
-    parts.push(box(`${prefix}-frame-${name}`, size, position, frameMaterial));
+    parts.push(box(`${prefix}-frame-${name}`, size, position, frameMaterial, 1.5));
   }
   parts.push(
     {
@@ -364,6 +501,7 @@ function atxBoard(options: {
   dimmSlots: number;
   pcieX16Slots: number;
   m2Heatsinks: number;
+  epsConnectors: number;
 }): ReferenceModel {
   const W = 244;
   const H = 305;
@@ -375,24 +513,63 @@ function atxBoard(options: {
   const face = 0.8;
   const on = (depth: number) => face + depth / 2;
   const parts: ReferenceModelPart[] = [
-    box("pcb", [W, H, 1.6], [x(W / 2), y(H / 2), 0], "pcb"),
-    box("socket-frame", [62, 62, 4], [socket[0], socket[1], on(4)], "slot-steel"),
-    box("io-shroud", [44, 150, 36], [x(24), y(80), on(36)], "heatsink-board"),
-    box("vrm-heatsink-top", [86, 26, 24], [x(112), y(20), on(24)], "heatsink-board"),
-    box("chipset-heatsink", [70, 58, 10], [x(186), y(240), on(10)], "heatsink-board"),
-    box("atx-24-pin", [10, 52, 15], [x(236), y(110), on(15)], "slot-plastic"),
+    box("pcb", [W, H, 1.6], [x(W / 2), y(H / 2), 0], "pcb", 1),
+    box("socket-frame", [62, 62, 4], [socket[0], socket[1], on(4)], "slot-steel", 2),
+    box("socket-lever", [3, 50, 3], [socket[0] + 36, socket[1], on(3)], "slot-steel", 1),
+    box("io-shroud", [44, 150, 36], [x(24), y(80), on(36)], "heatsink-board", 5),
+    // The page lists a pre-mounted I/O shield: a plate standing on the rear edge.
+    box("io-shield", [1.5, 158, 44], [x(-0.75), y(84), on(44)], "slot-steel"),
+    // VRM heatsinks as finned blocks: left of the socket and above it.
+    {
+      id: "vrm-heatsink-left",
+      shape: "fins",
+      sizeMm: [24, 92, 22],
+      positionMm: [x(60), y(84), on(22)],
+      material: "heatsink-board",
+      axis: "y",
+    },
+    {
+      id: "vrm-heatsink-top",
+      shape: "fins",
+      sizeMm: [86, 26, 24],
+      positionMm: [x(112), y(22), on(24)],
+      material: "heatsink-board",
+      axis: "x",
+    },
+    box("chipset-heatsink", [70, 58, 10], [x(186), y(240), on(10)], "heatsink-board", 3),
+    box("atx-24-pin", [10, 52, 15], [x(236), y(110), on(15)], "slot-plastic", 1),
+    box("pcie-6-pin", [10, 17, 13], [x(236), y(196), on(13)], "slot-plastic", 1),
   ];
-  // The DIMM slot right of the socket, the first of `dimmSlots` (memory sits in the 2nd and 4th).
-  for (let index = 0; index < options.dimmSlots; index += 1)
+  for (let index = 0; index < options.epsConnectors; index += 1)
     parts.push(
       box(
-        `dimm-slot-${index + 1}`,
-        [6.5, 140, 7],
-        [x(158 + index * 9.5), y(80), on(7)],
+        `eps-8-pin-${index + 1}`,
+        [20, 8, 13],
+        [x(65 + index * 23), y(4.5), on(13)],
         "slot-plastic",
+        1,
       ),
     );
-  // The top x16 slot sits under the GPU slot's PCIe fingers.
+  // The DIMM slot right of the socket, the first of `dimmSlots` (memory sits in the 2nd and 4th),
+  // each with a latch at both ends.
+  for (let index = 0; index < options.dimmSlots; index += 1) {
+    const slotX = x(158 + index * 9.5);
+    parts.push(box(`dimm-slot-${index + 1}`, [6.5, 140, 7], [slotX, y(80), on(7)], "slot-plastic"));
+    for (const [end, fromTop] of [
+      ["top", 6],
+      ["bottom", 154],
+    ] as const)
+      parts.push(
+        box(
+          `dimm-latch-${index + 1}-${end}`,
+          [7.5, 8, 10],
+          [slotX, y(fromTop), on(10)],
+          "slot-latch",
+          1,
+        ),
+      );
+  }
+  // The top x16 slot sits under the GPU slot's PCIe fingers; each has a release latch.
   const topSlotY = -53 - ANCHOR_MM.motherboard[1];
   for (let index = 0; index < options.pcieX16Slots; index += 1)
     parts.push(
@@ -401,6 +578,14 @@ function atxBoard(options: {
         [89, 9, 11],
         [x(95), topSlotY - index * 40, on(11)],
         "slot-steel",
+        1,
+      ),
+      box(
+        `pcie-x16-${index + 1}-latch`,
+        [8, 10, 13],
+        [x(143.5), topSlotY - index * 40, on(13)],
+        "slot-latch",
+        1,
       ),
     );
   for (let index = 0; index < options.m2Heatsinks; index += 1)
@@ -410,6 +595,7 @@ function atxBoard(options: {
         [96, 24, 6],
         [x(95), topSlotY - 20 - index * 40, on(6)],
         "heatsink-board",
+        2,
       ),
     );
   return placed({
@@ -418,9 +604,11 @@ function atxBoard(options: {
     assumptions: [
       "Placement of the socket, VRM and I/O heatsinks, chipset heatsink, connectors and slots is a visual estimate; the board is not drawn from its layout drawing.",
       "The board is shown on the generic layout's anchors, not on the case's real standoffs.",
+      "Connector, latch, I/O-shield and heatsink-fin sizes and edge radii are visual estimates; connector counts are from the manufacturer page.",
+      "Two of the board's three M.2 slots are drawn with covers.",
     ],
     parts,
-    materials: pick(["pcb", "heatsink-board", "slot-plastic", "slot-steel"]),
+    materials: pick(["pcb", "heatsink-board", "slot-plastic", "slot-steel", "slot-latch"]),
   });
 }
 
@@ -449,7 +637,7 @@ function aio360(options: {
       [pump[0], pump[1], pump[2] - pumpSize[2] / 2 - 1.5],
       "cold-plate",
     ),
-    box("pump-body", pumpSize, pump, "fan-white"),
+    box("pump-body", pumpSize, pump, "fan-white", 8),
     {
       id: "pump-light-ring",
       shape: "ring",
@@ -474,6 +662,7 @@ function aio360(options: {
         [tank, radThickness, radWidth],
         [radiator[0] + sign * (L / 2 - tank / 2), radiator[1], radiator[2]],
         "fan-white",
+        4,
       ),
     );
   const fanY = radiator[1] - radThickness / 2 - T / 2;
@@ -488,7 +677,7 @@ function aio360(options: {
         "fan-white",
       ),
     );
-  // Hoses leave the pump's rear face and climb to the rear end tank.
+  // Hoses leave fittings on the pump's rear face and bend up into fittings under the rear tank.
   const tankX = radiator[0] - (L / 2 - tank / 2);
   const hoseTop = radiator[1] - radThickness / 2;
   const pumpRear = pump[0] - pumpSize[0] / 2;
@@ -499,21 +688,32 @@ function aio360(options: {
     const z = pump[2] + dz;
     parts.push(
       {
-        id: `hose-${name}-run`,
+        id: `fitting-${name}-pump`,
         shape: "cylinder",
-        sizeMm: [pumpRear - tankX, 12, 12],
-        positionMm: [(pumpRear + tankX) / 2, pump[1], z],
-        material: "hose-white",
+        sizeMm: [12, 16, 16],
+        positionMm: [pumpRear - 6, pump[1], z],
+        material: "fitting-steel",
         axis: "x",
       },
       {
-        id: `hose-${name}-rise`,
+        id: `fitting-${name}-tank`,
         shape: "cylinder",
-        sizeMm: [12, hoseTop - pump[1] + 6, 12],
-        positionMm: [tankX, (hoseTop + pump[1] - 6) / 2, z],
-        material: "hose-white",
+        sizeMm: [16, 10, 16],
+        positionMm: [tankX, hoseTop - 5, z],
+        material: "fitting-steel",
         axis: "y",
       },
+      tube(
+        `hose-${name}`,
+        [
+          [pumpRear - 11, pump[1], z],
+          [tankX + 30, pump[1] + 6, z],
+          [tankX + 2, pump[1] + 45, z],
+          [tankX, hoseTop - 9, z],
+        ],
+        12,
+        "hose-white",
+      ),
     );
   }
   return placed({
@@ -522,11 +722,19 @@ function aio360(options: {
     assumptions: [
       'Radiator length is the page\'s "Product Length 396", read as millimetres (the page gives no unit).',
       "Radiator width is one fan width (the page states 360 mm radiator size and RX120 fans); thickness 27 mm and 20 mm end tanks are estimates.",
-      "Pump head size and the hose route are estimates; the published 450 mm tubing length is not drawn.",
+      "Pump head size, the hose route and the fittings are estimates; the published 450 mm tubing length is not drawn.",
+      "Edge radii of the pump, end tanks and fan frames are visual estimates.",
       "Fan frame rails, blade count and light-ring size are visual estimates.",
     ],
     parts,
-    materials: pick(["fan-white", "radiator-fins", "hose-white", "cold-plate", "light"]),
+    materials: pick([
+      "fan-white",
+      "radiator-fins",
+      "hose-white",
+      "cold-plate",
+      "light",
+      "fitting-steel",
+    ]),
   });
 }
 
@@ -547,18 +755,29 @@ function memoryKit(options: {
   for (const index of [1, 3]) {
     const [x, y] = rel("memory", [slotX(index), ANCHOR_MM.cpu[1] + 72 - 80, 0]);
     const z = (zWorld: number) => zWorld - ANCHOR_MM.memory[2];
+    // Bottom up: PCB edge with gold contacts, heatspreader, light bar; together the module height.
+    const edge = 4;
     parts.push(
+      box(`module-${index + 1}-pcb`, [1.2, L - 1, edge], [x, y, z(bottom + edge / 2)], "pcb"),
+      box(
+        `module-${index + 1}-contacts`,
+        [1.4, L - 14, 3],
+        [x, y, z(bottom + 1.5)],
+        "gold-contacts",
+      ),
       box(
         `module-${index + 1}-heatspreader`,
-        [W, L, H - lightBar],
-        [x, y, z(bottom + (H - lightBar) / 2)],
+        [W, L, H - lightBar - edge],
+        [x, y, z(bottom + edge + (H - lightBar - edge) / 2)],
         "fan-white",
+        1.5,
       ),
       box(
         `module-${index + 1}-light-bar`,
         [W - 1, L - 4, lightBar],
         [x, y, z(bottom + H - lightBar / 2)],
         "light",
+        1.5,
       ),
     );
   }
@@ -567,10 +786,11 @@ function memoryKit(options: {
     slug: options.slug,
     assumptions: [
       "Light-bar height (10 mm) is an estimate; module length, width and height are from the manufacturer.",
+      "The 4 mm PCB edge with gold contacts, and edge radii, are visual estimates.",
       "Modules shown in the 2nd and 4th slots of the reference board.",
     ],
     parts,
-    materials: pick(["fan-white", "light"]),
+    materials: pick(["fan-white", "light", "pcb", "gold-contacts"]),
   });
 }
 
@@ -603,6 +823,9 @@ const envelopeModels: ReferenceModel[] = [
     heightMm: 126,
     thicknessMm: 50,
     fans: 3,
+    // Tech specs: "1 x Native HDMI 2.1b", "3 x Native DisplayPort 2.1b", "1 x 16-pin".
+    displayPorts: 3,
+    hdmiPorts: 1,
   }),
   // corsair.com CW-9061021-WW: "Radiator Size 360mm", "Product Length 396" (no unit), three RX120
   // fans; the RX120 page (CO-9051021-WW) lists "120 x 25mm".
@@ -629,15 +852,59 @@ const envelopeModels: ReferenceModel[] = [
     dimmSlots: 4,
     pcieX16Slots: 3,
     m2Heatsinks: 2,
+    // "1 x 24-pin Main Power connector", "2 x 8-pin +12V Power connector", "1 x 6-pin PCIe Power
+    // connector", "Pre-mounted I/O shield".
+    epsConnectors: 2,
   }),
 ];
+
+// Display outputs of the img2threejs GPUs, from their manufacturer spec pages.
+const generatedGpuOutputs: Record<string, { displayPorts: number; hdmiPorts: number }> = {
+  // msi.com GeForce RTX 5070 Ti 16G GAMING TRIO OC WHITE specification: "DisplayPort x 3",
+  // "HDMI x 1", "16-pin x 1".
+  "showcase-gpu-msi-g507t-16gtcw": { displayPorts: 3, hdmiPorts: 1 },
+};
+
+/** An img2threejs GPU with rotors, softened shroud edges and the shared details. */
+function detailedGeneratedGpu(model: ReferenceModel): ReferenceModel {
+  const part = (id: string) => model.parts.find((item) => item.id === id);
+  const bracket = part("io-bracket");
+  const fingers = part("pcie-fingers");
+  const shroud = part("front-shroud");
+  const outputs = generatedGpuOutputs[model.partId];
+  const details =
+    bracket && fingers && shroud && outputs
+      ? gpuDetailParts({
+          bracketCentre: bracket.positionMm,
+          bracketHeightMm: bracket.sizeMm[1],
+          pcbX: fingers.positionMm[0],
+          topY: shroud.positionMm[1] + shroud.sizeMm[1] / 2,
+          centreZ: shroud.positionMm[2],
+          lengthMm: model.envelopeMm[2],
+          ...outputs,
+        })
+      : [];
+  return withRounding(
+    {
+      ...model,
+      parts: [...withRotors(model.parts), ...details],
+      materials: { ...model.materials, ...pick(["port-dark", "slot-plastic"]) },
+      assumptions: [
+        GPU_ROTOR_ASSUMPTION,
+        ...(details.length ? [GPU_DETAIL_ASSUMPTION] : []),
+        "Edge radii are visual estimates.",
+      ],
+    },
+    2.5,
+  );
+}
 
 const byPartId = new Map(
   [
     ...generatedReferenceModels.map((model) =>
       model.frame === "gpu"
-        ? { ...model, parts: withRotors(model.parts), assumptions: [GPU_ROTOR_ASSUMPTION] }
-        : model,
+        ? detailedGeneratedGpu(model)
+        : withRounding({ ...model, assumptions: ["Panel edge radii are visual estimates."] }, 2.5),
     ),
     ...envelopeModels,
   ].map((model) => [model.partId, model]),

@@ -7,6 +7,7 @@ import {
   referenceModelFor,
   referenceModelSlots,
   referenceModels,
+  cornerRadius,
   sceneCentre,
   sceneSize,
   type ReferenceModelPart,
@@ -55,7 +56,10 @@ describe("per-SKU reference models (demo track week 3)", () => {
       const mm = showcaseMeta[model.partId].dimensions!.mm!;
       within(model.envelopeMm[0], mm.depth, 0.01); // thickness
       within(model.envelopeMm[2], mm.width, 0.015); // length, plus the bracket plate
-      const card = model.parts.filter((part) => part.id !== "io-bracket");
+      // The bracket and what sits on it (vents, outputs) stand outside the card body.
+      const card = model.parts.filter(
+        (part) => !part.id.startsWith("io-bracket") && !part.id.startsWith("port-"),
+      );
       const top = Math.max(...card.map((part) => part.positionMm[1] + part.sizeMm[1] / 2));
       const bottom = Math.min(...card.map((part) => part.positionMm[1] - part.sizeMm[1] / 2));
       within(top - bottom, mm.height, 0.02);
@@ -148,7 +152,9 @@ describe("slice D part models", () => {
     const pcb = board.parts.find((part) => part.id === "pcb")!;
     expect(pcb.sizeMm.slice(0, 2)).toEqual([244, 305]);
     expect(parts("mobo-z790-hero", "dimm-slot-")).toHaveLength(4);
-    expect(parts("mobo-z790-hero", "pcie-x16-")).toHaveLength(3);
+    expect(
+      parts("mobo-z790-hero", "pcie-x16-").filter((part) => !part.id.endsWith("-latch")),
+    ).toHaveLength(3);
     expect(board.parts.filter((part) => /heatsink|io-shroud/.test(part.id)).length).toBeGreaterThan(
       2,
     );
@@ -172,5 +178,84 @@ describe("slice D part models", () => {
     // Off-anchor models report where their envelope sits, for the selection outline.
     expect(sceneCentre(model("showcase-cooler-corsair-cw-9061021-ww"))[1]).toBeGreaterThan(0);
     expect(sceneCentre(referenceModelFor("showcase-case-lianli-o11dew")!)).toEqual([0, 0, 0]);
+  });
+});
+
+describe("E3 detail in code", () => {
+  const model = (partId: string) => referenceModelFor(partId)!;
+  const parts = (partId: string, pattern: RegExp) =>
+    model(partId).parts.filter((part) => pattern.test(part.id));
+  const board = "mobo-z790-hero";
+
+  it("draws the board's latches, finned VRMs, I/O shield and the page's power connectors", () => {
+    expect(parts(board, /^dimm-latch-/)).toHaveLength(8);
+    expect(parts(board, /^pcie-x16-\d+-latch$/)).toHaveLength(3);
+    // Spec page: 1 x 24-pin, 2 x 8-pin +12V, 1 x 6-pin PCIe, pre-mounted I/O shield.
+    expect(parts(board, /^atx-24-pin$/)).toHaveLength(1);
+    expect(parts(board, /^eps-8-pin-/)).toHaveLength(2);
+    expect(parts(board, /^pcie-6-pin$/)).toHaveLength(1);
+    expect(parts(board, /^io-shield$/)).toHaveLength(1);
+    expect(parts(board, /^vrm-heatsink-/).every((part) => part.shape === "fins")).toBe(true);
+  });
+
+  it("gives every GPU its outputs and one 16-pin connector inside the card height", () => {
+    for (const gpu of referenceModels.filter((item) => item.frame === "gpu")) {
+      expect(gpu.parts.filter((part) => /^port-dp-/.test(part.id))).toHaveLength(3);
+      expect(gpu.parts.filter((part) => /^port-hdmi-/.test(part.id))).toHaveLength(1);
+      const power = gpu.parts.filter((part) => part.id === "power-16-pin");
+      expect(power).toHaveLength(1);
+      const shroud = gpu.parts.find((part) => part.id === "front-shroud")!;
+      expect(power[0].positionMm[1] + power[0].sizeMm[1] / 2).toBeLessThanOrEqual(
+        shroud.positionMm[1] + shroud.sizeMm[1] / 2 + 0.01,
+      );
+      expect(gpu.assumptions?.join(" ")).toMatch(/counts are from the manufacturer page/);
+    }
+  });
+
+  it("stacks each memory module from gold contacts to light bar at the published 44 mm", () => {
+    const kit = "showcase-ram-corsair-cmh32gx5m2b6000c30w";
+    for (const index of [2, 4]) {
+      const module = parts(kit, new RegExp(`^module-${index}-`));
+      expect(module.map((part) => part.id.split("-").slice(2).join("-")).sort()).toEqual(
+        ["contacts", "heatspreader", "light-bar", "pcb"].sort(),
+      );
+      const top = Math.max(...module.map((part) => part.positionMm[2] + part.sizeMm[2] / 2));
+      const bottom = Math.min(...module.map((part) => part.positionMm[2] - part.sizeMm[2] / 2));
+      expect(top - bottom).toBeCloseTo(44, 5);
+    }
+  });
+
+  it("bends each AIO hose between two fittings, inside its own bounding box", () => {
+    const aio = "showcase-cooler-corsair-cw-9061021-ww";
+    const hoses = parts(aio, /^hose-/);
+    expect(hoses).toHaveLength(2);
+    expect(parts(aio, /^fitting-/)).toHaveLength(4);
+    for (const hose of hoses) {
+      expect(hose.shape).toBe("tube");
+      expect(hose.pathMm!.length).toBeGreaterThanOrEqual(3);
+      for (const point of hose.pathMm!)
+        point.forEach((value, k) =>
+          expect(Math.abs(value)).toBeLessThanOrEqual(
+            hose.sizeMm[k] / 2 - hose.diameterMm! / 2 + 1e-6,
+          ),
+        );
+    }
+  });
+
+  it("rounds edges only where they fit, and never on glass", () => {
+    let rounded = 0;
+    for (const item of referenceModels)
+      for (const part of item.parts) {
+        if (!part.roundMm) continue;
+        rounded += 1;
+        expect(part.shape).toBe("box");
+        expect(item.materials[part.material]?.transmission ?? 0).toBe(0);
+        expect(cornerRadius(part)).toBeLessThan(Math.min(...part.sizeMm) / 2);
+      }
+    expect(rounded).toBeGreaterThan(50);
+    // The case panels are among them.
+    const o11 = model("showcase-case-lianli-o11dew").parts;
+    expect(o11.find((part) => part.id === "top-panel")?.roundMm).toBeGreaterThan(0);
+    expect(o11.find((part) => part.id === "side-glass")?.roundMm).toBeUndefined();
   });
 });

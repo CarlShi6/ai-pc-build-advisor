@@ -19,6 +19,7 @@ import {
   MeshReflectorMaterial,
   OrbitControls,
   PerformanceMonitor,
+  RoundedBox,
 } from "@react-three/drei";
 import {
   Bloom,
@@ -32,10 +33,13 @@ import { ToneMappingMode } from "postprocessing";
 import type { ThreeEvent } from "@react-three/fiber";
 import {
   Box3,
+  CatmullRomCurve3,
+  DirectionalLight,
   Euler,
   MathUtils,
   Matrix4,
   Quaternion,
+  TubeGeometry,
   Vector3,
   type Group,
   type InstancedMesh,
@@ -97,6 +101,7 @@ import {
 } from "@/lib/v3/photo-appearance";
 import {
   MM_PER_SCENE_UNIT,
+  cornerRadius,
   referenceModelFor,
   referenceModelSlots,
   sceneCentre,
@@ -637,6 +642,38 @@ function Fins({
   );
 }
 
+/** A bent hose along a smooth curve through `points`; fewer segments in the light tier. */
+function Hose({
+  points,
+  diameter,
+  position,
+  material,
+}: {
+  points: Point[];
+  diameter: number;
+  position: Point;
+  material: Record<string, unknown>;
+}) {
+  const light = useContext(LightTierContext);
+  const geometry = useMemo(
+    () =>
+      new TubeGeometry(
+        new CatmullRomCurve3(points.map((point) => new Vector3(...point))),
+        light ? 12 : 48,
+        diameter / 2,
+        light ? 6 : 14,
+        false,
+      ),
+    [points, diameter, light],
+  );
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  return (
+    <mesh geometry={geometry} position={position} castShadow receiveShadow>
+      <Mat {...material} />
+    </mesh>
+  );
+}
+
 /** One part of a reference model, in millimetres inside the model's group. */
 function ReferencePart({
   part,
@@ -653,6 +690,15 @@ function ReferencePart({
     roughness: material.roughness,
     metalness: material.metalness,
   };
+  if (part.shape === "tube" && part.pathMm)
+    return (
+      <Hose
+        points={part.pathMm}
+        diameter={part.diameterMm ?? 10}
+        position={part.positionMm}
+        material={surface}
+      />
+    );
   if (part.shape === "fins")
     return (
       <group position={part.positionMm}>
@@ -697,6 +743,7 @@ function ReferenceModelMesh({
   panels?: boolean;
 }) {
   const dim = useContext(DimContext);
+  const light = useContext(LightTierContext);
   const offsets = useContext(PanelOffsetContext);
   const panelOf = useMemo(
     () => new Map(model.parts.map((part) => [part.id, panels ? casePanelOf(part, model) : null])),
@@ -730,6 +777,41 @@ function ReferenceModelMesh({
     const glass = !!material.transmission;
     // A lit part (a memory light bar) glows in the build's RGB colour.
     const lit = part.material === "light";
+    const radius = cornerRadius(part);
+    const surface = lit ? (
+      <Mat
+        color={accent}
+        emissive={accent}
+        emissiveIntensity={dim ? 0.3 : 2.2}
+        toneMapped={false}
+      />
+    ) : glass ? (
+      <GlassMaterial
+        color={material.color}
+        roughness={material.roughness}
+        transmission={material.transmission ?? 1}
+        // The thin glass pane on the +z face is the side panel.
+        sidePanel={model.frame === "case" && part.positionMm[2] > 0 && part.sizeMm[2] < 10}
+        panel={panelOf.get(part.id)}
+      />
+    ) : (
+      <Mat color={material.color} roughness={material.roughness} metalness={material.metalness} />
+    );
+    // Rounded edges in the full tier; the light tier keeps plain boxes.
+    if (part.shape === "box" && radius > 0 && !light)
+      return (
+        <RoundedBox
+          key={part.id}
+          args={part.sizeMm}
+          radius={radius}
+          smoothness={2}
+          position={part.positionMm}
+          castShadow={!glass}
+          receiveShadow
+        >
+          {surface}
+        </RoundedBox>
+      );
     return (
       <mesh
         key={part.id}
@@ -739,29 +821,7 @@ function ReferenceModelMesh({
         receiveShadow
       >
         {part.shape === "box" ? <boxGeometry /> : <sphereGeometry args={[0.5, 48, 12]} />}
-        {lit ? (
-          <Mat
-            color={accent}
-            emissive={accent}
-            emissiveIntensity={dim ? 0.3 : 2.2}
-            toneMapped={false}
-          />
-        ) : glass ? (
-          <GlassMaterial
-            color={material.color}
-            roughness={material.roughness}
-            transmission={material.transmission ?? 1}
-            // The thin glass pane on the +z face is the side panel.
-            sidePanel={model.frame === "case" && part.positionMm[2] > 0 && part.sizeMm[2] < 10}
-            panel={panelOf.get(part.id)}
-          />
-        ) : (
-          <Mat
-            color={material.color}
-            roughness={material.roughness}
-            metalness={material.metalness}
-          />
-        )}
+        {surface}
       </mesh>
     );
   }
@@ -1284,6 +1344,18 @@ function CameraRig({
   return null;
 }
 
+/** A soft directional light aimed at the showcase spot. */
+function ShowcaseLight({ position }: { position: Point }) {
+  const light = useRef<DirectionalLight>(null);
+  useLayoutEffect(() => {
+    const node = light.current;
+    if (!node) return;
+    node.target.position.set(...SHOWCASE_POINT);
+    node.target.updateMatrixWorld();
+  }, []);
+  return <directionalLight ref={light} position={position} intensity={1.4} />;
+}
+
 /** Studio light rig built from lightformers, so no HDRI file is downloaded at runtime. */
 function StudioEnvironment() {
   return (
@@ -1470,6 +1542,16 @@ export default function BuildScene({
               distance={3}
               color={presentation.accentColor}
             />
+            {/* Showcase key light: from the camera side, above, onto the shown part. */}
+            {showing && (
+              <ShowcaseLight
+                position={
+                  SHOWCASE_POINT.map(
+                    (value, k) => value + FOCUS_VIEW[k] * 5 + [1.5, 2.5, 0][k],
+                  ) as Point
+                }
+              />
+            )}
             {/* RGB spill under the top fans: from the side, down-facing fans read as their glow. */}
             <pointLight
               position={[-0.25, 0.85, 0.45]}
