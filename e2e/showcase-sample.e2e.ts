@@ -19,6 +19,6 @@ test("home opens the white showcase sample as a full draft with honest labels", 
   // The O11 has no manufacturer price: shown as unknown, never counted as $0.
   await expect(page.getByText(/1 unknown price, not counted/)).toBeVisible();
   await expect(page.locator(".v3-scene-disclosure")).toContainText(
-    "Case and GPU: Reference reconstruction · dimensions from manufacturer specs.",
+    "Case, Motherboard, Cooler, GPU and Memory: Reference reconstruction · dimensions from manufacturer specs.",
   );
 });

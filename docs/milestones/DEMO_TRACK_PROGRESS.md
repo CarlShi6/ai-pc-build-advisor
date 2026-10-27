@@ -388,3 +388,35 @@ Before: light sage-green pages around a dark 3D panel, with green as the accent,
 - **Status never relies on colour alone:** chips, slot rows, the 2D cards and callouts all carry text (Top match, Choose one, Review, Add part, Appearance from photo…).
 - Tests: new `e2e/graphite-theme.e2e.ts` (no WebGL) checks the graphite background on home and My Builds, the strong-blue primary button, the amber tie chip with its text, a blue selected 2D card, an amber photo-only card and a grey dashed empty card.
 - Gate: lint 0, typecheck, 221 unit tests, build, **E2E 14/14**.
+
+### Slice D: recognisable part models (2026-10-26)
+
+Before: only the case and GPU were reference models; the AIO, memory and motherboard were generic boxes, and every fan (GPU, AIO, case) was a flat disc with a ring.
+
+- **Built in code** in `src/lib/v3/reference-models.ts` as `spec-envelope` models (`geometryAccuracy: "reference_reconstructed"`). No GLB and no img2threejs run; nothing generated from user photos.
+- **New shapes** (rendered in `BuildScene.tsx`): `rotor` (nine pitched blades round a hub), `fins` (radiator fin plates between two rails, one instanced mesh), `ring` (a light ring in the build's RGB colour), `cylinder` (hoses), plus lit boxes (memory light bars).
+- **Dimensions, all read from manufacturer pages on 2026-10-26:**
+  - Corsair iCUE LINK TITAN 360 RX RGB White (CW-9061021-WW): "Radiator Size 360mm", "Product Length 396" (no unit on the page; read as mm). Its three RX120 fans: "120 x 25mm" on the RX120 page.
+  - Corsair VENGEANCE RGB DDR5 (CMH): 135 x 8 x 44 mm on Corsair's "DDR5 memory module dimensions" page (the product page has no size; its note now says so).
+  - ASUS ROG MAXIMUS Z790 HERO: "ATX Form Factor 12 inch x 9.6 inch (30.5 cm x 24.4 cm)", 4 DIMM, 3 PCIe x16 (rog.asus.com spec page).
+- **Assumptions** are stored on each model (`assumptions`):
+  - AIO: radiator width = one fan width, 27 mm thickness and 20 mm end tanks are estimates, as are the pump size and hose route (the 450 mm tubing length is not drawn), frame rails, blade count and ring size.
+  - Memory: the 10 mm light-bar height; modules shown in slots 2 and 4.
+  - Board: every sub-part position and size (socket, VRM and I/O heatsinks, chipset heatsink, M.2 covers, 24-pin, slots); the board sits on the generic layout's anchors, not the case's standoffs.
+  - GPUs: fan blade count and shape are not published.
+- **GPUs:** the flat blade discs of both white GPUs become rotors of the same diameter.
+- **Case fans from the photo:** square frame, pitched blades and a light ring (were a disc and a ring).
+- **Placement:** the AIO, memory and board are placed relative to their slot anchors so the pump sits on the CPU, the modules in the board's DIMM slots and the top x16 slot under the GPU's fingers. Placement is illustrative; the disclosure still says nothing verifies clearance. A model off its anchor carries `centreMm`, and the selection outline follows it.
+- **Focus:** a focused AIO turns its fans towards the viewer, like the GPU.
+- **No logos:** no part is a logo, badge or text; a unit test checks part ids.
+- **Adaptive quality:** in the light tier, rotors are flat discs and the radiator core is one block; the PSU, CPU and SSD stay generic.
+- **Studio text:** the disclosure lists "Case, Motherboard, Cooler, GPU and Memory: Reference reconstruction · dimensions from manufacturer specs." The scene carries `data-reference-models` for tests.
+- Tests:
+  - `reference-models.test.ts` adds 5 tests: the radiator spans 396 mm, with three 120 x 25 mm fans and four light rings; each module is 135 x 8 x 44 mm, with its light bar on top and its x position matching the board's DIMM slots 2 and 4; the board is 244 x 305 mm, with 4 DIMM and 3 x16 slots; every GPU has three rotors; every spec-envelope model lists assumptions, no part is a logo, and the envelope wraps every part.
+  - `showcase-sample.test.ts` now expects five reference slots.
+  - The new E2E in `demo-path-3d.e2e.ts`:
+    - `data-reference-models` lists the five slots, and each focused model's card says "Reference reconstruction · dimensions from manufacturer specs".
+    - Swapping to Kingston memory (no published size) shows "Illustrative geometry" and drops Memory from the disclosure.
+    - No page errors.
+- Adaptive quality: under SwiftShader, the scene drops to the light tier; flat rotors and a solid radiator still read as an AIO.
+- Gate: lint 0, typecheck, 226 unit tests, build, **E2E 15/15**.

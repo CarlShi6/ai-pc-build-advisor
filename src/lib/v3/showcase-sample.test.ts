@@ -31,8 +31,15 @@ describe("white showcase one-click sample", () => {
     expect(sample.build.totalPrice).toBe(priceCoverage(sample.build.parts).known);
   });
 
-  it("renders the case and GPU as reference reconstructions", () => {
-    expect(referenceModelSlots(createWhiteShowcaseSample())).toEqual(["case", "gpu"]);
+  it("renders every part with published millimetres as a reference reconstruction", () => {
+    // CPU, SSD and PSU stay generic: the PSU page has no size, and CPU and SSD may stay simple.
+    expect(referenceModelSlots(createWhiteShowcaseSample())).toEqual([
+      "case",
+      "motherboard",
+      "cooler",
+      "gpu",
+      "memory",
+    ]);
   });
 
   it("is a fresh draft each time and keeps its source through a save round trip", () => {

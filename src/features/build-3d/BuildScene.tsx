@@ -2,6 +2,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useLayoutEffect,
   useRef,
   useState,
   type ReactNode,
@@ -20,7 +21,7 @@ import {
 } from "@react-three/drei";
 import { Bloom, DepthOfField, EffectComposer, N8AO, Vignette } from "@react-three/postprocessing";
 import type { ThreeEvent } from "@react-three/fiber";
-import { Euler, Matrix4, Quaternion, Vector3, type Group } from "three";
+import { Euler, Matrix4, Quaternion, Vector3, type Group, type InstancedMesh } from "three";
 import {
   primarySlots,
   selectedPart,
@@ -52,7 +53,12 @@ import {
 import {
   MM_PER_SCENE_UNIT,
   referenceModelFor,
+  referenceModelSlots,
+  sceneCentre,
   sceneSize,
+  type ReferenceAxis,
+  type ReferenceMaterial,
+  type ReferenceModelPart,
   type ReferenceModel,
 } from "@/lib/v3/reference-models";
 
@@ -158,7 +164,10 @@ function RgbStrip({ size, position, color }: { size: Point; position: Point; col
   );
 }
 
-/** A fan: frame disc, hub and a lit ring facing +x (front intake), +y (bottom intake) or -y. */
+/**
+ * A fan of half-width `radius` facing +x (front intake), +y (bottom intake) or -y: square frame,
+ * pitched blades and a lit ring. Depth is 25/120 of the width, a standard 120 x 25 mm fan.
+ */
 function CaseFan({
   position,
   facing,
@@ -172,6 +181,9 @@ function CaseFan({
   frameColor: string;
   light: string;
 }) {
+  const rail = radius * 0.13;
+  const depth = radius * (25 / 60);
+  const blades = 2 * radius - 2 * rail - radius * 0.06;
   return (
     <group
       position={position}
@@ -183,15 +195,28 @@ function CaseFan({
             : [Math.PI / 2, 0, 0]
       }
     >
-      <mesh rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[radius, radius, 0.05, 32]} />
-        <Mat color={frameColor} metalness={0.05} roughness={0.55} />
-      </mesh>
-      <mesh position={[0, 0, 0.03]} rotation={[Math.PI / 2, 0, 0]}>
-        <cylinderGeometry args={[radius * 0.26, radius * 0.26, 0.02, 20]} />
-        <Mat color={frameColor} metalness={0.05} roughness={0.5} />
-      </mesh>
-      <RgbRing radius={radius * 0.92} position={[0, 0, 0.03]} color={light} />
+      {/* Square frame: four rails around the blades. */}
+      {[
+        [0, radius - rail / 2, 2 * radius, rail],
+        [0, -radius + rail / 2, 2 * radius, rail],
+        [radius - rail / 2, 0, rail, 2 * radius],
+        [-radius + rail / 2, 0, rail, 2 * radius],
+      ].map(([x, y, width, height]) => (
+        <Box
+          key={`${x}:${y}`}
+          size={[width, height, depth]}
+          position={[x, y, 0]}
+          material={{ color: frameColor, metalness: 0.05, roughness: 0.55 }}
+        />
+      ))}
+      <group rotation={[Math.PI / 2, 0, 0]}>
+        <group scale={[blades, depth * 0.7, blades]}>
+          <Rotor material={{ color: frameColor, metalness: 0.05, roughness: 0.5 }} />
+        </group>
+        <group position={[0, depth / 2, 0]} scale={2 * radius - 2 * rail}>
+          <LitRing color={light} />
+        </group>
+      </group>
     </group>
   );
 }
@@ -304,8 +329,178 @@ const gpuFrameRotation = new Euler().setFromRotationMatrix(
   new Matrix4().makeBasis(new Vector3(0, -1, 0), new Vector3(0, 0, 1), new Vector3(-1, 0, 0)),
 );
 
+// A y-axis primitive (cylinder, rotor, ring) turned to face along x, y or z.
+const axisTurn: Record<ReferenceAxis, Point> = {
+  x: [0, 0, -Math.PI / 2],
+  y: [0, 0, 0],
+  z: [Math.PI / 2, 0, 0],
+};
+/** Local [diameter, length, diameter] scale of a turned y-axis primitive with world size `size`. */
+function axisScale(axis: ReferenceAxis, size: Point): Point {
+  return axis === "x"
+    ? [size[1], size[0], size[2]]
+    : axis === "y"
+      ? size
+      : [size[0], size[2], size[1]];
+}
+
+const BLADES = 9;
+
+/**
+ * Fan blades in unit space: diameter 1 across x/z, thickness 1 along y. Nine pitched blades
+ * around a hub; the light tier draws one flat disc instead.
+ */
+function Rotor({ material }: { material: Record<string, unknown> }) {
+  const light = useContext(LightTierContext);
+  if (light)
+    return (
+      <mesh>
+        <cylinderGeometry args={[0.5, 0.5, 0.3, 24]} />
+        <Mat {...material} />
+      </mesh>
+    );
+  return (
+    <group>
+      <mesh castShadow>
+        <cylinderGeometry args={[0.17, 0.17, 1, 24]} />
+        <Mat {...material} />
+      </mesh>
+      {Array.from({ length: BLADES }, (_, index) => (
+        <group key={index} rotation={[0, (index * 2 * Math.PI) / BLADES, 0]}>
+          <mesh position={[0.32, 0, 0]} rotation={[0.6, 0, 0]} castShadow>
+            <boxGeometry args={[0.31, 0.08, 0.24]} />
+            <Mat {...material} />
+          </mesh>
+        </group>
+      ))}
+    </group>
+  );
+}
+
+/** Lit ring in unit space (outer diameter 1) facing along y, in the build's RGB colour. */
+function LitRing({ color }: { color: string }) {
+  const dim = useContext(DimContext);
+  return (
+    <mesh rotation={[Math.PI / 2, 0, 0]}>
+      <torusGeometry args={[0.465, 0.035, 10, 48]} />
+      <Mat color={color} emissive={color} emissiveIntensity={dim ? 0.3 : 2.4} toneMapped={false} />
+    </mesh>
+  );
+}
+
+const FIN_PITCH_MM = 4;
+const finMatrix = new Matrix4();
+
+/**
+ * Radiator core in millimetres: thin fin plates stacked along `axis` between two side rails. The
+ * light tier draws one solid block.
+ */
+function Fins({
+  sizeMm,
+  axis,
+  material,
+}: {
+  sizeMm: Point;
+  axis: ReferenceAxis;
+  material: Record<string, unknown>;
+}) {
+  const light = useContext(LightTierContext);
+  const instances = useRef<InstancedMesh>(null);
+  const k = axis === "x" ? 0 : axis === "y" ? 1 : 2;
+  const count = Math.max(1, Math.floor(sizeMm[k] / FIN_PITCH_MM));
+  useLayoutEffect(() => {
+    const mesh = instances.current;
+    if (!mesh) return;
+    for (let index = 0; index < count; index += 1) {
+      const offset: Point = [0, 0, 0];
+      offset[k] = -sizeMm[k] / 2 + (index + 0.5) * (sizeMm[k] / count);
+      mesh.setMatrixAt(index, finMatrix.makeTranslation(...offset));
+    }
+    mesh.instanceMatrix.needsUpdate = true;
+  }, [count, k, sizeMm, light]);
+  if (light)
+    return (
+      <mesh scale={sizeMm}>
+        <boxGeometry />
+        <Mat {...material} />
+      </mesh>
+    );
+  const plate: Point = [...sizeMm];
+  plate[k] = 0.6;
+  // Rails run along the stack on the two faces across the fin plates' width.
+  const railFace = k === 2 ? 0 : 2;
+  const rail: Point = [...sizeMm];
+  rail[railFace] = 4;
+  return (
+    <group>
+      <instancedMesh ref={instances} args={[undefined, undefined, count]} castShadow>
+        <boxGeometry args={plate} />
+        <Mat {...material} />
+      </instancedMesh>
+      {[-1, 1].map((sign) => {
+        const position: Point = [0, 0, 0];
+        position[railFace] = sign * (sizeMm[railFace] / 2 - 2);
+        return (
+          <mesh key={sign} position={position} castShadow>
+            <boxGeometry args={rail} />
+            <Mat {...material} />
+          </mesh>
+        );
+      })}
+    </group>
+  );
+}
+
+/** One part of a reference model, in millimetres inside the model's group. */
+function ReferencePart({
+  part,
+  material,
+  accent,
+}: {
+  part: ReferenceModelPart;
+  material: ReferenceMaterial;
+  accent: string;
+}) {
+  const axis = part.axis ?? "x";
+  const surface = {
+    color: material.color,
+    roughness: material.roughness,
+    metalness: material.metalness,
+  };
+  if (part.shape === "fins")
+    return (
+      <group position={part.positionMm}>
+        <Fins sizeMm={part.sizeMm} axis={axis} material={surface} />
+      </group>
+    );
+  if (part.shape === "ring" || part.shape === "rotor" || part.shape === "cylinder") {
+    const scale = axisScale(axis, part.sizeMm);
+    return (
+      <group position={part.positionMm} rotation={axisTurn[axis]}>
+        {part.shape === "ring" ? (
+          <group scale={Math.max(scale[0], scale[2])}>
+            <LitRing color={accent} />
+          </group>
+        ) : (
+          <group scale={scale}>
+            {part.shape === "rotor" ? (
+              <Rotor material={surface} />
+            ) : (
+              <mesh castShadow receiveShadow>
+                <cylinderGeometry args={[0.5, 0.5, 1, 20]} />
+                <Mat {...surface} />
+              </mesh>
+            )}
+          </group>
+        )}
+      </group>
+    );
+  }
+  return null;
+}
+
 /** A per-SKU reference reconstruction, drawn 1:1 from its millimetre parts. */
-function ReferenceModelMesh({ model }: { model: ReferenceModel }) {
+function ReferenceModelMesh({ model, accent }: { model: ReferenceModel; accent: string }) {
   const dim = useContext(DimContext);
   const light = useContext(LightTierContext);
   return (
@@ -315,7 +510,11 @@ function ReferenceModelMesh({ model }: { model: ReferenceModel }) {
     >
       {model.parts.map((part) => {
         const material = model.materials[part.material];
+        if (part.shape !== "box" && part.shape !== "disc")
+          return <ReferencePart key={part.id} part={part} material={material} accent={accent} />;
         const glass = !!material.transmission;
+        // A lit part (a memory light bar) glows in the build's RGB colour.
+        const lit = part.material === "light";
         return (
           <mesh
             key={part.id}
@@ -325,7 +524,14 @@ function ReferenceModelMesh({ model }: { model: ReferenceModel }) {
             receiveShadow
           >
             {part.shape === "box" ? <boxGeometry /> : <sphereGeometry args={[0.5, 48, 12]} />}
-            {glass ? (
+            {lit ? (
+              <Mat
+                color={accent}
+                emissive={accent}
+                emissiveIntensity={dim ? 0.3 : 2.2}
+                toneMapped={false}
+              />
+            ) : glass ? (
               <meshPhysicalMaterial
                 key={dim ? "dim" : "lit"}
                 color={material.color}
@@ -547,7 +753,7 @@ function SlotMesh({
   presentation: ScenePresentation;
   /** Unresolved slot the photo shows: drawn as a look-alike placeholder (PRD §9.3 level 2). */
   look?: SlotAppearance;
-  /** Confirmed case only: fans seen in the photo, until the fan models land (slice D). */
+  /** Confirmed case only: fans seen in the photo (a style note; fans are not Build slots). */
   fans?: PhotoFans | null;
 }) {
   const group = useRef<Group>(null);
@@ -562,13 +768,15 @@ function SlotMesh({
     : slot === "case" && presentation.layout === "showcase"
       ? [2.55, 3.05, 1.75]
       : layout[slot].size;
-  // A focused GPU reference model turns its fan side to the viewer; in the case it lies fans-down.
+  // A focused GPU or AIO reference model turns its fans to the viewer; in the case they face down.
   const rotation: Point =
     slot === "gpu" && model && focusSlot === slot
       ? [-1.87, 0, 0]
-      : slot === "gpu" && presentation.gpuVertical
-        ? [0, 0, Math.PI / 2]
-        : [0, 0, 0];
+      : slot === "cooler" && model && focusSlot === slot
+        ? [-1.15, 0, 0]
+        : slot === "gpu" && presentation.gpuVertical
+          ? [0, 0, Math.PI / 2]
+          : [0, 0, 0];
   const placed = useRef(false);
   // Ease towards the resting pose; snap on the first frame and when the user prefers reduced motion.
   useFrame((_, delta) => {
@@ -614,8 +822,8 @@ function SlotMesh({
         {occupancy === "selected" ? (
           model ? (
             <>
-              <ReferenceModelMesh model={model} />
-              {/* The reference case has no fans yet (slice D); draw the ones the photo shows. */}
+              <ReferenceModelMesh model={model} accent={presentation.accentColor} />
+              {/* Fans are not Build parts; draw the ones the photo shows on the confirmed case. */}
               {slot === "case" && fans && (
                 <FanSet
                   size={size}
@@ -661,7 +869,7 @@ function SlotMesh({
           </mesh>
         )}
         {edgeColor && !dimmed && !(slot === "case" && (occupancy === "selected" || look)) && (
-          <mesh>
+          <mesh position={model && model.frame === "case" ? sceneCentre(model) : undefined}>
             <boxGeometry args={[size[0] * 1.02, size[1] * 1.02, size[2] * 1.02]} />
             <meshBasicMaterial visible={false} />
             <Edges
@@ -820,6 +1028,7 @@ export default function BuildScene({
     <div
       className={`v3-scene-canvas ${focusSlot ? "is-focused" : ""}`}
       data-scene-quality={quality}
+      data-reference-models={referenceModelSlots(document).join(" ")}
       role="region"
       aria-label="Illustrative interactive PC scene. The eight 2D slot buttons below provide keyboard access."
     >

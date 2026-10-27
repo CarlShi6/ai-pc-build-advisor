@@ -74,6 +74,13 @@ import {
 } from "@/lib/v3/photo-appearance";
 
 /** Signed price change, or "Unknown" when either price is unknown (unknown is never $0). */
+/** "A", "A and B", "A, B and C". */
+function listLabels(labels: string[]) {
+  return labels.length < 2
+    ? labels.join("")
+    : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
+}
+
 function priceChangeText(delta: number, candidate: Part, current: Part | undefined) {
   if (priceUnknown(candidate) || (current && priceUnknown(current))) return "Unknown";
   return `${delta < 0 ? "−" : "+"}$${Math.abs(delta).toLocaleString()}`;
@@ -423,7 +430,7 @@ function StudioPage() {
           )}
           <p className="v3-scene-disclosure">
             {referenceSlots.length > 0 &&
-              `${referenceSlots.map((slot) => slotLabel[slot]).join(" and ")}: ${REFERENCE_MODEL_LABEL}. `}
+              `${listLabels(referenceSlots.map((slot) => slotLabel[slot]))}: ${REFERENCE_MODEL_LABEL}. `}
             {photoLookSlots.length > 0 &&
               `${photoLookSlots.map((slot) => slotLabel[slot]).join(", ")}: ${PHOTO_APPEARANCE_LABEL}. `}
             {fansFromPhoto &&

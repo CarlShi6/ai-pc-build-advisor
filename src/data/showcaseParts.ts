@@ -204,7 +204,9 @@ const sources: ShowcaseSource[] = [
       profile: "Intel XMP",
       color: "White",
     },
-    notes: ["Module dimensions are not on the page, so the 3D model can only be a placeholder."],
+    notes: [
+      "Module size is not on the product page; the 3D model uses Corsair's DDR5 module dimensions page (VENGEANCE RGB, CMH: 135 x 8 x 44 mm), verified 2026-10-26.",
+    ],
   },
   {
     id: "showcase-psu-corsair-cp-9020274-na",
