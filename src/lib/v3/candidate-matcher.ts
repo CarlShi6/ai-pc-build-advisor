@@ -11,6 +11,8 @@ export interface AppearanceCandidate {
   displayName: string;
   category: VisibleCatalogCategory;
   rank: number;
+  /** Summed observation weight behind the rank; equal scores mean the photo cannot tell them apart. */
+  evidenceScore: number;
   visualMatchBand: "strong" | "possible" | "weak";
   identityEvidence: "visible_marking" | "appearance_only";
   matchedObservationIds: string[];
@@ -82,6 +84,15 @@ function describesLighting(value: string) {
   );
 }
 
+/** Front-panel material named in an observation; "solid" and other words are not compared. */
+function frontMaterial(value: string): "glass" | "mesh" | "perforated" | null {
+  const text = value.toLowerCase();
+  if (/\bglass\b/.test(text)) return "glass";
+  if (/\bperforat/.test(text)) return "perforated";
+  if (/\bmesh\b/.test(text)) return "mesh";
+  return null;
+}
+
 function scoreProfile(profile: AppearanceProfile, observations: VisualObservation[]) {
   const matchedObservationIds: string[] = [];
   const matchedSignals: string[] = [];
@@ -105,6 +116,30 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
         matchedSignals.push(`Color: ${item.value}`);
         observationEvidence.push(item.evidence);
       }
+    } else if (/front/.test(attribute) && frontMaterial(item.value)) {
+      // Unknown on the manufacturer page counts neither for nor against the candidate.
+      if (!profile.frontPanel) continue;
+      if (frontMaterial(item.value) !== profile.frontPanel) {
+        if (item.origin === "observed" && item.confidenceBand !== "low") return null;
+        continue;
+      }
+      score += weight;
+      matchedObservationIds.push(item.id);
+      matchedSignals.push(
+        `Front panel: ${profile.frontPanel} (manufacturer page, verified ${profile.appearanceVerifiedAt})`,
+      );
+      observationEvidence.push(item.evidence);
+    } else if (
+      /layout|chamber/.test(attribute) &&
+      /dual.?chamber/i.test(item.value) &&
+      profile.caseLayout === "dual-chamber"
+    ) {
+      score += weight;
+      matchedObservationIds.push(item.id);
+      matchedSignals.push(
+        `Layout: dual-chamber (manufacturer page, verified ${profile.appearanceVerifiedAt})`,
+      );
+      observationEvidence.push(item.evidence);
     } else if (
       /shape|silhouette|style|panel|layout/.test(attribute) &&
       signalMatch(item.value, profile.style)
@@ -204,6 +239,7 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
             displayName: profile.displayName,
             category,
             rank: index + 1,
+            evidenceScore: evidence.score,
             visualMatchBand:
               evidence.marking && evidence.matchedObservationIds.length > 1
                 ? "strong"
@@ -242,6 +278,19 @@ export interface CandidateReview {
   chosenEvidence?: { observationIds: string[]; photoEvidence: string[]; catalogSourceId: string };
   excludedPartIds: string[];
   manualText?: string;
+}
+
+/**
+ * The candidates still in play that share the best score, when two or more do: the photo cannot
+ * tell them apart, so the user picks. Empty when one candidate leads.
+ */
+export function equallyLikelyCandidates(
+  set: CandidateSet,
+  review: CandidateReview,
+): AppearanceCandidate[] {
+  const open = set.candidates.filter((item) => !review.excludedPartIds.includes(item.partId));
+  const tied = open.filter((item) => item.evidenceScore === open[0]?.evidenceScore);
+  return tied.length > 1 ? tied : [];
 }
 
 export function chooseCandidate(

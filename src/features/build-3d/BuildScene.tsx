@@ -42,8 +42,11 @@ import {
   appearanceHex,
   appearanceSummary,
   colorName,
+  PHOTO_FANS_LABEL,
   lightHex,
   photoAppearance,
+  photoFans,
+  type PhotoFans,
   type SlotAppearance,
 } from "@/lib/v3/photo-appearance";
 import {
@@ -211,7 +214,6 @@ function CaseModel({
   const panel = white
     ? { color: presentation.caseColor, metalness: 0.1, roughness: 0.45 }
     : { color: presentation.caseColor, metalness: 0.55, roughness: 0.42 };
-  // Up to three front intakes, then up to three on the PSU shroud.
   const fanCount = Math.min(6, Math.max(0, presentation.fanAccentCount));
   const fanFrame = white ? "#dfe3e8" : "#18191c";
   return (
@@ -253,21 +255,46 @@ function CaseModel({
       ) : (
         <Box size={[w, h, t]} position={[0, 0, d / 2]} material={panel} />
       )}
-      {Array.from({ length: fanCount }, (_, index) => (
+      <FanSet size={size} count={fanCount} frameColor={fanFrame} light={presentation.accentColor} />
+    </group>
+  );
+}
+
+/**
+ * Up to three front intakes, then up to three on the PSU shroud, spaced for a case of `size`
+ * (laid out on the 2.35 x 3.15 tower slot and scaled from it).
+ */
+function FanSet({
+  size,
+  count,
+  frameColor,
+  light,
+}: {
+  size: Point;
+  count: number;
+  frameColor: string;
+  light: string;
+}) {
+  const [w, h] = size;
+  const sx = w / 2.35;
+  const sy = h / 3.15;
+  return (
+    <>
+      {Array.from({ length: Math.min(6, Math.max(0, count)) }, (_, index) => (
         <CaseFan
           key={index}
           position={
             index < 3
-              ? [w / 2 - 0.09, h / 2 - 0.62 - index * 0.78, 0]
-              : [-w / 2 + 0.5 + (index - 3) * 0.66, -h / 2 + 0.81, 0]
+              ? [w / 2 - 0.09 * sx, h / 2 - (0.62 + index * 0.78) * sy, 0]
+              : [-w / 2 + (0.5 + (index - 3) * 0.66) * sx, -h / 2 + 0.81 * sy, 0]
           }
           facing={index < 3 ? "x" : "y"}
-          radius={0.3}
-          frameColor={fanFrame}
-          light={presentation.accentColor}
+          radius={0.3 * Math.min(sx, sy)}
+          frameColor={frameColor}
+          light={light}
         />
       ))}
-    </group>
+    </>
   );
 }
 
@@ -508,6 +535,7 @@ function SlotMesh({
   onPick,
   presentation,
   look,
+  fans,
 }: {
   slot: SlotId;
   document: BuildDocumentV3;
@@ -519,6 +547,8 @@ function SlotMesh({
   presentation: ScenePresentation;
   /** Unresolved slot the photo shows: drawn as a look-alike placeholder (PRD §9.3 level 2). */
   look?: SlotAppearance;
+  /** Confirmed case only: fans seen in the photo, until the fan models land (slice D). */
+  fans?: PhotoFans | null;
 }) {
   const group = useRef<Group>(null);
   const occupancy = slotOccupancy(document, slot);
@@ -583,7 +613,22 @@ function SlotMesh({
       >
         {occupancy === "selected" ? (
           model ? (
-            <ReferenceModelMesh model={model} />
+            <>
+              <ReferenceModelMesh model={model} />
+              {/* The reference case has no fans yet (slice D); draw the ones the photo shows. */}
+              {slot === "case" && fans && (
+                <FanSet
+                  size={size}
+                  count={fans.count}
+                  frameColor={fans.color === "black" ? "#18191c" : "#dfe3e8"}
+                  light={
+                    fans.lightColor
+                      ? (lightHex[fans.lightColor] ?? presentation.accentColor)
+                      : presentation.accentColor
+                  }
+                />
+              )}
+            </>
           ) : slot === "case" ? (
             <CaseModel size={size} presentation={presentation} />
           ) : (
@@ -749,6 +794,7 @@ export default function BuildScene({
   const cardRef = useRef<HTMLDivElement | null>(null);
   const presentation = scenePresentation(document);
   const looks = photoAppearance(document);
+  const fans = photoFans(document);
   // A white board right behind the interior fill light blows out; move the light towards the glass.
   const whiteBoard =
     (looks.motherboard?.color ?? colorName(selectedPart(document, "motherboard")?.color)) ===
@@ -822,6 +868,7 @@ export default function BuildScene({
               onPick={pick}
               presentation={presentation}
               look={looks[slot]}
+              fans={slot === "case" ? fans : null}
             />
           ))}
           {primarySlots.map((slot) => (
@@ -921,6 +968,11 @@ export default function BuildScene({
                         : "Add part")}
                 </small>
               </button>
+              {slot === "case" && fans && (
+                <span className="v3-photo-fans-note" data-photo-fans={fans.count}>
+                  {fans.count} fan{fans.count === 1 ? "" : "s"} · {PHOTO_FANS_LABEL}
+                </span>
+              )}
               {link && (
                 <a href={link.href} target="_blank" rel="noopener noreferrer">
                   {link.label} ↗

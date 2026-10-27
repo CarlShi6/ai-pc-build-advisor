@@ -1,4 +1,5 @@
 import { curatedFans } from "@/data/curatedFans";
+import { caseAppearance, type FrontPanelMaterial } from "@/data/showcaseParts";
 import { v3Catalog } from "@/lib/v3/catalog";
 import type { PartCategory } from "@/types/parts";
 
@@ -14,6 +15,10 @@ export interface AppearanceProfile {
   coolerType: string | null;
   /** Lighting type when the source states it (fans), otherwise null. */
   lighting: string | null;
+  /** Cases only, from the manufacturer page (src/data/showcaseParts.ts); null = unknown. */
+  frontPanel: FrontPanelMaterial | null;
+  caseLayout: "dual-chamber" | null;
+  appearanceVerifiedAt: string | null;
   identityText: string;
   specFieldCount: number;
   catalogSourceId: string;
@@ -37,6 +42,9 @@ const seedProfiles: AppearanceProfile[] = v3Catalog
       style: typeof part.specs.style === "string" ? part.specs.style : null,
       coolerType: typeof part.specs.coolerType === "string" ? part.specs.coolerType : null,
       lighting: null,
+      frontPanel: caseAppearance[part.id]?.frontPanel ?? null,
+      caseLayout: caseAppearance[part.id]?.layout ?? null,
+      appearanceVerifiedAt: caseAppearance[part.id]?.verifiedAt ?? null,
       identityText: `${part.brand} ${part.model}`,
       specFieldCount: Object.keys(part.specs).length,
       catalogSourceId: `${showcase ? "showcaseParts" : "seedParts"}:${part.id}`,
@@ -64,6 +72,9 @@ const fanProfiles: AppearanceProfile[] = curatedFans.map((fan) => ({
   style: null,
   coolerType: null,
   lighting: fan.lighting,
+  frontPanel: null,
+  caseLayout: null,
+  appearanceVerifiedAt: null,
   identityText: `${fan.brand} ${fan.model} ${fan.partNumber}`,
   specFieldCount: 1 + fanSpecFields.filter((field) => fan[field] !== null).length,
   catalogSourceId: `curatedFans:${fan.id}`,

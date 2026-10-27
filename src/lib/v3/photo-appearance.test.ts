@@ -1,8 +1,19 @@
 import { describe, expect, it } from "vitest";
 import { createDraft, slotOccupancy } from "@/lib/v3/build-document";
-import { createOgImageFixture, createWhiteSketchFixture } from "@/lib/v3/dev-image-fixture";
+import { caseAppearance } from "@/data/showcaseParts";
+import {
+  chooseCandidate,
+  emptyCandidateReview,
+  equallyLikelyCandidates,
+  matchVisualCandidates,
+} from "@/lib/v3/candidate-matcher";
+import {
+  createGlassFrontFixture,
+  createOgImageFixture,
+  createWhiteSketchFixture,
+} from "@/lib/v3/dev-image-fixture";
 import { confirmImageBuild, proposeImageBuild, suggestParts } from "@/lib/v3/image-build";
-import { appearanceSummary, photoAppearance } from "@/lib/v3/photo-appearance";
+import { appearanceSummary, photoAppearance, photoFans } from "@/lib/v3/photo-appearance";
 
 describe("photo appearance placeholders (PRD §9.3 level 2)", () => {
   it("draws unresolved visible slots from the photo and leaves hidden slots empty", () => {
@@ -38,17 +49,21 @@ describe("photo appearance placeholders (PRD §9.3 level 2)", () => {
 
 describe("Use suggested parts", () => {
   it("previews the top candidate per category and changes nothing until confirmed", () => {
-    const analysis = createWhiteSketchFixture();
+    const analysis = createGlassFrontFixture();
     const before = createDraft("blank");
-    const suggested = suggestParts(analysis, {}, 2500, before);
+    // The two white GPUs tie on the photo, so the user picks one first.
+    const gpus = matchVisualCandidates(analysis).find((set) => set.category === "gpu")!;
+    const msi = gpus.candidates.find((item) => /MSI/.test(item.displayName))!;
+    const reviews = { gpu: chooseCandidate(gpus, emptyCandidateReview(), msi.partId) };
+    const suggested = suggestParts(analysis, reviews, 2500, before);
     expect(before.build.parts).toHaveLength(0);
     const rows = Object.fromEntries(suggested.changes.map((row) => [row.category, row]));
-    expect(rows.case.partName).toMatch(/\(White\)$/);
-    expect(rows.gpu.partName).toMatch(/White/);
+    expect(rows.case.partName).toBe("Lian Li O11 Dynamic EVO (White)");
+    expect(rows.gpu.partName).toMatch(/^MSI .*WHITE$/);
     expect(rows.cooler.partName).toMatch(/White/);
-    expect(rows.case.match).toBe("Weak visual match · appearance only");
     expect(rows.case.appearance).toBe("White, matches the photo");
     expect(rows.fan.price).toBe("Not counted");
+    expect(rows.fan.match).toBe("5 options equally likely");
     // No white motherboard in the catalog: it stays unresolved and is drawn from the photo.
     expect(rows.motherboard.partName).toBeNull();
     expect(rows.motherboard.appearance).toMatch(/drawn from the photo \(White/);
@@ -60,10 +75,33 @@ describe("Use suggested parts", () => {
     expect(slotOccupancy(draft, "gpu")).toBe("selected");
     expect(slotOccupancy(draft, "motherboard")).toBe("unresolved");
     expect(Object.keys(photoAppearance(draft))).toEqual(["motherboard"]);
+    // The confirmed case keeps the photo's fans as an appearance note.
+    expect(photoFans(draft)).toMatchObject({ count: 5, color: "white", lightColor: "blue" });
+  });
+
+  it("never picks a tied candidate by name", () => {
+    const suggested = suggestParts(createWhiteSketchFixture(), {}, 2500);
+    const rows = Object.fromEntries(suggested.changes.map((row) => [row.category, row]));
+    expect(suggested.reviews.case).toBeUndefined();
+    expect(rows.case.partName).toBeNull();
+    expect(rows.case.match).toBe("3 options equally likely");
+    expect(rows.case.equallyLikely).toHaveLength(3);
+    expect(rows.case.appearance).toMatch(/^Choose one in the review; drawn from the photo/);
+    expect(rows.gpu.match).toBe("2 options equally likely");
+    // A tied category the user already decided keeps that choice.
+    const sets = matchVisualCandidates(createWhiteSketchFixture());
+    const cases = sets.find((set) => set.category === "case")!;
+    const h5 = cases.candidates.find((item) => /H5 Flow/.test(item.displayName))!;
+    const chosen = suggestParts(
+      createWhiteSketchFixture(),
+      { case: chooseCandidate(cases, emptyCandidateReview(), h5.partId) },
+      2500,
+    );
+    expect(chosen.reviews.case?.chosenPartId).toBe(h5.partId);
   });
 
   it("skips a candidate the user excluded", () => {
-    const analysis = createWhiteSketchFixture();
+    const analysis = createGlassFrontFixture();
     const first = suggestParts(analysis, {}, 2500);
     const top = first.reviews.case!.chosenPartId!;
     const second = suggestParts(
@@ -73,5 +111,43 @@ describe("Use suggested parts", () => {
     );
     expect(second.reviews.case?.chosenPartId).toBeDefined();
     expect(second.reviews.case?.chosenPartId).not.toBe(top);
+  });
+});
+
+describe("case front panel (manufacturer pages, verified 2026-10-26)", () => {
+  it("ranks the glass-front O11 first, drops the mesh-front H5 Flow and keeps the unknown 4000D", () => {
+    const cases = matchVisualCandidates(createGlassFrontFixture()).find(
+      (set) => set.category === "case",
+    )!;
+    expect(cases.candidates.map((item) => item.displayName)).toEqual([
+      "Lian Li O11 Dynamic EVO (White)",
+      "Corsair 4000D Airflow (White)",
+    ]);
+    expect(cases.candidates[0].matchedSignals).toContain(
+      "Front panel: glass (manufacturer page, verified 2026-10-26)",
+    );
+    expect(equallyLikelyCandidates(cases, emptyCandidateReview())).toEqual([]);
+  });
+
+  it("reports a tie when the photo does not show the front", () => {
+    const cases = matchVisualCandidates(createWhiteSketchFixture()).find(
+      (set) => set.category === "case",
+    )!;
+    expect(equallyLikelyCandidates(cases, emptyCandidateReview())).toHaveLength(3);
+    // Excluding one leaves the other two tied.
+    const review = { status: "unknown" as const, excludedPartIds: [cases.candidates[0].partId] };
+    expect(equallyLikelyCandidates(cases, review)).toHaveLength(2);
+  });
+
+  it("records only what each manufacturer page states", () => {
+    expect(caseAppearance["showcase-case-lianli-o11dew"]).toMatchObject({
+      frontPanel: "glass",
+      layout: "dual-chamber",
+      verifiedAt: "2026-10-26",
+    });
+    expect(caseAppearance["showcase-case-nzxt-cc-h52fw-01"].frontPanel).toBe("mesh");
+    expect(caseAppearance["showcase-case-corsair-cc-9011201-ww"].frontPanel).toBeNull();
+    for (const entry of Object.values(caseAppearance))
+      expect(entry.sourceUrl).toMatch(/^https:\/\//);
   });
 });

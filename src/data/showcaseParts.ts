@@ -253,6 +253,58 @@ export const showcaseMeta: Record<string, ShowcaseMeta> = Object.fromEntries(
   ]),
 );
 
+/**
+ * Case appearance for photo matching (visual redesign slice A2), read on 2026-10-26 from each
+ * case's `productUrl`. A field is set only when the page names it in words; anything the page
+ * leaves unsaid is null (unknown), and an unknown never counts for or against a candidate.
+ */
+export type FrontPanelMaterial = "glass" | "mesh" | "perforated";
+
+export interface CaseAppearance {
+  frontPanel: FrontPanelMaterial | null;
+  layout: "dual-chamber" | null;
+  /** The manufacturer's own words behind each field, or why it stays unknown. */
+  evidence: string[];
+  sourceUrl: string;
+  verifiedAt: string;
+}
+
+const APPEARANCE_VERIFIED = "2026-10-26";
+
+export const caseAppearance: Record<string, CaseAppearance> = {
+  "showcase-case-lianli-o11dew": {
+    frontPanel: "glass",
+    layout: "dual-chamber",
+    evidence: [
+      'Front: "Front and side tempered glass panels for components and RGB display".',
+      'Layout: "Dual-chamber layout with hooks friendly cable management compartment".',
+    ],
+    sourceUrl: "https://lian-li.com/product/o11-dynamic-evo/",
+    verifiedAt: APPEARANCE_VERIFIED,
+  },
+  "showcase-case-nzxt-cc-h52fw-01": {
+    frontPanel: "mesh",
+    layout: null,
+    evidence: [
+      'Front: "Ultra-fine mesh on the top, front, and side panels".',
+      "Layout: the page does not describe a chamber layout, so it is unknown.",
+    ],
+    sourceUrl: "https://nzxt.com/products/h5-flow",
+    verifiedAt: APPEARANCE_VERIFIED,
+  },
+  "showcase-case-corsair-cc-9011201-ww": {
+    frontPanel: null,
+    layout: null,
+    evidence: [
+      'Front: the page says "High-airflow optimized steel front panel" but not whether it is mesh or perforated, so the material is unknown.',
+      "Layout: the page does not describe a chamber layout, so it is unknown.",
+    ],
+    sourceUrl:
+      "https://www.corsair.com/us/en/p/pc-cases/cc-9011201-ww/4000d-airflow-tempered-glass-mid-tower-atx-case-white-cc-9011201-ww",
+    verifiedAt: APPEARANCE_VERIFIED,
+  },
+};
+
 function searchUrl(brand: string, model: string) {
   return `https://www.newegg.com/p/pl?d=${encodeURIComponent(`${brand} ${model}`)}`;
 }

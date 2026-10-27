@@ -88,17 +88,31 @@ const obs = (
 const caseRegion = { x: 0.208, y: 0.122, width: 0.583, height: 0.767 };
 
 /**
- * Local development fixture for `e2e/fixtures/white-build-sketch.png`, a drawn (not photographed)
- * white glass-panel build with five blue-lit fans. It never calls an AI provider.
+ * Local development fixtures for drawn (not photographed) white builds with five blue-lit fans.
+ * They never call an AI provider. `white-build-sketch.png` is a straight side view, so nothing
+ * shows the front panel; `white-build-glass-front.png` adds the front face, a pillarless clear
+ * glass panel.
  */
-export function createWhiteSketchFixture(): ImageAnalysisResult {
+function whiteSketch(frontGlass: boolean): ImageAnalysisResult {
   return createImageAnalysisResult(
     {
-      summary:
-        "Local fixture: a drawn white tempered-glass build with five blue-lit fans, a white AIO and a white graphics card.",
+      summary: frontGlass
+        ? "Local fixture: a drawn white build with glass side and front panels, five blue-lit fans, a white AIO and a white graphics card."
+        : "Local fixture: a drawn white tempered-glass build with five blue-lit fans, a white AIO and a white graphics card.",
       quality: "clear",
       qualityIssues: ["This is a drawing, not a hardware photograph."],
       observations: [
+        ...(frontGlass
+          ? [
+              obs(
+                "case",
+                "front panel material",
+                "tempered glass",
+                "The front face is a clear glass panel that meets the side glass with no corner pillar; the fan rings show through it.",
+                { x: 0.792, y: 0.122, width: 0.093, height: 0.767 },
+              ),
+            ]
+          : []),
         obs("case", "color", "white", "The case frame and PSU shroud are white.", caseRegion),
         obs(
           "case",
@@ -175,13 +189,17 @@ export function createWhiteSketchFixture(): ImageAnalysisResult {
       absentParts: [],
     },
     { mime: "image/png", width: 1200, height: 900 },
-    "local-white-sketch-fixture",
+    frontGlass ? "local-white-glass-front-fixture" : "local-white-sketch-fixture",
     "fixture",
   );
 }
+
+export const createWhiteSketchFixture = () => whiteSketch(false);
+export const createGlassFrontFixture = () => whiteSketch(true);
 
 /** Dev-only fixtures keyed by the file name that triggers them. */
 export const devImageFixtures: Record<string, () => ImageAnalysisResult> = {
   "og.png": createOgImageFixture,
   "white-build-sketch.png": createWhiteSketchFixture,
+  "white-build-glass-front.png": createGlassFrontFixture,
 };

@@ -3,6 +3,7 @@ import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import {
   chooseCandidate,
   emptyCandidateReview,
+  equallyLikelyCandidates,
   excludeCandidate,
   keepCandidateUnknown,
   matchVisualCandidates,
@@ -59,8 +60,9 @@ export function ImageCandidateReview({
       {sets.map((set) => {
         const review = reviews[set.category] ?? emptyCandidateReview();
         const chosen = set.candidates.find((candidate) => candidate.partId === review.chosenPartId);
+        const tied = equallyLikelyCandidates(set, review);
         return (
-          <div className="v3-candidate-set" key={set.category}>
+          <div className="v3-candidate-set" key={set.category} data-category={set.category}>
             <div className="v3-candidate-heading">
               <h3>{categoryLabels[set.category]}</h3>
               <small>
@@ -74,6 +76,13 @@ export function ImageCandidateReview({
               </small>
             </div>
             <p>{set.explanation}</p>
+            {tied.length > 0 && !chosen && (
+              <p className="v3-equally-likely" role="note">
+                <strong>{tied.length} options equally likely.</strong> The photo cannot tell{" "}
+                {tied.map((candidate) => candidate.displayName).join(", ")} apart, so none is picked
+                for you. Choose one, or keep it unknown.
+              </p>
+            )}
             {chosen && (
               <p className="v3-review-choice">
                 Planned option: {chosen.displayName}. Original photo identity remains unverified.

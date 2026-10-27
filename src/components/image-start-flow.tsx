@@ -21,7 +21,7 @@ import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import { inspectImage } from "@/lib/v3/image-input";
 
 /** Dev-only sample files with a keyless fixture analysis (`src/lib/v3/dev-image-fixture.ts`). */
-const devFixtureNames = ["og.png", "white-build-sketch.png"];
+const devFixtureNames = ["og.png", "white-build-sketch.png", "white-build-glass-front.png"];
 
 /**
  * Photo → observations → candidate review → Build preview → confirm. Shared by the home hero and
@@ -506,6 +506,14 @@ function SuggestedChanges({
                   <>
                     <strong>{change.partName}</strong>
                     <small>{change.match}</small>
+                  </>
+                ) : change.equallyLikely.length ? (
+                  <>
+                    <strong>{change.match}</strong>
+                    <small>
+                      {change.equallyLikely.join(" · ")}. Choose one above; nothing is picked by
+                      name.
+                    </small>
                   </>
                 ) : (
                   <strong>Stays unresolved</strong>

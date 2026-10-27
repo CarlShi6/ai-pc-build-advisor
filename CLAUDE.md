@@ -101,6 +101,11 @@ Order: each slice gets the full gate plus E2E, before/after browser screenshots,
   - **Placeholders.** Unresolved slots that have photo observations draw an appearance placeholder (PRD §9.3 level 2, appearance-informed). It uses the observed colour, the glass side panel, the fan count and light colour, and AIO vs air cooler type. The label reads "Appearance from photo · model not confirmed" and never names a model. Slots without observations keep the empty-slot style.
   - **"Use suggested parts".** On the review page, it takes the top-ranked candidate in every category at once. It first shows a change list: what each slot becomes, the total price, compatibility, and the effect on appearance. It applies only after the user confirms, through the existing preview/confirm flow. Weak matches still say "Weak visual match · appearance only".
   - **E2E:** photo sample → use suggested parts → confirm → the Studio's case and GPU are white.
+- **Slice A2 (added after the slice A review, before B):**
+  - Case catalog appearance fields (front-panel material glass / mesh / perforated, layout such as dual-chamber), only as each manufacturer page states them, with link and verification date; anything unstated stays unknown. The image observation format gains the case front-panel material, and the matcher uses it.
+  - Candidates that still tie are shown as "N options equally likely" for the user to pick; nothing is picked by name order.
+  - Until the fan models land (slice D), a confirmed case still draws the photo's fans, labelled "Appearance from photo".
+  - Tests: a glass-front sample ranks the O11 first; a tie shows "equally likely".
 - **Slice B: review page re-layout (PRD §4.3).**
   - Desktop: the photo stays fixed on the left, with observation regions outlined when present; the part list is on the right.
   - Observations collapse to one tag line per category (e.g. "White · Tempered glass · 5 fans · Blue LED"); reasons and confidence show on expand.

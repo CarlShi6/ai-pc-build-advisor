@@ -284,3 +284,42 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - The selection outline is still green until slice C.
 - Tests: `src/lib/v3/photo-appearance.test.ts` (4 tests). E2E `e2e/photo-suggested-parts.e2e.ts`: photo sample → change list (weak label, unresolved board, incomplete, unknown price) → confirm → 3/8 selected, case and GPU `data-color="white"` in 3D and 2D, board labelled as from the photo.
 - Gate: lint 0, typecheck passed, 212 tests in 33 files passed, build passed, **E2E 12/12**.
+
+### Slice A2: case front panel, honest ties, photo fans on a confirmed case (2026-10-26)
+
+Asked for after the slice A review: the three white cases tied on colour and the alphabetical first (Corsair 4000D) won, though the photo looks like an O11.
+
+- **Case appearance fields** (`caseAppearance` in `src/data/showcaseParts.ts`), read on 2026-10-26 from each case's own product page, with the quoted wording, link and date:
+  - Lian Li O11 Dynamic EVO White: front **glass** ("Front and side tempered glass panels"), layout **dual-chamber** ("Dual-chamber layout…").
+  - NZXT H5 Flow White: front **mesh** ("Ultra-fine mesh on the top, front, and side panels"); layout not described, so unknown.
+  - Corsair 4000D Airflow White: front **unknown**. The page says "High-airflow optimized steel front panel" without saying mesh or perforated. Layout unknown.
+- **Matching** (`src/lib/v3/candidate-matcher.ts`):
+  - A case "front panel material" observation scores against the stated material.
+  - A confident observed mismatch drops the candidate, like colour does.
+  - An unknown on the manufacturer page counts neither way.
+  - A "dual-chamber" layout observation scores only against a stated dual-chamber case.
+  - Signals read e.g. "Front panel: glass (manufacturer page, verified 2026-10-26)".
+- **Image prompt** (`image-analysis.server.ts`): when the case front is visible, add a "front panel material" observation (glass / mesh / perforated / solid), otherwise omit it; add "layout: dual-chamber" when a separate rear chamber is visible.
+- **Ties are shown, not resolved by name.**
+  - `equallyLikelyCandidates(set, review)` returns the non-excluded top candidates that share the best score.
+  - The review shows "N options equally likely. The photo cannot tell … apart, so none is picked for you."
+  - "Use suggested parts" picks nothing for a tied category unless the user already chose one there. Its row reads "N options equally likely", lists the names, and says "Choose one in the review; nothing is picked by name". The slot stays drawn from the photo until then.
+  - On the current catalog the two white GPUs (MSI, ASUS) and the white fans also tie, so they now ask the user too.
+- **Photo fans on a confirmed case** (`photoFans` in `photo-appearance.ts`, `FanSet` in `BuildScene.tsx`):
+  - When the case is selected and the photo counted fans, the reference case draws them (count, frame colour, light colour).
+  - The case callout reads "5 fans · Appearance from photo".
+  - The scene disclosure adds "Fans (5): Appearance from photo, a style note, not a Build part."
+  - A stopgap until slice D's fan models.
+- **Samples** (drawings, keyless dev fixtures):
+  - `e2e/fixtures/white-build-sketch.png` stays the straight side view, where nothing shows the front, so the cases tie.
+  - New `e2e/fixtures/white-build-glass-front.png` adds a three-quarter front face with a pillarless glass front.
+- **Result on the glass-front sample:**
+  - Cases: O11 (score 4, possible match) first, then 4000D (2, weak; front unknown). The H5 Flow is dropped by its mesh front.
+  - The user picks the MSI GPU from the two tied options, then "Use suggested parts" gives O11 + MSI + Corsair AIO.
+  - In the Studio, the O11 reference model shows the three blue-ring front fans through its glass.
+- Tests:
+  - `photo-appearance.test.ts` (now 7): glass front → O11 first with the front-panel signal; tie → 3 equally likely, and excluding one leaves 2; suggest never picks a tied case but keeps a user's earlier choice; manufacturer fields as stated; `photoFans` after confirm.
+  - E2E `photo-suggested-parts.e2e.ts` (now 2 tests):
+    - glass front → O11 first → GPU "2 options equally likely" → pick MSI → change list → confirm → 3/8, white case and GPU, "5 fans · Appearance from photo".
+    - side sketch → case "3 options equally likely" in the review and the change list.
+- Gate: lint 0, typecheck passed, 216 tests in 33 files passed, build passed, **E2E 13/13**.

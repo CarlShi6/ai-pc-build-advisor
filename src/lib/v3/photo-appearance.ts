@@ -156,6 +156,45 @@ export function photoAppearance(
   return result;
 }
 
+export const PHOTO_FANS_LABEL = "Appearance from photo";
+
+export interface PhotoFans {
+  count: number;
+  /** Fan frame colour from the photo (a fan colour, else the theme). */
+  color: AppearanceColor | null;
+  lightColor: string | null;
+  observationIds: string[];
+}
+
+/**
+ * Fans the photo shows, drawn on a confirmed case whose reference model has none of its own.
+ * A stopgap until the fan models (visual redesign slice D); a style note, never a Build part.
+ */
+export function photoFans(document: BuildDocumentV3): PhotoFans | null {
+  if (slotOccupancy(document, "case") !== "selected") return null;
+  const observations = (document.imageContext?.observations ?? []).filter(usable);
+  const countItem = observations.find(
+    (item) =>
+      item.category === "fan" &&
+      /count|number|quantity|layout/.test(item.attribute.toLowerCase()) &&
+      fanCountFrom(item.value) > 0,
+  );
+  if (!countItem) return null;
+  const colorItem =
+    observations.find(
+      (item) => item.category === "fan" && isColorAttribute(item) && bodyColor(item.value),
+    ) ?? observations.find((item) => item.category === "theme" && bodyColor(item.value));
+  const lightItem = observations
+    .filter(isLightingAttribute)
+    .find((item) => lightColor(item.value) !== null);
+  return {
+    count: fanCountFrom(countItem.value),
+    color: colorItem ? bodyColor(colorItem.value) : null,
+    lightColor: lightItem ? lightColor(lightItem.value) : null,
+    observationIds: [countItem, colorItem, lightItem].flatMap((item) => (item ? [item.id] : [])),
+  };
+}
+
 /** Short trait line for labels and tooltips, e.g. "White · Glass side panel · 5 fans · Blue light". */
 export function appearanceSummary(appearance: SlotAppearance): string {
   const traits = [

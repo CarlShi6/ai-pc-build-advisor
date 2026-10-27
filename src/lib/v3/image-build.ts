@@ -13,6 +13,7 @@ import {
 import {
   chooseCandidate,
   emptyCandidateReview,
+  equallyLikelyCandidates,
   matchVisualCandidates,
   type AppearanceCandidate,
   type CandidateReview,
@@ -213,6 +214,8 @@ export interface SuggestedChange {
   match: string | null;
   price: string;
   appearance: string;
+  /** Names of the top candidates the photo cannot tell apart; the user picks one. */
+  equallyLikely: string[];
 }
 
 export interface SuggestedParts {
@@ -225,7 +228,8 @@ export interface SuggestedParts {
 
 /**
  * "Use suggested parts": the top-ranked candidate in every category at once (skipping ones the
- * user excluded), as a full preview. Nothing changes until the proposal is confirmed.
+ * user excluded), as a full preview. Nothing changes until the proposal is confirmed. When two or
+ * more candidates tie, none is picked unless the user already chose one of them.
  */
 export function suggestParts(
   analysis: ImageAnalysisResult,
@@ -235,14 +239,23 @@ export function suggestParts(
 ): SuggestedParts {
   const reviews: ImageReviews = { ...current };
   const picks: Partial<Record<VisibleCatalogCategory, AppearanceCandidate>> = {};
+  const ties: Partial<Record<VisibleCatalogCategory, AppearanceCandidate[]>> = {};
   for (const set of matchVisualCandidates(analysis)) {
     const review = current[set.category] ?? emptyCandidateReview();
     const top = set.candidates.find(
       (candidate) => !review.excludedPartIds.includes(candidate.partId),
     );
     if (!top) continue;
-    reviews[set.category] = chooseCandidate(set, review, top.partId);
-    picks[set.category] = top;
+    const tied = equallyLikelyCandidates(set, review);
+    const pick = tied.length
+      ? set.candidates.find((candidate) => candidate.partId === review.chosenPartId)
+      : top;
+    if (!pick) {
+      ties[set.category] = tied;
+      continue;
+    }
+    reviews[set.category] = chooseCandidate(set, review, pick.partId);
+    picks[set.category] = pick;
   }
   const proposal = proposeImageBuild(analysis, reviews, budget, draft);
   const observations = analysis.observations.filter(
@@ -256,15 +269,21 @@ export function suggestParts(
     if (set.status === "not_in_photo") continue;
     if (!pick) {
       const look = set.category === "fan" ? undefined : looks[set.category as SlotId];
+      const tied = ties[set.category] ?? [];
+      const reason = tied.length ? "Choose one in the review" : "No catalog match";
+      const until = tied.length ? " until then" : "";
       changes.push({
         category: set.category,
         label,
         partName: null,
-        match: null,
+        match: tied.length ? `${tied.length} options equally likely` : null,
         price: "Not counted",
         appearance: look
-          ? `No catalog match; drawn from the photo (${appearanceSummary(look)})`
-          : "No catalog match; stays unresolved",
+          ? `${reason}; drawn from the photo${until} (${appearanceSummary(look)})`
+          : set.category === "fan"
+            ? `${reason}; a style note only, not a Build slot`
+            : `${reason}; stays unresolved`,
+        equallyLikely: tied.map((candidate) => candidate.displayName),
       });
       continue;
     }
@@ -288,6 +307,7 @@ export function suggestParts(
       label,
       partName: pick.displayName,
       match: candidateMatchLabel(pick),
+      equallyLikely: [],
       price:
         set.category === "fan" || !part
           ? "Not counted"
