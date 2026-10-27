@@ -559,3 +559,29 @@ The review came from a real photo run: the O11 confirmed, GPU and cooler "Appear
   - `slot-models.test.ts`: look-alikes, ghost, reference, and the disclosure for the reported scene.
   - `funnel-analytics.test.ts`: the new category fields, never observation text.
   - E2E: the photo flow checks `data-slot-models` and each disclosure line, and that the line stays inside the panel. Showcase and demo tests assert the new lines.
+
+### "Diorama" render style (2026-10-27)
+
+A second look beside "Studio", switched in the scene toolbar (Studio | Diorama). The choice is remembered per browser (`localStorage`, guarded); the default stays Studio until the user decides. It changes only the camera, materials, lighting and set dressing: the Build, part sizes, structure and counts, explode, focus and the replace card are the same. The scene reports `data-render-style`.
+
+- **Camera** (`scene-diorama.ts`): a 20° lens, looking down about 30° from halfway between the front and the open glass side. Home frames the case and plinth at 80% of the free canvas; orbit and zoom stay free. Explode and focus framing use the live lens.
+- **Plinth:** a 25 mm slab (at model scale) with softened edges, 0.55 units wider than the case on every side, faintly reflective on top. It drops under exploded parts.
+  - Two non-interactive props, no brands: a potted plant and a coiled cable, centred in the margin and clear of the case (tested).
+- **Cutaway:** the glass side and front panels are off by default; "Show side panel" refits them. The Studio keeps its "Remove side panel".
+- **Clay materials:** every surface goes rough (≥ 0.82) and nearly non-metallic (≤ 0.06), with low environment reflection. Near-whites become a soft warm white. Lights stay emissive. Glass, when refitted, barely reflects.
+- **Light:**
+  - A dark blue-grey room with low ambient and hemisphere light.
+  - A weak key light with soft shadows for the outline, and a faint cool rim.
+  - The build's RGB as the main light: four point lights in the open cutaway (pump, GPU, memory, front), spilling colour onto the plinth. The light tier keeps two.
+- **Effects:** stronger ambient occlusion (radius 1, intensity 3.4), contact shadows on the plinth top, slightly stronger bloom, no depth of field.
+- **Labels:** the side columns turn with the camera and sit wider; the cards are smaller and translucent; callout lines are thinner and fainter. The focus card is translucent.
+- **Detail, in both styles** (sizes and positions are estimates, no logos):
+  - Sleeved power cables with a generated braid texture: the board's 24-pin and the GPU's 16-pin, each from its connector into a tray grommet (`scene-cables.ts`). Drawn only while assembled, and only when the case, board and GPU are reference models with those features.
+  - Three rubber cable grommets on the O11's tray.
+  - Two screws on each GPU bracket.
+  - Hub-cap stickers on every fan rotor.
+  - Memory latches were already drawn.
+- **Tests:**
+  - `scene-diorama.test.ts`: the view angle; plinth thickness and margins; the plinth dropping under exploded parts; props clear of the case; cables ending in grommets inside the case; no cables without reference models.
+  - New E2E `diorama.e2e.ts`: switching keeps the same models, slot kinds and disclosure; cutaway by default with a working "Show side panel"; GPU focus framed in Standard and memory in Exploded; the choice survives a reload; back to Studio.
+  - The framing helpers moved to `e2e/scene-framing.ts`.

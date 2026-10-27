@@ -6899,3 +6899,26 @@
   color: var(--g-text);
   border-color: var(--g-line-strong);
 }
+/* Render style switch sits beside the 3D / 2D toggle. */
+.v3-scene-toolbar [aria-label="Render style"] {
+  margin-left: auto;
+}
+/* Diorama: lighter labels and card, so the miniature stays the subject. */
+.v3-scene-canvas[data-render-style="diorama"] .v3-scene-callout {
+  background: #1d2024a6;
+  border-color: #ffffff1f;
+  backdrop-filter: blur(6px);
+  min-width: 0;
+}
+.v3-scene-canvas[data-render-style="diorama"] .v3-scene-callout button strong {
+  font-size: 11px;
+}
+.v3-scene-canvas[data-render-style="diorama"] .v3-scene-callout small {
+  font-size: 9px;
+  opacity: 0.8;
+}
+.v3-scene-canvas[data-render-style="diorama"] .v3-focus-card {
+  background: #1b1e22c7;
+  border-color: #ffffff1a;
+  backdrop-filter: blur(16px);
+}

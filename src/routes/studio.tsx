@@ -65,6 +65,9 @@ const balanceLabels: Array<[BalanceWeight, string]> = [
 import { getValidatedOfficialUrl } from "@/lib/product-trust";
 import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
 import { DISCLOSURE_NOTE, sceneDisclosure } from "@/lib/v3/scene-disclosure";
+import { renderStyles, type RenderStyle } from "@/lib/v3/scene-diorama";
+
+const RENDER_STYLE_KEY = "aipc-v3-render-style";
 
 /** Signed price change, or "Unknown" when either price is unknown (unknown is never $0). */
 function priceChangeText(delta: number, candidate: Part, current: Part | undefined) {
@@ -104,6 +107,25 @@ function StudioPage() {
   const [explode, setExplode] = useState(55);
   const [resetKey, setResetKey] = useState(0);
   const [sidePanelRemoved, setSidePanelRemoved] = useState(false);
+  // Render style: a per-viewer preference, remembered in this browser when storage allows.
+  const [renderStyle, setRenderStyle] = useState<RenderStyle>("studio");
+  const [casePanelsShown, setCasePanelsShown] = useState(false);
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem(RENDER_STYLE_KEY);
+      if (saved === "studio" || saved === "diorama") setRenderStyle(saved);
+    } catch {
+      // Storage blocked: keep the default.
+    }
+  }, []);
+  const chooseRenderStyle = (next: RenderStyle) => {
+    setRenderStyle(next);
+    try {
+      window.localStorage.setItem(RENDER_STYLE_KEY, next);
+    } catch {
+      // Storage blocked: the choice lasts for this page only.
+    }
+  };
   const [focusSlot, setFocusSlot] = useState<SlotId | null>(null);
   const clearFocus = useCallback(() => setFocusSlot(null), []);
   const [saving, setSaving] = useState(false);
@@ -324,6 +346,21 @@ function StudioPage() {
               <span className="v3-kicker">YOUR BUILD, IN SPACE</span>
               <strong>{show3D ? "Illustrative layout" : "2D layout"}</strong>
             </div>
+            {show3D && (
+              <div className="v3-scene-controls" role="group" aria-label="Render style">
+                {renderStyles.map((style) => (
+                  <button
+                    type="button"
+                    key={style}
+                    className={renderStyle === style ? "active" : ""}
+                    aria-pressed={renderStyle === style}
+                    onClick={() => chooseRenderStyle(style)}
+                  >
+                    {style === "studio" ? "Studio" : "Diorama"}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="v3-scene-controls">
               <button
                 type="button"
@@ -365,6 +402,8 @@ function StudioPage() {
                     partLink={(slot) => partLinkFor(selectedPart(document, slot))}
                     focusCard={replaceCard}
                     sidePanelRemoved={sidePanelRemoved}
+                    renderStyle={renderStyle}
+                    casePanelsShown={casePanelsShown}
                   />
                 </SceneBoundary>
               ) : (
@@ -399,14 +438,26 @@ function StudioPage() {
                       {explode}%
                     </label>
                   )}
-                  <label className="v3-scene-toggle">
-                    <input
-                      type="checkbox"
-                      checked={sidePanelRemoved}
-                      onChange={(event) => setSidePanelRemoved(event.target.checked)}
-                    />{" "}
-                    Remove side panel
-                  </label>
+                  {/* The diorama is a cutaway (glass side and front off) with a switch to refit them. */}
+                  {renderStyle === "diorama" ? (
+                    <label className="v3-scene-toggle">
+                      <input
+                        type="checkbox"
+                        checked={casePanelsShown}
+                        onChange={(event) => setCasePanelsShown(event.target.checked)}
+                      />{" "}
+                      Show side panel
+                    </label>
+                  ) : (
+                    <label className="v3-scene-toggle">
+                      <input
+                        type="checkbox"
+                        checked={sidePanelRemoved}
+                        onChange={(event) => setSidePanelRemoved(event.target.checked)}
+                      />{" "}
+                      Remove side panel
+                    </label>
+                  )}
                   <button type="button" onClick={() => setResetKey((value) => value + 1)}>
                     Reset camera
                   </button>

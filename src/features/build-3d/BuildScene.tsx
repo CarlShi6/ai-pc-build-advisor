@@ -33,6 +33,7 @@ import { ToneMappingMode } from "postprocessing";
 import type { ThreeEvent } from "@react-three/fiber";
 import {
   Box3,
+  CanvasTexture,
   CatmullRomCurve3,
   DirectionalLight,
   Euler,
@@ -44,6 +45,8 @@ import {
   type Group,
   type InstancedMesh,
   type MeshPhysicalMaterial,
+  type PerspectiveCamera,
+  RepeatWrapping,
 } from "three";
 import {
   primarySlots,
@@ -75,6 +78,17 @@ import {
   type SceneMode,
 } from "@/lib/v3/scene-focus";
 import { slotModel } from "@/lib/v3/slot-models";
+import { sceneCables, type SceneCable } from "@/lib/v3/scene-cables";
+import {
+  DIORAMA_AZIMUTH,
+  DIORAMA_FILL,
+  DIORAMA_FOV,
+  DIORAMA_REMOVED_PANELS,
+  DIORAMA_VIEW,
+  dioramaProps,
+  plinthBox,
+  type RenderStyle,
+} from "@/lib/v3/scene-diorama";
 import {
   GENERIC_CASE_WALL,
   GENERIC_SHROUD_FROM_BOTTOM,
@@ -130,6 +144,10 @@ export interface BuildSceneProps {
   partLink?: (slot: SlotId) => { href: string; label: string } | null;
   /** Hide the case's glass side panel to look straight in. */
   sidePanelRemoved?: boolean;
+  /** "studio" (default) or the "diorama" miniature; geometry and interaction are the same. */
+  renderStyle?: RenderStyle;
+  /** Diorama only: put the cut-away glass side and front back on. */
+  casePanelsShown?: boolean;
 }
 
 const FLOOR_Y = -1.7;
@@ -187,6 +205,26 @@ function Eased({ position = ORIGIN, children }: { position?: Point; children: Re
 /** True inside the ghosted placeholder of an open slot (PRD §9.3): every surface is a faint grey. */
 const GhostContext = createContext(false);
 
+/** The render style: the diorama turns every surface into matte clay. */
+const StyleContext = createContext<RenderStyle>("studio");
+/** Case panels taken off entirely (the diorama's cutaway). */
+const RemovedPanelsContext = createContext<CasePanel[]>([]);
+
+/** Diorama clay: near-white turns a soft warm white, everything else keeps its hue. */
+const CLAY_WHITE = [0xe9, 0xe3, 0xda];
+function clayColor(color?: string) {
+  if (!color || !/^#[0-9a-f]{6}$/i.test(color)) return color;
+  const channels = [1, 3, 5].map((at) => parseInt(color.slice(at, at + 2), 16));
+  if (Math.min(...channels) < 0xc0) return color;
+  return `#${channels
+    .map((value, k) =>
+      Math.round(value * 0.25 + CLAY_WHITE[k] * 0.75)
+        .toString(16)
+        .padStart(2, "0"),
+    )
+    .join("")}`;
+}
+
 /** True inside a slot that is dimmed because another part is focused. */
 const DimContext = createContext(false);
 /** True in the light quality tier: glass skips the extra transmission render pass. */
@@ -203,6 +241,7 @@ function prefersReducedMotion() {
 function Mat(props: Record<string, unknown> & { opacity?: number; transparent?: boolean }) {
   const dim = useContext(DimContext);
   const ghost = useContext(GhostContext);
+  const style = useContext(StyleContext);
   const opacity = props.opacity ?? 1;
   if (ghost)
     // One flat, light translucent grey: reads as "a board goes here" against white or dark walls.
@@ -217,12 +256,23 @@ function Mat(props: Record<string, unknown> & { opacity?: number; transparent?: 
         depthWrite={false}
       />
     );
+  // Diorama: matte clay, rough and barely metallic, almost no reflection; lights stay lights.
+  const clay = style === "diorama" && !props.emissive;
   return (
     <meshStandardMaterial
       // three.js needs a recompile when `transparent` flips, so remount on dim changes.
       key={dim ? "dim" : "lit"}
       {...props}
-      color={surfaceColor(props.color as string | undefined, !!props.emissive)}
+      {...(clay && {
+        roughness: Math.max(0.82, Number(props.roughness ?? 0.8)),
+        metalness: Math.min(0.06, Number(props.metalness ?? 0)),
+        envMapIntensity: 0.5,
+      })}
+      color={
+        clay
+          ? clayColor(surfaceColor(props.color as string | undefined))
+          : surfaceColor(props.color as string | undefined, !!props.emissive)
+      }
       transparent={dim || props.transparent}
       opacity={dim ? Math.min(0.1, opacity) : opacity}
       depthWrite={!dim && props.depthWrite !== false}
@@ -297,6 +347,7 @@ function GlassMaterial({
   panel?: CasePanel | null;
 }) {
   const offsets = useContext(PanelOffsetContext);
+  const style = useContext(StyleContext);
   const apart = !!casePanel && Math.hypot(...(offsets[casePanel] ?? ORIGIN)) > 0.05;
   const dim = useContext(DimContext);
   const light = useContext(LightTierContext);
@@ -330,8 +381,8 @@ function GlassMaterial({
         transmission={light ? 0 : transmission}
         thickness={0.05}
         ior={1.5}
-        envMapIntensity={0.25}
-        specularIntensity={0.4}
+        envMapIntensity={style === "diorama" ? 0.08 : 0.25}
+        specularIntensity={style === "diorama" ? 0.15 : 0.4}
         transparent
         depthWrite={false}
       />
@@ -432,6 +483,7 @@ function CaseModel({
   const dim = useContext(DimContext);
   const light = useContext(LightTierContext);
   const offsets = useContext(PanelOffsetContext);
+  const removed = useContext(RemovedPanelsContext);
   const [w, h, d] = size;
   const t = GENERIC_CASE_WALL;
   const white = presentation.caseColor === appearanceHex.white;
@@ -452,18 +504,20 @@ function CaseModel({
       </Eased>
       <Box size={[t, h, d]} position={[-w / 2, 0, 0]} material={panel} />
       {/* Front panel: mesh look; see-through enough to show lit front fans. */}
-      <Eased position={offsets.front}>
-        <Box
-          size={[t, h, d]}
-          position={[w / 2, 0, 0]}
-          material={{
-            color: white ? "#cfd4da" : "#101113",
-            metalness: 0.3,
-            roughness: 0.8,
-            ...(fanCount > 0 && { transparent: true, opacity: 0.45, depthWrite: false }),
-          }}
-        />
-      </Eased>
+      {!removed.includes("front") && (
+        <Eased position={offsets.front}>
+          <Box
+            size={[t, h, d]}
+            position={[w / 2, 0, 0]}
+            material={{
+              color: white ? "#cfd4da" : "#101113",
+              metalness: 0.3,
+              roughness: 0.8,
+              ...(fanCount > 0 && { transparent: true, opacity: 0.45, depthWrite: false }),
+            }}
+          />
+        </Eased>
+      )}
       <Eased position={offsets.shroud}>
         <Box
           size={[w - t * 2, 0.04, d - t * 2]}
@@ -472,22 +526,24 @@ function CaseModel({
         />
       </Eased>
       {/* Tempered glass side panel, facing the default camera. */}
-      <Eased position={offsets.glass}>
-        {glass ? (
-          <mesh position={[0, 0, d / 2]}>
-            <boxGeometry args={[w, h, 0.02]} />
-            <GlassMaterial
-              color="#d8e2e6"
-              roughness={0.04}
-              transmission={1}
-              sidePanel
-              panel="glass"
-            />
-          </mesh>
-        ) : (
-          <Box size={[w, h, 0.02]} position={[0, 0, d / 2]} material={panel} />
-        )}
-      </Eased>
+      {!removed.includes("glass") && (
+        <Eased position={offsets.glass}>
+          {glass ? (
+            <mesh position={[0, 0, d / 2]}>
+              <boxGeometry args={[w, h, 0.02]} />
+              <GlassMaterial
+                color="#d8e2e6"
+                roughness={0.04}
+                transmission={1}
+                sidePanel
+                panel="glass"
+              />
+            </mesh>
+          ) : (
+            <Box size={[w, h, 0.02]} position={[0, 0, d / 2]} material={panel} />
+          )}
+        </Eased>
+      )}
       <FanSet size={size} count={fanCount} frameColor={fanFrame} light={presentation.accentColor} />
     </group>
   );
@@ -573,6 +629,13 @@ function Rotor({ material }: { material: Record<string, unknown> }) {
         <cylinderGeometry args={[0.17, 0.17, 1, 24]} />
         <Mat {...material} />
       </mesh>
+      {/* Hub cap stickers on both faces: plain, no logo. */}
+      {[-1, 1].map((side) => (
+        <mesh key={side} position={[0, side * 0.51, 0]}>
+          <cylinderGeometry args={[0.14, 0.14, 0.02, 24]} />
+          <Mat color="#c9ced5" roughness={0.6} metalness={0} />
+        </mesh>
+      ))}
       {Array.from({ length: BLADES }, (_, index) => (
         <group key={index} rotation={[0, (index * 2 * Math.PI) / BLADES, 0]}>
           <mesh position={[0.32, 0, 0]} rotation={[0.6, 0, 0]} castShadow>
@@ -762,6 +825,7 @@ function ReferenceModelMesh({
   const dim = useContext(DimContext);
   const light = useContext(LightTierContext);
   const offsets = useContext(PanelOffsetContext);
+  const removed = useContext(RemovedPanelsContext);
   const panelOf = useMemo(
     () => new Map(model.parts.map((part) => [part.id, panels ? casePanelOf(part, model) : null])),
     [model, panels],
@@ -773,6 +837,7 @@ function ReferenceModelMesh({
     >
       {model.parts.map((part) => {
         const panel = panelOf.get(part.id);
+        if (panel && removed.includes(panel)) return null;
         const element = referencePartElement(part);
         if (!panel) return element;
         const offset = (offsets[panel] ?? ORIGIN).map(
@@ -1193,23 +1258,26 @@ function SlotCallout({
   to,
   selected,
   unresolved,
+  thin = false,
 }: {
   from: Point;
   to: Point;
   selected: boolean;
   unresolved: boolean;
+  /** Diorama: a finer, fainter line. */
+  thin?: boolean;
 }) {
   const color = selected ? "#6aa6ff" : unresolved ? "#f2b65f" : "#7d8690";
   return (
     <Line
       points={[from, to]}
       color={color}
-      lineWidth={1.2}
+      lineWidth={thin ? 0.7 : 1.2}
       dashed
       dashSize={0.1}
       gapSize={0.07}
       transparent
-      opacity={selected ? 1 : 0.7}
+      opacity={(selected ? 1 : 0.7) * (thin ? 0.6 : 1)}
     />
   );
 }
@@ -1266,6 +1334,8 @@ function CameraRig({
   explodedBoxes,
   cardRef,
   sceneRef,
+  diorama,
+  homeBoxes,
 }: {
   focusSlot: SlotId | null;
   mode: SceneMode;
@@ -1274,6 +1344,9 @@ function CameraRig({
   explodedBoxes: SceneBox[];
   cardRef: RefObject<HTMLDivElement | null>;
   sceneRef: RefObject<HTMLDivElement | null>;
+  /** Diorama: the whole set (case and plinth) framed from the diorama view at home. */
+  diorama: boolean;
+  homeBoxes: SceneBox[];
 }) {
   const camera = useThree((state) => state.camera);
   const size = useThree((state) => state.size);
@@ -1321,6 +1394,13 @@ function CameraRig({
       card.style.maxHeight = `${frame.card.maxHeight}px`;
     }
     const shown = focusSlot ? groups.current?.[focusSlot] : null;
+    const fov = (camera as PerspectiveCamera).fov;
+    const wide = {
+      x0: 24,
+      y0: FRAME_TOP - 40,
+      x1: size.width - 24,
+      y1: size.height - FRAME_BOTTOM,
+    };
     let goal: CameraPose;
     if (shown) {
       rigBox.setFromObject(shown);
@@ -1328,8 +1408,8 @@ function CameraRig({
       // The case is shown from the default side-front view; a part straight on.
       goal = fitCamera(
         box,
-        focusSlot === "case" ? DEFAULT_CAMERA : FOCUS_VIEW,
-        CAMERA_FOV,
+        focusSlot === "case" ? (diorama ? DIORAMA_VIEW : DEFAULT_CAMERA) : FOCUS_VIEW,
+        fov,
         size,
         frame.free,
         FOCUS_FILL,
@@ -1358,15 +1438,11 @@ function CameraRig({
       if (sceneRef.current) delete sceneRef.current.dataset.focusRect;
       goal =
         mode === "exploded"
-          ? fitBoxes(
-              explodedBoxes,
-              EXPLODED_VIEW,
-              CAMERA_FOV,
-              size,
-              { x0: 24, y0: FRAME_TOP - 40, x1: size.width - 24, y1: size.height - FRAME_BOTTOM },
-              0.92,
-            )
-          : (saved.current ?? { position: DEFAULT_CAMERA, target: ORIGIN });
+          ? fitBoxes(explodedBoxes, diorama ? DIORAMA_VIEW : EXPLODED_VIEW, fov, size, wide, 0.92)
+          : (saved.current ??
+            (diorama
+              ? fitBoxes(homeBoxes, DIORAMA_VIEW, fov, size, wide, DIORAMA_FILL)
+              : { position: DEFAULT_CAMERA, target: ORIGIN }));
     }
     if (!active.current || !controls) return;
     const step = prefersReducedMotion() ? 1 : 1 - Math.exp(-delta * 4);
@@ -1375,6 +1451,135 @@ function CameraRig({
     controls.update();
   });
   return null;
+}
+
+/** Diagonal braid stripes, generated once (no image file); tinted by the cable colour. */
+let braidTexture: CanvasTexture | null = null;
+function braid() {
+  if (braidTexture || typeof document === "undefined") return braidTexture;
+  const canvas = document.createElement("canvas");
+  canvas.width = 32;
+  canvas.height = 32;
+  const context = canvas.getContext("2d");
+  if (!context) return null;
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, 32, 32);
+  context.strokeStyle = "#8a8f96";
+  context.lineWidth = 5;
+  for (let offset = -32; offset <= 32; offset += 11) {
+    context.beginPath();
+    context.moveTo(offset, 0);
+    context.lineTo(offset + 32, 32);
+    context.stroke();
+  }
+  braidTexture = new CanvasTexture(canvas);
+  braidTexture.wrapS = RepeatWrapping;
+  braidTexture.wrapT = RepeatWrapping;
+  return braidTexture;
+}
+
+/** A sleeved power cable through `points`; the light tier drops the braid and most segments. */
+function BraidedCable({ cable, color }: { cable: SceneCable; color: string }) {
+  const light = useContext(LightTierContext);
+  const curve = useMemo(
+    () => new CatmullRomCurve3(cable.points.map((point) => new Vector3(...point))),
+    [cable],
+  );
+  const geometry = useMemo(
+    () => new TubeGeometry(curve, light ? 16 : 64, cable.diameter / 2, light ? 6 : 12, false),
+    [curve, cable.diameter, light],
+  );
+  useEffect(() => () => geometry.dispose(), [geometry]);
+  const map = useMemo(() => {
+    const base = light ? null : braid();
+    if (!base) return null;
+    const texture = base.clone();
+    texture.repeat.set(curve.getLength() / (cable.diameter * 1.4), 2);
+    texture.needsUpdate = true;
+    return texture;
+  }, [light, curve, cable.diameter]);
+  return (
+    <mesh geometry={geometry} castShadow receiveShadow>
+      <Mat color={color} map={map ?? undefined} roughness={0.85} metalness={0} />
+    </mesh>
+  );
+}
+
+/** The diorama plinth: a thick slab with softened edges and a faintly reflective top. */
+function Plinth({ box }: { box: SceneBox }) {
+  return (
+    <RoundedBox
+      args={box.size}
+      radius={0.035}
+      smoothness={3}
+      position={box.centre}
+      receiveShadow
+      raycast={() => null}
+    >
+      <meshStandardMaterial
+        color="#2c333d"
+        roughness={0.5}
+        metalness={0.15}
+        envMapIntensity={0.4}
+      />
+    </RoundedBox>
+  );
+}
+
+/** Set dressing on the plinth, never interactive and never branded: a potted plant and a coiled cable. */
+function PlinthProps({ plant, cable, radius }: Omit<ReturnType<typeof dioramaProps>, "footprint">) {
+  const leafAngles = [0, 1.25, 2.5, 3.75, 5];
+  const r = radius;
+  return (
+    <group raycast={() => null}>
+      <group position={plant}>
+        <mesh position={[0, r * 0.45, 0]} castShadow receiveShadow raycast={() => null}>
+          <cylinderGeometry args={[r * 0.5, r * 0.4, r * 0.9, 24]} />
+          <Mat color="#c9b8a6" roughness={0.9} />
+        </mesh>
+        <mesh position={[0, r * 0.91, 0]} raycast={() => null}>
+          <cylinderGeometry args={[r * 0.46, r * 0.46, 0.01, 24]} />
+          <Mat color="#3b3029" roughness={1} />
+        </mesh>
+        {leafAngles.map((angle, index) => (
+          <mesh
+            key={angle}
+            position={[
+              Math.cos(angle) * r * 0.18,
+              r * (1.35 + (index % 2) * 0.2),
+              Math.sin(angle) * r * 0.18,
+            ]}
+            rotation={[Math.sin(angle) * 0.5, -angle, Math.cos(angle) * 0.5]}
+            scale={[r * 0.16, r * 0.75, r * 0.06]}
+            castShadow
+            raycast={() => null}
+          >
+            <sphereGeometry args={[1, 12, 8]} />
+            <Mat color="#6f9670" roughness={0.9} />
+          </mesh>
+        ))}
+      </group>
+      <group position={cable}>
+        {[0, 1, 2].map((loop) => (
+          <mesh
+            key={loop}
+            position={[loop * 0.012, 0.016 + loop * 0.02, 0]}
+            rotation={[Math.PI / 2, 0, loop * 0.3]}
+            castShadow
+            receiveShadow
+            raycast={() => null}
+          >
+            <torusGeometry args={[r * 0.6, 0.014, 10, 40]} />
+            <Mat color="#3a3f47" roughness={0.9} />
+          </mesh>
+        ))}
+        <mesh position={[r * 0.6, 0.04, 0]} castShadow raycast={() => null}>
+          <boxGeometry args={[0.03, 0.08, 0.05]} />
+          <Mat color="#5e6670" roughness={0.9} />
+        </mesh>
+      </group>
+    </group>
+  );
 }
 
 /** A soft directional light aimed at the showcase spot. */
@@ -1389,10 +1594,63 @@ function ShowcaseLight({ position }: { position: Point }) {
   return <directionalLight ref={light} position={position} intensity={1.4} />;
 }
 
-/** Studio light rig built from lightformers, so no HDRI file is downloaded at runtime. */
-function StudioEnvironment() {
+/**
+ * Diorama lighting: a dark blue-grey room, a weak key light for the outline, and the build's own
+ * RGB (pump, memory, GPU, front fans) as the main light, spilling colour onto the plinth through
+ * the cutaway. The light tier keeps two of the four RGB lights.
+ */
+function DioramaLights({
+  accent,
+  caseBox,
+  dim,
+}: {
+  accent: string;
+  caseBox: SceneBox;
+  dim: boolean;
+}) {
+  const light = useContext(LightTierContext);
+  // In open space inside the cutaway (not against a surface, which would flare).
+  const front = caseBox.centre[0] + caseBox.size[0] / 2 - 0.45;
+  const glows: Point[] = [
+    [layout.cooler.anchor[0], layout.cooler.anchor[1] + 0.1, layout.cooler.anchor[2] + 0.55],
+    [layout.gpu.anchor[0], layout.gpu.anchor[1] - 0.45, layout.gpu.anchor[2] + 0.45],
+    [layout.memory.anchor[0] - 0.3, layout.memory.anchor[1], layout.memory.anchor[2] + 0.55],
+    [front, 0.2, 0.2],
+  ];
   return (
-    <Environment resolution={256} frames={1} environmentIntensity={1}>
+    <>
+      <ambientLight intensity={0.32} color="#a9b8cc" />
+      <hemisphereLight args={["#c9d3e0", "#1a2029", 0.35]} />
+      <directionalLight
+        position={[-4, 6, 3]}
+        intensity={1.25}
+        castShadow
+        shadow-mapSize={[2048, 2048]}
+        shadow-bias={-0.0004}
+        shadow-camera-left={-5}
+        shadow-camera-right={5}
+        shadow-camera-top={5}
+        shadow-camera-bottom={-5}
+      />
+      <directionalLight position={[4, 3, -5]} intensity={0.35} color="#b7c6dd" />
+      {glows.slice(0, light ? 2 : 4).map((position) => (
+        <pointLight
+          key={position.join(":")}
+          position={position}
+          intensity={dim ? 0.4 : 1.3}
+          distance={3.6}
+          decay={2}
+          color={accent}
+        />
+      ))}
+    </>
+  );
+}
+
+/** Studio light rig built from lightformers, so no HDRI file is downloaded at runtime. */
+function StudioEnvironment({ intensity = 1 }: { intensity?: number }) {
+  return (
+    <Environment resolution={256} frames={1} environmentIntensity={intensity}>
       <Lightformer
         form="rect"
         intensity={3}
@@ -1433,7 +1691,10 @@ export default function BuildScene({
   focusCard,
   partLink,
   sidePanelRemoved = false,
+  renderStyle = "studio",
+  casePanelsShown = false,
 }: BuildSceneProps) {
+  const diorama = renderStyle === "diorama";
   const labelRefs = useRef<Partial<Record<SlotId, HTMLElement | null>>>({});
   const cardRef = useRef<HTMLDivElement | null>(null);
   const presentation = scenePresentation(document);
@@ -1467,10 +1728,15 @@ export default function BuildScene({
   const explodedBoxes = (Object.keys(boxes) as ExplodeId[]).map((id) =>
     shiftBox(boxes[id], explodeOffset(id, distances, amount)),
   );
-  const floorY = Math.min(
-    FLOOR_Y,
-    Math.min(...explodedBoxes.map((box) => box.centre[1] - box.size[1] / 2)) - 0.06,
-  );
+  const lowestY = Math.min(...explodedBoxes.map((box) => box.centre[1] - box.size[1] / 2));
+  const floorY = Math.min(FLOOR_Y, lowestY - 0.06);
+  // Diorama set: a plinth under the case (lower when parts explode below it), two props, cables.
+  const plinth = plinthBox(boxes.case, lowestY);
+  const homePlinth = plinthBox(boxes.case, boxes.case.centre[1] - boxes.case.size[1] / 2);
+  const plinthTop = plinth.centre[1] + plinth.size[1] / 2;
+  const removedPanels = diorama && !casePanelsShown ? DIORAMA_REMOVED_PANELS : [];
+  const cables = useMemo(() => sceneCables(document), [document]);
+  const assembled = amount === 0 && !focusSlot;
   // E2: a shown part goes to the showcase spot, best face forward; the rest dims and steps back.
   // Showing the case keeps everything in place, panels closed, and fades the parts inside.
   const showing = focusSlot && focusSlot !== "case" ? focusSlot : null;
@@ -1513,7 +1779,18 @@ export default function BuildScene({
   // Labels sit above each exploded part; otherwise in their side columns.
   const labels = Object.fromEntries(
     primarySlots.map((slot) => {
-      if (mode !== "exploded") return [slot, layout[slot].label];
+      if (mode !== "exploded") {
+        // Diorama: the side columns turn with the camera, so they stay left and right of the case,
+        // and sit wider apart (seen corner-on, the case covers more of the screen).
+        const [labelX, y] = layout[slot].label;
+        const x = diorama ? labelX * 1.35 : labelX;
+        return [
+          slot,
+          diorama
+            ? [x * Math.cos(DIORAMA_AZIMUTH), y, -x * Math.sin(DIORAMA_AZIMUTH)]
+            : layout[slot].label,
+        ];
+      }
       const box = shiftBox(boxes[slot], explodeOffset(slot, distances, amount));
       return [slot, [box.centre[0], box.centre[1] + box.size[1] / 2 + 0.25, box.centre[2]]];
     }),
@@ -1537,14 +1814,26 @@ export default function BuildScene({
           return drawn ? [`${slot}:${drawn.kind}`] : [];
         })
         .join(" ")}
-      data-side-panel={sidePanelRemoved ? "removed" : panelFaded ? "faded" : "shown"}
+      data-render-style={renderStyle}
+      data-side-panel={
+        (diorama ? removedPanels.includes("glass") : sidePanelRemoved)
+          ? "removed"
+          : panelFaded
+            ? "faded"
+            : "shown"
+      }
+      data-cables={cables.map((cable) => cable.id).join(" ")}
       role="region"
       aria-label="Illustrative interactive PC scene. The eight 2D slot buttons below provide keyboard access."
     >
       <Canvas
-        key={resetKey}
-        // Side-front: the camera looks in through the glass side panel (+z), past the front edge.
-        camera={{ position: DEFAULT_CAMERA, fov: CAMERA_FOV }}
+        // A style switch remounts the canvas: the diorama uses a narrow, near-isometric lens.
+        key={`${resetKey}-${renderStyle}`}
+        // Studio: side-front, looking in through the glass side panel (+z), past the front edge.
+        camera={{
+          position: diorama ? (DIORAMA_VIEW.map((value) => value * 16) as Point) : DEFAULT_CAMERA,
+          fov: diorama ? DIORAMA_FOV : CAMERA_FOV,
+        }}
         dpr={quality === "high" ? [1, 1.5] : 1}
         gl={{ antialias: false, powerPreference: "high-performance" }}
         // The AgX pass in the effect chain reads this; slightly under 1 keeps white panels off the clip.
@@ -1555,148 +1844,199 @@ export default function BuildScene({
         onPointerMissed={() => onClearFocus?.()}
       >
         <LightTierContext.Provider value={quality === "low"}>
-          <SidePanelContext.Provider value={{ removed: sidePanelRemoved, faded: panelFaded }}>
-            <PerformanceMonitor
-              bounds={() => [30, 55]}
-              onDecline={lowerQuality}
-              onFallback={lowerQuality}
-            />
-            <SidePanelWatch onChange={setPanelFaded} />
-            <color attach="background" args={["#17191c"]} />
-            <fog attach="fog" args={["#17191c", 16, 40]} />
-            <StudioEnvironment />
-            <ambientLight intensity={0.25} />
-            <directionalLight position={[3, 6, 6]} intensity={1.6} castShadow />
-            <directionalLight position={[-5, 3, -4]} intensity={0.8} color="#cfd8ff" />
-            {/* Low interior fill just inside the glass so parts read through it. It falls off fast
+          <StyleContext.Provider value={renderStyle}>
+            <RemovedPanelsContext.Provider value={removedPanels}>
+              <SidePanelContext.Provider value={{ removed: sidePanelRemoved, faded: panelFaded }}>
+                <PerformanceMonitor
+                  bounds={() => [30, 55]}
+                  onDecline={lowerQuality}
+                  onFallback={lowerQuality}
+                />
+                <SidePanelWatch onChange={setPanelFaded} />
+                <color attach="background" args={[diorama ? "#1a2029" : "#17191c"]} />
+                {!diorama && <fog attach="fog" args={["#17191c", 16, 40]} />}
+                <StudioEnvironment intensity={diorama ? 0.5 : 1} />
+                {diorama ? (
+                  <DioramaLights
+                    accent={presentation.accentColor}
+                    caseBox={boxes.case}
+                    dim={!!focusSlot}
+                  />
+                ) : (
+                  <>
+                    <ambientLight intensity={0.25} />
+                    <directionalLight position={[3, 6, 6]} intensity={1.6} castShadow />
+                    <directionalLight position={[-5, 3, -4]} intensity={0.8} color="#cfd8ff" />
+                    {/* Low interior fill just inside the glass so parts read through it. It falls off fast
                 (decay 2) so the white walls next to it do not flare; the RGB colour comes from the
                 lit fan and pump rings, not from a light pooling on the PSU shroud. */}
-            <pointLight
-              position={[0.2, 0.4, whiteBoard ? 0.7 : 0.55]}
-              intensity={(focusSlot ? 0.6 : 0.9) * (whiteBoard ? 0.6 : 1)}
-              distance={3}
-              decay={2}
-            />
-            {/* Showcase key light: from the camera side, above, onto the shown part. */}
-            {showing && (
-              <ShowcaseLight
-                position={
-                  SHOWCASE_POINT.map(
-                    (value, k) => value + FOCUS_VIEW[k] * 5 + [1.5, 2.5, 0][k],
-                  ) as Point
-                }
-              />
-            )}
-            {/* RGB spill under the top fans: from the side, down-facing fans read as their glow. */}
-            <pointLight
-              position={[-0.25, 0.85, 0.45]}
-              intensity={focusSlot ? 0 : 0.35}
-              distance={1.4}
-              decay={2}
-              color={presentation.accentColor}
-            />
-            <PanelOffsetContext.Provider value={panelOffsets}>
-              {primarySlots.map((slot) => (
-                <SlotMesh
-                  key={slot}
-                  slot={slot}
-                  document={document}
-                  selected={selectedSlot === slot}
-                  mode={mode}
-                  target={placements[slot].target}
-                  rotation={placements[slot].rotation}
-                  focusSlot={focusSlot}
-                  onPick={pick}
-                  onGroup={registerGroup}
-                  presentation={presentation}
-                  look={looks[slot]}
-                  fans={slot === "case" ? fans : null}
-                />
-              ))}
-            </PanelOffsetContext.Provider>
-            {/* Dashed callouts to the side labels; exploded labels sit on their parts instead. */}
-            {!focusSlot &&
-              mode !== "exploded" &&
-              primarySlots.map((slot) => (
-                <SlotCallout
-                  key={`${slot}-callout`}
-                  from={placements[slot].target}
-                  to={labels[slot]}
-                  selected={selectedSlot === slot}
-                  unresolved={slotOccupancy(document, slot) === "unresolved"}
-                />
-              ))}
-            <ContactShadows
-              frames={quality === "low" ? 1 : Infinity}
-              position={[0, floorY + 0.005, 0]}
-              opacity={0.65}
-              scale={9}
-              blur={2.6}
-              far={3.2}
-            />
-            <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]}>
-              <planeGeometry args={[40, 40]} />
-              {quality === "low" ? (
-                <meshStandardMaterial color="#151619" metalness={0.5} roughness={0.9} />
-              ) : (
-                <MeshReflectorMaterial
-                  resolution={512}
-                  blur={[300, 80]}
-                  mixBlur={1}
-                  mixStrength={18}
-                  mirror={0.35}
-                  depthScale={1}
-                  minDepthThreshold={0.6}
-                  maxDepthThreshold={1.4}
-                  color="#151619"
-                  metalness={0.5}
-                  roughness={0.9}
-                />
-              )}
-            </mesh>
-            <ProjectOverlay labelRefs={labelRefs} labels={labels} />
-            <OrbitControls
-              makeDefault
-              enablePan
-              enableZoom
-              minDistance={0.8}
-              maxDistance={30}
-              maxPolarAngle={Math.PI / 2 - 0.05}
-              target={[0, 0, 0]}
-            />
-            <CameraRig
-              focusSlot={focusSlot}
-              mode={mode}
-              explode={explode}
-              groups={groups}
-              explodedBoxes={explodedBoxes}
-              cardRef={cardRef}
-              sceneRef={sceneRef}
-            />
-            {quality === "high" ? (
-              <EffectComposer multisampling={4}>
-                <N8AO aoRadius={0.6} intensity={2.2} distanceFalloff={1} halfRes />
-                <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
-                {/* Depth of field follows the shown part; off for the wide exploded layout. */}
-                {mode !== "exploded" && focusSlot !== "case" && (
-                  <DepthOfField
-                    target={showing ? SHOWCASE_POINT : [0, 0, 0.6]}
-                    focalLength={0.2}
-                    bokehScale={0.7}
-                  />
+                    <pointLight
+                      position={[0.2, 0.4, whiteBoard ? 0.7 : 0.55]}
+                      intensity={(focusSlot ? 0.6 : 0.9) * (whiteBoard ? 0.6 : 1)}
+                      distance={3}
+                      decay={2}
+                    />
+                    {/* Showcase key light: from the camera side, above, onto the shown part. */}
+                    {showing && (
+                      <ShowcaseLight
+                        position={
+                          SHOWCASE_POINT.map(
+                            (value, k) => value + FOCUS_VIEW[k] * 5 + [1.5, 2.5, 0][k],
+                          ) as Point
+                        }
+                      />
+                    )}
+                    {/* RGB spill under the top fans: from the side, down-facing fans read as their glow. */}
+                    <pointLight
+                      position={[-0.25, 0.85, 0.45]}
+                      intensity={focusSlot ? 0 : 0.35}
+                      distance={1.4}
+                      decay={2}
+                      color={presentation.accentColor}
+                    />
+                  </>
                 )}
-                <Vignette eskil={false} offset={0.25} darkness={0.55} />
-                <ToneMapping mode={ToneMappingMode.AGX} />
-              </EffectComposer>
-            ) : (
-              // Light tier: no SSAO or depth of field, no multisampling; RGB glow, vignette and tone mapping stay.
-              <EffectComposer multisampling={0}>
-                <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
-                <Vignette eskil={false} offset={0.25} darkness={0.55} />
-                <ToneMapping mode={ToneMappingMode.AGX} />
-              </EffectComposer>
-            )}
-          </SidePanelContext.Provider>
+                <PanelOffsetContext.Provider value={panelOffsets}>
+                  {primarySlots.map((slot) => (
+                    <SlotMesh
+                      key={slot}
+                      slot={slot}
+                      document={document}
+                      selected={selectedSlot === slot}
+                      mode={mode}
+                      target={placements[slot].target}
+                      rotation={placements[slot].rotation}
+                      focusSlot={focusSlot}
+                      onPick={pick}
+                      onGroup={registerGroup}
+                      presentation={presentation}
+                      look={looks[slot]}
+                      fans={slot === "case" ? fans : null}
+                    />
+                  ))}
+                </PanelOffsetContext.Provider>
+                {/* Sleeved power cables, only while the build is assembled and nothing is shown. */}
+                {assembled &&
+                  cables.map((cable) => (
+                    <BraidedCable
+                      key={cable.id}
+                      cable={cable}
+                      color={presentation.caseColor === appearanceHex.white ? "#e4e7eb" : "#2a2d33"}
+                    />
+                  ))}
+                {diorama && (
+                  <>
+                    <Plinth box={plinth} />
+                    {amount === 0 && <PlinthProps {...dioramaProps(plinth, boxes.case)} />}
+                  </>
+                )}
+                {/* Dashed callouts to the side labels; exploded labels sit on their parts instead. */}
+                {!focusSlot &&
+                  mode !== "exploded" &&
+                  primarySlots.map((slot) => (
+                    <SlotCallout
+                      key={`${slot}-callout`}
+                      from={placements[slot].target}
+                      to={labels[slot]}
+                      selected={selectedSlot === slot}
+                      unresolved={slotOccupancy(document, slot) === "unresolved"}
+                      thin={diorama}
+                    />
+                  ))}
+                {/* Soft contact shadows: on the plinth top in the diorama, on the floor in the studio. */}
+                <ContactShadows
+                  frames={quality === "low" ? 1 : Infinity}
+                  position={[
+                    diorama ? plinth.centre[0] : 0,
+                    (diorama ? plinthTop : floorY) + 0.005,
+                    diorama ? plinth.centre[2] : 0,
+                  ]}
+                  opacity={diorama ? 0.75 : 0.65}
+                  scale={diorama ? Math.max(plinth.size[0], plinth.size[2]) * 1.02 : 9}
+                  blur={diorama ? 2.2 : 2.6}
+                  far={diorama ? 2.4 : 3.2}
+                  color={diorama ? "#0b0e13" : "#000000"}
+                />
+                {!diorama && (
+                  <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, floorY, 0]}>
+                    <planeGeometry args={[40, 40]} />
+                    {quality === "low" ? (
+                      <meshStandardMaterial color="#151619" metalness={0.5} roughness={0.9} />
+                    ) : (
+                      <MeshReflectorMaterial
+                        resolution={512}
+                        blur={[300, 80]}
+                        mixBlur={1}
+                        mixStrength={18}
+                        mirror={0.35}
+                        depthScale={1}
+                        minDepthThreshold={0.6}
+                        maxDepthThreshold={1.4}
+                        color="#151619"
+                        metalness={0.5}
+                        roughness={0.9}
+                      />
+                    )}
+                  </mesh>
+                )}
+                <ProjectOverlay labelRefs={labelRefs} labels={labels} />
+                <OrbitControls
+                  makeDefault
+                  enablePan
+                  enableZoom
+                  minDistance={0.8}
+                  maxDistance={diorama ? 70 : 30}
+                  maxPolarAngle={Math.PI / 2 - 0.05}
+                  target={[0, 0, 0]}
+                />
+                <CameraRig
+                  focusSlot={focusSlot}
+                  mode={mode}
+                  explode={explode}
+                  groups={groups}
+                  explodedBoxes={explodedBoxes}
+                  cardRef={cardRef}
+                  sceneRef={sceneRef}
+                  diorama={diorama}
+                  homeBoxes={[boxes.case, homePlinth]}
+                />
+                {quality === "high" ? (
+                  <EffectComposer multisampling={4}>
+                    {/* The diorama leans on ambient occlusion: soft contact shading between parts. */}
+                    <N8AO
+                      aoRadius={diorama ? 1 : 0.6}
+                      intensity={diorama ? 3.4 : 2.2}
+                      distanceFalloff={diorama ? 0.8 : 1}
+                      halfRes
+                    />
+                    <Bloom
+                      mipmapBlur
+                      luminanceThreshold={diorama ? 1.4 : 1.6}
+                      intensity={diorama ? 1.15 : 0.9}
+                    />
+                    {/* Depth of field follows the shown part; off for the wide exploded layout and the
+                    crisp diorama. */}
+                    {!diorama && mode !== "exploded" && focusSlot !== "case" && (
+                      <DepthOfField
+                        target={showing ? SHOWCASE_POINT : [0, 0, 0.6]}
+                        focalLength={0.2}
+                        bokehScale={0.7}
+                      />
+                    )}
+                    <Vignette eskil={false} offset={0.25} darkness={diorama ? 0.4 : 0.55} />
+                    <ToneMapping mode={ToneMappingMode.AGX} />
+                  </EffectComposer>
+                ) : (
+                  // Light tier: no SSAO or depth of field, no multisampling; RGB glow, vignette and tone mapping stay.
+                  <EffectComposer multisampling={0}>
+                    <Bloom mipmapBlur luminanceThreshold={1.6} intensity={0.9} />
+                    <Vignette eskil={false} offset={0.25} darkness={0.55} />
+                    <ToneMapping mode={ToneMappingMode.AGX} />
+                  </EffectComposer>
+                )}
+              </SidePanelContext.Provider>
+            </RemovedPanelsContext.Provider>
+          </StyleContext.Provider>
         </LightTierContext.Provider>
       </Canvas>
       <div className="v3-scene-overlay">

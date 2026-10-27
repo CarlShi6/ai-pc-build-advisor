@@ -103,6 +103,7 @@ const sharedMaterials: Record<string, ReferenceMaterial> = {
   "slot-latch": { color: "#3A3D42", roughness: 0.5, metalness: 0.05 },
   "port-dark": { color: "#0E0F11", roughness: 0.6, metalness: 0.2 },
   "fitting-steel": { color: "#B9BEC5", roughness: 0.3, metalness: 0.9 },
+  "grommet-rubber": { color: "#2B2E33", roughness: 0.85, metalness: 0 },
   light: { color: "#FFFFFF", roughness: 0.4, metalness: 0 },
 };
 
@@ -260,15 +261,26 @@ function gpuDetailParts(options: {
 }): ReferenceModelPart[] {
   const { bracketCentre: b, bracketHeightMm: bh } = options;
   const outer = b[2] + 0.75 + 1.25;
-  // Vent slots in the bracket above the outputs.
-  const parts: ReferenceModelPart[] = [0, 1, 2].map((index) =>
-    box(
-      `io-bracket-vent-${index + 1}`,
-      [4, 28, 1.8],
-      [b[0] + 6 + index * 8, b[1] + bh / 2 - 26, outer - 0.4],
-      "port-dark",
+  // Vent slots in the bracket above the outputs, and a screw per slot at its top.
+  const screws: ReferenceModelPart[] = [-1, 1].map((sign, index) => ({
+    id: `io-bracket-screw-${index + 1}`,
+    shape: "cylinder",
+    sizeMm: [6, 6, 2.5],
+    positionMm: [b[0] + sign * 10, b[1] + bh / 2 - 5, outer + 0.25],
+    material: "fitting-steel",
+    axis: "z",
+  }));
+  const parts: ReferenceModelPart[] = [
+    ...screws,
+    ...[0, 1, 2].map((index) =>
+      box(
+        `io-bracket-vent-${index + 1}`,
+        [4, 28, 1.8],
+        [b[0] + 6 + index * 8, b[1] + bh / 2 - 26, outer - 0.4],
+        "port-dark",
+      ),
     ),
-  );
+  ];
   // Outputs stack along the bracket from its lower end; DisplayPort first, then HDMI.
   const ports = [
     ...Array.from({ length: options.displayPorts }, (_, index) => `dp-${index + 1}`),
@@ -298,7 +310,7 @@ function gpuDetailParts(options: {
 }
 
 const GPU_DETAIL_ASSUMPTION =
-  "Bracket vents, display-output openings and the 16-pin connector are drawn at estimated sizes and positions; their counts are from the manufacturer page.";
+  "Bracket vents and screws, display-output openings and the 16-pin connector are drawn at estimated sizes and positions; their counts are from the manufacturer page.";
 
 /**
  * A graphics card from its published length x height x thickness. Fans are evenly spaced (the
@@ -390,6 +402,7 @@ function gpuEnvelope(options: {
       "backplate-white",
       "port-dark",
       "slot-plastic",
+      "fitting-steel",
     ]),
   };
 }
@@ -948,6 +961,37 @@ const envelopeModels: ReferenceModel[] = [
   }),
 ];
 
+/**
+ * Cable pass-throughs on a case's tray (the "tray-divider" part): three rubber grommets just in
+ * front of the board's front edge. Positions and sizes are visual estimates.
+ */
+const GROMMET_SIZE_MM: Point = [22, 60, 2];
+export function caseGrommetsMm(model: ReferenceModel): Point[] {
+  const tray = model.parts.find((part) => part.id === "tray-divider");
+  if (!tray) return [];
+  const face = tray.positionMm[2] + tray.sizeMm[2] / 2 + GROMMET_SIZE_MM[2] / 2;
+  return [90, 0, -90].map((y) => [125, tray.positionMm[1] + y, face] as Point);
+}
+
+function withGrommets(model: ReferenceModel): ReferenceModel {
+  const grommets = caseGrommetsMm(model);
+  if (!grommets.length) return model;
+  return {
+    ...model,
+    parts: [
+      ...model.parts,
+      ...grommets.map((centre, index) =>
+        box(`cable-grommet-${index + 1}`, GROMMET_SIZE_MM, centre, "grommet-rubber", 0.9),
+      ),
+    ],
+    materials: { ...model.materials, ...pick(["grommet-rubber"]) },
+    assumptions: [
+      ...(model.assumptions ?? []),
+      "Cable grommets on the tray are drawn at estimated sizes and positions.",
+    ],
+  };
+}
+
 /** Interior surfaces (trays, inner rails) a step greyer than the outer white panels. */
 const INTERIOR_WHITE = "#CDD1D6";
 function withGreyInterior(materials: Record<string, ReferenceMaterial>) {
@@ -989,7 +1033,7 @@ function detailedGeneratedGpu(model: ReferenceModel): ReferenceModel {
     {
       ...model,
       parts: [...withRotors(model.parts), ...details],
-      materials: { ...model.materials, ...pick(["port-dark", "slot-plastic"]) },
+      materials: { ...model.materials, ...pick(["port-dark", "slot-plastic", "fitting-steel"]) },
       assumptions: [
         GPU_ROTOR_ASSUMPTION,
         ...(details.length ? [GPU_DETAIL_ASSUMPTION] : []),
@@ -1006,14 +1050,14 @@ const byPartId = new Map(
       model.frame === "gpu"
         ? detailedGeneratedGpu(model)
         : withRounding(
-            {
+            withGrommets({
               ...model,
               materials: withGreyInterior(model.materials),
               assumptions: [
                 "Panel edge radii are visual estimates.",
                 "Interior trays are drawn a slightly grey white so parts in front of them keep their shading.",
               ],
-            },
+            }),
             2.5,
           ),
     ),
