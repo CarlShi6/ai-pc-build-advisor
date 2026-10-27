@@ -314,6 +314,8 @@ function gpuEnvelope(options: {
   fans: number;
   displayPorts: number;
   hdmiPorts: number;
+  /** False for a look-alike with no model behind it: no outputs, vents or power connector. */
+  details?: boolean;
 }): ReferenceModel {
   const { lengthMm: L, heightMm: H, thicknessMm: T, fans } = options;
   const fingers = 11;
@@ -331,16 +333,18 @@ function gpuEnvelope(options: {
       "gold-contacts",
     ),
     box("io-bracket", [40, 120, 1.5], [-2, H / 2 - 30 - 60, L / 2 + 3], "bracket-steel"),
-    ...gpuDetailParts({
-      bracketCentre: [-2, H / 2 - 30 - 60, L / 2 + 3],
-      bracketHeightMm: 120,
-      pcbX: -10,
-      topY: H / 2,
-      centreZ: 0,
-      lengthMm: L,
-      displayPorts: options.displayPorts,
-      hdmiPorts: options.hdmiPorts,
-    }),
+    ...(options.details === false
+      ? []
+      : gpuDetailParts({
+          bracketCentre: [-2, H / 2 - 30 - 60, L / 2 + 3],
+          bracketHeightMm: 120,
+          pcbX: -10,
+          topY: H / 2,
+          centreZ: 0,
+          lengthMm: L,
+          displayPorts: options.displayPorts,
+          hdmiPorts: options.hdmiPorts,
+        })),
   ];
   const pitch = L / fans;
   const diameter = Math.min(shroudH * 0.76, pitch - 8);
@@ -794,6 +798,92 @@ function memoryKit(options: {
   });
 }
 
+/**
+ * Look-alikes for slots a photo shows but whose model is not confirmed, and the ghosted board of
+ * an open motherboard slot (PRD §9.3). They reuse the detailed builders at illustrative
+ * proportions; no model is identified and no size is read from a manufacturer page. They are
+ * never listed as reference models.
+ */
+const ILLUSTRATIVE_ASSUMPTION =
+  "Illustrative proportions of the part type; no model is identified, so no size comes from a manufacturer page.";
+
+const appearanceGpuModel: ReferenceModel = {
+  ...gpuEnvelope({
+    partId: "appearance-gpu-3-fan",
+    slug: "appearance-gpu-3-fan",
+    lengthMm: 300,
+    heightMm: 120,
+    thicknessMm: 50,
+    fans: 3,
+    displayPorts: 0,
+    hdmiPorts: 0,
+    details: false,
+  }),
+  assumptions: [ILLUSTRATIVE_ASSUMPTION, GPU_ROTOR_ASSUMPTION],
+};
+
+const appearanceAioModel: ReferenceModel = {
+  ...aio360({
+    partId: "appearance-cooler-aio-360",
+    slug: "appearance-cooler-aio-360",
+    radiatorLengthMm: 400,
+    fanSizeMm: 120,
+    fanThicknessMm: 25,
+  }),
+  assumptions: [ILLUSTRATIVE_ASSUMPTION],
+};
+
+const appearanceBoardModel: ReferenceModel = {
+  ...atxBoard({
+    partId: "appearance-board-atx",
+    slug: "appearance-board-atx",
+    dimmSlots: 4,
+    pcieX16Slots: 2,
+    m2Heatsinks: 2,
+    epsConnectors: 1,
+  }),
+  assumptions: [
+    "A generic ATX board (305 x 244 mm form factor) with illustrative slots and heatsinks; no model is identified.",
+  ],
+};
+
+/** Neutral body colour when the photo shows a part but not its colour. */
+const NEUTRAL_BODY = "#9AA0A8";
+
+/** A look-alike's body materials in the photo's colour (lights take the photo's light colour). */
+function tinted(model: ReferenceModel, bodyHex: string | null, bodyMaterials: string[]) {
+  const color = bodyHex ?? NEUTRAL_BODY;
+  return {
+    ...model,
+    materials: Object.fromEntries(
+      Object.entries(model.materials).map(([id, material]) => [
+        id,
+        bodyMaterials.includes(id) ? { ...material, color } : material,
+      ]),
+    ),
+  };
+}
+
+export const appearanceModels = {
+  // The look-alike's heatsink is a soft dark grey: no model is known, so no hard black core.
+  gpu: (bodyHex: string | null) =>
+    tinted(
+      {
+        ...appearanceGpuModel,
+        materials: {
+          ...appearanceGpuModel.materials,
+          "heatsink-dark": { color: "#4A4E55", roughness: 0.6, metalness: 0.3 },
+        },
+      },
+      bodyHex,
+      ["shroud-white", "backplate-white"],
+    ),
+  aio: (bodyHex: string | null) => tinted(appearanceAioModel, bodyHex, ["fan-white", "hose-white"]),
+  board: (bodyHex: string | null) => tinted(appearanceBoardModel, bodyHex, ["heatsink-board"]),
+  /** The open motherboard slot's ghost: the generic board, drawn faint by the scene. */
+  ghostBoard: appearanceBoardModel,
+};
+
 const envelopeModels: ReferenceModel[] = [
   // nzxt.com/products/h5-flow: 465 H x 225 W x 430 D mm; mesh top and front; perforated PSU shroud; tempered glass side.
   caseEnvelope({
@@ -858,6 +948,17 @@ const envelopeModels: ReferenceModel[] = [
   }),
 ];
 
+/** Interior surfaces (trays, inner rails) a step greyer than the outer white panels. */
+const INTERIOR_WHITE = "#CDD1D6";
+function withGreyInterior(materials: Record<string, ReferenceMaterial>) {
+  return Object.fromEntries(
+    Object.entries(materials).map(([id, material]) => [
+      id,
+      id === "tray-white" ? { ...material, color: INTERIOR_WHITE, roughness: 0.6 } : material,
+    ]),
+  );
+}
+
 // Display outputs of the img2threejs GPUs, from their manufacturer spec pages.
 const generatedGpuOutputs: Record<string, { displayPorts: number; hdmiPorts: number }> = {
   // msi.com GeForce RTX 5070 Ti 16G GAMING TRIO OC WHITE specification: "DisplayPort x 3",
@@ -904,7 +1005,17 @@ const byPartId = new Map(
     ...generatedReferenceModels.map((model) =>
       model.frame === "gpu"
         ? detailedGeneratedGpu(model)
-        : withRounding({ ...model, assumptions: ["Panel edge radii are visual estimates."] }, 2.5),
+        : withRounding(
+            {
+              ...model,
+              materials: withGreyInterior(model.materials),
+              assumptions: [
+                "Panel edge radii are visual estimates.",
+                "Interior trays are drawn a slightly grey white so parts in front of them keep their shading.",
+              ],
+            },
+            2.5,
+          ),
     ),
     ...envelopeModels,
   ].map((model) => [model.partId, model]),

@@ -68,6 +68,30 @@ describe("v3 funnel analytics", () => {
     expect(JSON.stringify(properties)).not.toContain(fixture.summary);
   });
 
+  it("names the visible and clearly absent part categories, never observation text", () => {
+    const fixture = createOgImageFixture();
+    const properties = analysisProperties({
+      ...fixture,
+      observations: [
+        ...fixture.observations,
+        { ...fixture.observations[0], id: "hidden", category: "gpu", visibleInImage: false },
+      ],
+      absentParts: ["motherboard", "fan"],
+    });
+    const visible = String(properties.visible_categories).split(",");
+    expect(visible).toEqual([...visible].sort());
+    expect(visible).toEqual(
+      [
+        ...new Set(
+          fixture.observations.filter((item) => item.visibleInImage).map((item) => item.category),
+        ),
+      ].sort(),
+    );
+    expect(properties.absent_parts).toBe("fan,motherboard");
+    for (const item of fixture.observations)
+      expect(JSON.stringify(properties)).not.toContain(item.value);
+  });
+
   it("records the review decision but not manual notes", () => {
     expect(
       reviewProperties("case", {

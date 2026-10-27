@@ -74,6 +74,7 @@ import {
   type Point,
   type SceneMode,
 } from "@/lib/v3/scene-focus";
+import { slotModel } from "@/lib/v3/slot-models";
 import {
   GENERIC_CASE_WALL,
   GENERIC_SHROUD_FROM_BOTTOM,
@@ -102,7 +103,6 @@ import {
 import {
   MM_PER_SCENE_UNIT,
   cornerRadius,
-  referenceModelFor,
   referenceModelSlots,
   sceneCentre,
   sceneSize,
@@ -184,6 +184,9 @@ function Eased({ position = ORIGIN, children }: { position?: Point; children: Re
   return <group ref={ref}>{children}</group>;
 }
 
+/** True inside the ghosted placeholder of an open slot (PRD §9.3): every surface is a faint grey. */
+const GhostContext = createContext(false);
+
 /** True inside a slot that is dimmed because another part is focused. */
 const DimContext = createContext(false);
 /** True in the light quality tier: glass skips the extra transmission render pass. */
@@ -199,7 +202,21 @@ function prefersReducedMotion() {
 /** Standard material that fades out when its slot is dimmed. */
 function Mat(props: Record<string, unknown> & { opacity?: number; transparent?: boolean }) {
   const dim = useContext(DimContext);
+  const ghost = useContext(GhostContext);
   const opacity = props.opacity ?? 1;
+  if (ghost)
+    // One flat, light translucent grey: reads as "a board goes here" against white or dark walls.
+    return (
+      <meshStandardMaterial
+        key={dim ? "ghost-dim" : "ghost"}
+        color="#B4BCC6"
+        roughness={0.8}
+        metalness={0}
+        transparent
+        opacity={dim ? 0.06 : 0.26}
+        depthWrite={false}
+      />
+    );
   return (
     <meshStandardMaterial
       // three.js needs a recompile when `transparent` flips, so remount on dim changes.
@@ -1033,8 +1050,9 @@ function SlotMesh({
   const group = useRef<Group>(null);
   const occupancy = slotOccupancy(document, slot);
   const dimmed = isDimmed(slot, focusSlot);
-  const model =
-    occupancy === "selected" ? referenceModelFor(selectedPart(document, slot)?.id) : null;
+  // A reference model, a photo look-alike or the ghosted board (see slotModel).
+  const drawn = slotModel(document, slot);
+  const model = drawn?.model ?? null;
   const partColor = colorName(selectedPart(document, slot)?.color);
   const size: Point = model
     ? sceneSize(model)
@@ -1124,6 +1142,21 @@ function SlotMesh({
               }
             />
           )
+        ) : drawn?.kind === "ghost" ? (
+          // Open motherboard slot: a faint generic board, so the parts around it have a base.
+          <GhostContext.Provider value>
+            <ReferenceModelMesh model={drawn.model} accent={presentation.accentColor} />
+          </GhostContext.Provider>
+        ) : drawn?.kind === "appearance" ? (
+          // A detailed look-alike in the photo's colour and light; the label says no model.
+          <ReferenceModelMesh
+            model={drawn.model}
+            accent={
+              look?.lightColor
+                ? (lightHex[look.lightColor] ?? presentation.accentColor)
+                : presentation.accentColor
+            }
+          />
         ) : look ? (
           <AppearancePlaceholder slot={slot} size={size} look={look} presentation={presentation} />
         ) : (
@@ -1498,6 +1531,12 @@ export default function BuildScene({
       data-focus-slot={focusSlot ?? undefined}
       data-scene-quality={quality}
       data-reference-models={referenceModelSlots(document).join(" ")}
+      data-slot-models={primarySlots
+        .flatMap((slot) => {
+          const drawn = slotModel(document, slot);
+          return drawn ? [`${slot}:${drawn.kind}`] : [];
+        })
+        .join(" ")}
       data-side-panel={sidePanelRemoved ? "removed" : panelFaded ? "faded" : "shown"}
       role="region"
       aria-label="Illustrative interactive PC scene. The eight 2D slot buttons below provide keyboard access."
@@ -1529,18 +1568,14 @@ export default function BuildScene({
             <ambientLight intensity={0.25} />
             <directionalLight position={[3, 6, 6]} intensity={1.6} castShadow />
             <directionalLight position={[-5, 3, -4]} intensity={0.8} color="#cfd8ff" />
-            {/* Low interior fill just inside the glass so parts read through it, plus a soft accent glow. */}
+            {/* Low interior fill just inside the glass so parts read through it. It falls off fast
+                (decay 2) so the white walls next to it do not flare; the RGB colour comes from the
+                lit fan and pump rings, not from a light pooling on the PSU shroud. */}
             <pointLight
               position={[0.2, 0.4, whiteBoard ? 0.7 : 0.55]}
-              intensity={(focusSlot ? 0.8 : 1.4) * (whiteBoard ? 0.6 : 1)}
-              distance={3.5}
-              decay={1.6}
-            />
-            <pointLight
-              position={[0.6, -0.9, 0.2]}
-              intensity={1.5}
+              intensity={(focusSlot ? 0.6 : 0.9) * (whiteBoard ? 0.6 : 1)}
               distance={3}
-              color={presentation.accentColor}
+              decay={2}
             />
             {/* Showcase key light: from the camera side, above, onto the shown part. */}
             {showing && (
@@ -1555,8 +1590,9 @@ export default function BuildScene({
             {/* RGB spill under the top fans: from the side, down-facing fans read as their glow. */}
             <pointLight
               position={[-0.25, 0.85, 0.45]}
-              intensity={focusSlot ? 0 : 0.8}
-              distance={1.6}
+              intensity={focusSlot ? 0 : 0.35}
+              distance={1.4}
+              decay={2}
               color={presentation.accentColor}
             />
             <PanelOffsetContext.Provider value={panelOffsets}>

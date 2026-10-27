@@ -528,3 +528,34 @@ The user chose code over GLBs. The search found no CC0 PC parts and no CC BY mod
 - Second follow-up: "Open guided advisor" (to `/consult`, the old light advisor page) is gone from My Builds too, along with its now-unused `.v3-legacy-link` styles. The `/consult` route stays.
   - `navigation.e2e.ts` checks both old pages: no v3 page links to `/legacy-workspace` or `/consult` or mentions "current workspace" / "guided advisor", and both routes still return 200 with their titles. With the old My Builds code it fails on `/my-builds → /consult`.
   - Old pages still link to `/consult` among themselves: the old top bar ("Configuration"), checkout success/cancel ("Back to /consult") and the dashboard ("Open Advisor"). None of them is a v3 page; left as they are.
+
+### Photo-run Studio fixes (2026-10-27)
+
+The review came from a real photo run: the O11 confirmed, GPU and cooler "Appearance from photo", the motherboard "Add part". It was reproduced from the white glass-front dev fixture with its motherboard observations removed (scratch draft loaded into Studio's session storage).
+
+- **Look-alikes from the detailed builders** (`slot-models.ts`, `appearanceModels` in `reference-models.ts`).
+  - An unconfirmed GPU the photo shows is drawn as a generic three-fan card (rotors, shroud, backplate, bracket), 300 x 120 x 50 mm.
+  - An AIO cooler the photo shows is drawn as a 400 mm radiator with fins, three 120 mm fans, pump and bent hoses.
+  - A board the photo shows is drawn as a generic ATX board.
+  - Bodies take the photo's colour (a neutral grey when it shows none) and lights take the photo's light colour. No outputs or power connector are drawn, since no model is known to count them from.
+  - The proportions are illustrative and say so in `assumptions`. These models are never listed as reference models.
+- **Ghosted board:** an open motherboard slot draws the generic ATX board in one flat translucent grey (`GhostContext` in `Mat`). The GPU and cooler now have something to sit on.
+- **Same boxes everywhere:** `slotModel()` is what the scene draws. The explode layout's boxes use it too, so look-alikes and the ghost explode without overlaps. The scene reports `data-slot-models` (`slot:reference|appearance|ghost`).
+- **Interior exposure:**
+  - Removed the accent point light that pooled on the PSU shroud. The RGB colour comes from the lit rings.
+  - The interior fill drops to 0.9 with decay 2. The RGB spill under the top fans drops to 0.35 with decay 2.
+  - The O11's interior trays are `#CDD1D6` instead of near-white, so parts in front keep their shading.
+- **Disclosure:** one short line per kind of geometry (`scene-disclosure.ts`), every slot under exactly one kind, plus "Nothing here checks physical fit.":
+  - Reference reconstruction: …
+  - Appearance from photo: … (with the photo fans)
+  - Illustrative: …
+
+  It sits under the scene controls in one bottom stack, so a wrapped line pushes the controls up instead of running off the panel. The outdated "generic illustrative geometry" sentence is gone.
+- **Why the motherboard was "Add part":**
+  - The server log for that run: the first analysis failed (`INVALID_ANALYSIS`); the retry returned 9 observations, 8 observed. Review chose only the case and excluded nothing (`excluded_count: 0`). The draft had 1 selected, 2 unresolved, 5 empty.
+  - A slot is left empty only when the analysis has no observation of that category, or lists it in `absentParts`. Review cannot cause it.
+  - The analysis is not stored, so which of the two cannot be told for that run. `v3_image_analysis_completed` now also records `visible_categories` and `absent_parts` (category enums only), so the next run shows it.
+- **Tests:**
+  - `slot-models.test.ts`: look-alikes, ghost, reference, and the disclosure for the reported scene.
+  - `funnel-analytics.test.ts`: the new category fields, never observation text.
+  - E2E: the photo flow checks `data-slot-models` and each disclosure line, and that the line stays inside the panel. Showcase and demo tests assert the new lines.

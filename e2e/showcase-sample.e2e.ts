@@ -18,7 +18,11 @@ test("home opens the white showcase sample as a full draft with honest labels", 
   await expect(compatibility(page)).toHaveText(/^pass$/i);
   // The O11 has no manufacturer price: shown as unknown, never counted as $0.
   await expect(page.getByText(/1 unknown price, not counted/)).toBeVisible();
-  await expect(page.locator(".v3-scene-disclosure")).toContainText(
-    "Case, Motherboard, Cooler, GPU and Memory: Reference reconstruction · dimensions from manufacturer specs.",
+  const disclosure = page.locator(".v3-scene-disclosure");
+  await expect(disclosure.locator('[data-kind="reference"]')).toHaveText(
+    "Reference reconstruction: Case, Motherboard, Cooler, GPU, Memory",
+  );
+  await expect(disclosure.locator('[data-kind="illustrative"]')).toHaveText(
+    "Illustrative: CPU, Storage, Power supply",
   );
 });

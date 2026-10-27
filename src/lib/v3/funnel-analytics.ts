@@ -34,6 +34,16 @@ export function analysisProperties(result: ImageAnalysisResult): AnalyticsProper
     quality: result.quality,
     observation_count: result.observations.length,
     observed_count: result.observations.filter((item) => item.origin === "observed").length,
+    // Category enums only: which parts the photo was read as showing, and which as clearly not
+    // installed. An empty Build slot after review traces back to one of these two lists.
+    visible_categories: [
+      ...new Set(
+        result.observations.filter((item) => item.visibleInImage).map((item) => item.category),
+      ),
+    ]
+      .sort()
+      .join(","),
+    absent_parts: [...(result.absentParts ?? [])].sort().join(","),
   };
 }
 

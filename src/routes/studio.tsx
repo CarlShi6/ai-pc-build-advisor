@@ -62,25 +62,11 @@ const balanceLabels: Array<[BalanceWeight, string]> = [
   [0.5, "Even"],
   [0.75, "Favor performance"],
 ];
-import { scenePresentation } from "@/lib/v3/scene-presentation";
 import { getValidatedOfficialUrl } from "@/lib/product-trust";
 import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
-import { REFERENCE_MODEL_LABEL, referenceModelSlots } from "@/lib/v3/reference-models";
-import {
-  PHOTO_APPEARANCE_LABEL,
-  PHOTO_FANS_LABEL,
-  photoAppearance,
-  photoFans,
-} from "@/lib/v3/photo-appearance";
+import { DISCLOSURE_NOTE, sceneDisclosure } from "@/lib/v3/scene-disclosure";
 
 /** Signed price change, or "Unknown" when either price is unknown (unknown is never $0). */
-/** "A", "A and B", "A, B and C". */
-function listLabels(labels: string[]) {
-  return labels.length < 2
-    ? labels.join("")
-    : `${labels.slice(0, -1).join(", ")} and ${labels.at(-1)}`;
-}
-
 function priceChangeText(delta: number, candidate: Part, current: Part | undefined) {
   if (priceUnknown(candidate) || (current && priceUnknown(current))) return "Unknown";
   return `${delta < 0 ? "−" : "+"}$${Math.abs(delta).toLocaleString()}`;
@@ -234,10 +220,17 @@ function StudioPage() {
   const proposal = candidate ? proposePartSelection(document, selectedSlot, candidate) : null;
   const preview = proposal?.candidate ?? null;
   const previewStatus = preview ? completeness(preview) : null;
-  const presentation = scenePresentation(document);
-  const referenceSlots = referenceModelSlots(document);
-  const photoLookSlots = Object.keys(photoAppearance(document)) as SlotId[];
-  const fansFromPhoto = photoFans(document);
+  // One short line: every slot under the kind of geometry it is drawn with.
+  const disclosure = (
+    <p className="v3-scene-disclosure">
+      {sceneDisclosure(document).map((group) => (
+        <span key={group.kind} data-kind={group.kind}>
+          <strong>{group.label}:</strong> {group.items.join(", ")}
+        </span>
+      ))}
+      <span>{DISCLOSURE_NOTE}</span>
+    </p>
+  );
   const show3D = view === "3d" && sceneAvailable;
   // One replace card for both views: beside the focused part in 3D, under the grid in 2D.
   const replaceCard = focusSlot ? (
@@ -377,43 +370,48 @@ function StudioPage() {
               ) : (
                 <div className="v3-scene-loading">Loading interactive scene…</div>
               )}
-              <div className="v3-scene-footer">
-                <div className="v3-scene-controls">
-                  {(["standard", "exploded", "review"] as const).map((next) => (
-                    <button
-                      type="button"
-                      key={next}
-                      className={mode === next ? "active" : ""}
-                      onClick={() => setMode(next)}
-                    >
-                      {next[0].toUpperCase() + next.slice(1)}
-                    </button>
-                  ))}
-                </div>
-                {mode === "exploded" && (
-                  <label>
-                    Explode{" "}
+              {/* Controls and the disclosure stack at the bottom: a wrapped line pushes the
+                  controls up instead of running off the panel. */}
+              <div className="v3-scene-bottom">
+                <div className="v3-scene-footer">
+                  <div className="v3-scene-controls">
+                    {(["standard", "exploded", "review"] as const).map((next) => (
+                      <button
+                        type="button"
+                        key={next}
+                        className={mode === next ? "active" : ""}
+                        onClick={() => setMode(next)}
+                      >
+                        {next[0].toUpperCase() + next.slice(1)}
+                      </button>
+                    ))}
+                  </div>
+                  {mode === "exploded" && (
+                    <label>
+                      Explode{" "}
+                      <input
+                        type="range"
+                        min="0"
+                        max="100"
+                        value={explode}
+                        onChange={(event) => setExplode(Number(event.target.value))}
+                      />{" "}
+                      {explode}%
+                    </label>
+                  )}
+                  <label className="v3-scene-toggle">
                     <input
-                      type="range"
-                      min="0"
-                      max="100"
-                      value={explode}
-                      onChange={(event) => setExplode(Number(event.target.value))}
+                      type="checkbox"
+                      checked={sidePanelRemoved}
+                      onChange={(event) => setSidePanelRemoved(event.target.checked)}
                     />{" "}
-                    {explode}%
+                    Remove side panel
                   </label>
-                )}
-                <label className="v3-scene-toggle">
-                  <input
-                    type="checkbox"
-                    checked={sidePanelRemoved}
-                    onChange={(event) => setSidePanelRemoved(event.target.checked)}
-                  />{" "}
-                  Remove side panel
-                </label>
-                <button type="button" onClick={() => setResetKey((value) => value + 1)}>
-                  Reset camera
-                </button>
+                  <button type="button" onClick={() => setResetKey((value) => value + 1)}>
+                    Reset camera
+                  </button>
+                </div>
+                {disclosure}
               </div>
             </>
           ) : (
@@ -436,19 +434,9 @@ function StudioPage() {
                   setFocusSlot((current) => (current === slot ? null : slot));
                 }}
               />
+              {disclosure}
             </div>
           )}
-          <p className="v3-scene-disclosure">
-            {referenceSlots.length > 0 &&
-              `${listLabels(referenceSlots.map((slot) => slotLabel[slot]))}: ${REFERENCE_MODEL_LABEL}. `}
-            {photoLookSlots.length > 0 &&
-              `${photoLookSlots.map((slot) => slotLabel[slot]).join(", ")}: ${PHOTO_APPEARANCE_LABEL}. `}
-            {fansFromPhoto &&
-              `Fans (${fansFromPhoto.count}): ${PHOTO_FANS_LABEL}, a style note, not a Build part. `}
-            {presentation.layout === "showcase" ? "Showcase" : "Tower"} layout uses generic
-            illustrative geometry{referenceSlots.length > 0 ? " for the other parts" : ""}. Neither
-            verifies physical clearance.{show3D && " Dashed callouts remain for empty slots."}
-          </p>
         </section>
         {document.imageContext && (
           <section className="v3-image-priorities" aria-label="Photo inspiration">

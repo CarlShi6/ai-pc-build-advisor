@@ -106,11 +106,29 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   const board = page.locator('.v3-scene-callout[data-scene-slot="motherboard"]');
   await expect(board).toHaveAttribute("data-look", "photo");
   await expect(board).toContainText("Appearance from photo · model not confirmed");
-  const disclosure = page.locator(".v3-scene-disclosure");
-  await expect(disclosure).toContainText(
-    "Cooler, Motherboard: Appearance from photo · model not confirmed",
+  // Unconfirmed parts are detailed look-alikes in the photo's colour, not models.
+  await expect(scene).toHaveAttribute(
+    "data-slot-models",
+    "case:reference motherboard:appearance cooler:appearance gpu:reference",
   );
-  await expect(disclosure).toContainText("Fans (5): Appearance from photo");
+  // One short line per kind of geometry, inside the panel.
+  const disclosure = page.locator(".v3-scene-disclosure");
+  await expect(disclosure.locator('[data-kind="reference"]')).toHaveText(
+    "Reference reconstruction: Case, GPU",
+  );
+  await expect(disclosure.locator('[data-kind="photo"]')).toHaveText(
+    "Appearance from photo: Cooler, Motherboard, 5 fans",
+  );
+  await expect(disclosure.locator('[data-kind="illustrative"]')).toHaveText(
+    "Illustrative: CPU, Memory, Storage, Power supply",
+  );
+  await expect(disclosure).not.toContainText(/generic illustrative geometry/);
+  const panel = (await page.locator(".v3-scene-panel").boundingBox())!;
+  const line = (await disclosure.boundingBox())!;
+  expect(line.y + line.height).toBeLessThanOrEqual(panel.y + panel.height);
+  expect(await disclosure.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(
+    true,
+  );
 
   // The 2D layout says the same.
   await page.getByRole("button", { name: "2D view" }).click();

@@ -14,6 +14,7 @@ import {
   type ReferenceModelPart,
 } from "@/lib/v3/reference-models";
 import { scenePresentation } from "@/lib/v3/scene-presentation";
+import { slotModel } from "@/lib/v3/slot-models";
 import { slotLayout, type Point } from "@/lib/v3/scene-focus";
 
 /**
@@ -229,25 +230,21 @@ function boundsBox(parts: ReferenceModelPart[]): SceneBox {
 
 /** Assembled box of a slot, the same size the scene draws it at. */
 export function slotBox(document: BuildDocumentV3, slot: SlotId): SceneBox {
-  const model =
-    slotOccupancy(document, slot) === "selected"
-      ? referenceModelFor(selectedPart(document, slot)?.id)
-      : null;
+  // Reference models, photo look-alikes and the ghosted board are drawn at their own size.
+  const model = slotModel(document, slot)?.model;
   const anchor = slotLayout[slot].anchor;
-  if (model) {
-    const centre = model.frame === "case" ? sceneCentre(model) : ([0, 0, 0] as Point);
-    return {
-      centre: anchor.map((value, k) => value + centre[k]) as Point,
-      size: sceneSize(model),
-    };
-  }
-  const size = slot === "case" ? genericCaseSize(document) : slotLayout[slot].size;
+  const centre = model?.frame === "case" ? sceneCentre(model) : ([0, 0, 0] as Point);
+  const size = model
+    ? sceneSize(model)
+    : slot === "case"
+      ? genericCaseSize(document)
+      : slotLayout[slot].size;
   // A vertical GPU stands on its end: length and thickness swap.
   const turned =
     slot === "gpu" && scenePresentation(document).gpuVertical
       ? ([size[1], size[0], size[2]] as Point)
       : size;
-  return { centre: anchor, size: turned };
+  return { centre: anchor.map((value, k) => value + centre[k]) as Point, size: turned };
 }
 
 /** Assembled boxes of every slot and case panel; the "case" box is the whole main frame. */

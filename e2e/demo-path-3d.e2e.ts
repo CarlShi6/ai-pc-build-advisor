@@ -24,8 +24,8 @@ test("3D Studio: click a part, swap it in the focus card, and see it in the shop
   const scene = page.locator(".v3-scene-canvas");
   await expect(scene.locator("canvas")).toHaveCount(1, { timeout: 30_000 });
   await expect(scene).toHaveAttribute("data-scene-quality", /^(high|low)$/);
-  await expect(page.locator(".v3-scene-disclosure")).toContainText(
-    "Case, Motherboard, Cooler, GPU and Memory: Reference reconstruction",
+  await expect(page.locator('.v3-scene-disclosure [data-kind="reference"]')).toHaveText(
+    "Reference reconstruction: Case, Motherboard, Cooler, GPU, Memory",
   );
 
   // Click the GPU's 3D label: the part is shown on its own and the focus card opens beside it.
@@ -101,8 +101,11 @@ test("3D Studio: the white showcase AIO, memory and board render as labeled refe
     .click();
   await expect(card.locator(".v3-replace-model")).toHaveText("Illustrative geometry");
   await expect(scene).toHaveAttribute("data-reference-models", "case motherboard cooler gpu");
-  await expect(page.locator(".v3-scene-disclosure")).toContainText(
-    "Case, Motherboard, Cooler and GPU: Reference reconstruction",
+  await expect(page.locator('.v3-scene-disclosure [data-kind="reference"]')).toHaveText(
+    "Reference reconstruction: Case, Motherboard, Cooler, GPU",
+  );
+  await expect(page.locator('.v3-scene-disclosure [data-kind="illustrative"]')).toContainText(
+    "Memory",
   );
   expect(errors).toEqual([]);
 });

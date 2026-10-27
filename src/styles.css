@@ -5867,14 +5867,25 @@
 .v3-scene-toolbar > * {
   pointer-events: auto;
 }
-.v3-scene-footer {
+/* Controls over the scene's bottom edge, with the disclosure under them: they stack, so a wrapped
+   disclosure pushes the controls up and never runs off the panel. */
+.v3-scene-bottom {
   position: absolute;
   z-index: 2;
   left: 0;
   right: 0;
-  bottom: 22px;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  padding-bottom: 8px;
+  background: linear-gradient(#17191c00, #17191cd9 45%);
+  pointer-events: none;
+}
+.v3-scene-bottom > * {
+  pointer-events: auto;
+}
+.v3-scene-footer {
   border-top: 0;
-  background: linear-gradient(#17191c00, #17191cd9);
   pointer-events: none;
 }
 .v3-scene-footer > * {
@@ -5884,13 +5895,15 @@
   height: 640px;
 }
 .v3-scene-disclosure {
-  position: absolute;
-  z-index: 2;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  padding: 0 22px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  padding: 0 22px 2px;
   color: var(--g-text-muted);
+}
+.v3-scene-disclosure strong {
+  color: var(--g-text);
+  font-weight: 650;
 }
 .v3-scene-controls button,
 .v3-scene-footer > button {
@@ -5937,8 +5950,9 @@
     position: static;
     background: none;
   }
-  .v3-scene-disclosure {
+  .v3-scene-bottom {
     position: static;
+    background: none;
   }
   .v3-scene-canvas {
     height: 440px;
