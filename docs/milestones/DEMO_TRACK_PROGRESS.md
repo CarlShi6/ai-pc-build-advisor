@@ -666,3 +666,47 @@ Review: when exploded, CPU and memory were small with the case right behind them
   - the GPU shows evidence and similar looks, with no bare dropdown;
   - "Use this" previews, and Confirm selects;
   - the motherboard shows "No catalog part looks like this yet", search works, and keep-unknown works.
+
+## Step A: appearance layer, parametric 3D (2026-10-28)
+
+What the 3D draws (appearance) is now separate from which model it is (identity). With no catalog match, the scene still looks like the photo.
+
+**Parameters** (`appearance-params.ts`). The analysis returns strict per-category enums; anything not clearly visible is `unknown`, and nothing is guessed:
+- Case: type (`dual-chamber`, `mesh-front-mid-tower`, `itx`, `other`), colour, glass (`side`, `front`, `both`, `none`), orientation.
+- GPU: fan count (1–3), length class (short, medium, long), colour, mount (horizontal, vertical), light colour.
+- Cooler: type (`air-tower`, `aio`), radiator size (240/280/360/420), radiator position (top, side, front), pump style (round, square, screen), colour.
+- Fans: count per position (front, top, side, bottom, rear), ring colour.
+- Memory: sticks (1–4), light bar, colour.
+- Motherboard: colour.
+
+Validated with Zod (`.strict()`, enums only) and sent to the provider as a required JSON schema. A prompt line (`APPEARANCE_PROMPT`) says to use `unknown` when not visible and never to infer a model. The parameters travel with the draft (`ImageBuildContext.appearance`) and are re-validated when a saved draft is read. Older analyses without them draw the older way.
+
+**Generators** (`appearance-models.ts`). They reuse the detailed builders, with typical values where the photo leaves a field unknown:
+- **Case:** typical size per type. Glass front and/or side; mesh front for mesh towers; a divider for dual-chamber cases, a PSU shroud otherwise.
+- **Case fans:** drawn per position, never where the AIO radiator sits, so the radiator's own fans are not doubled. Dual-chamber "side" fans stand at the front of the main chamber.
+- **GPU:** fans, length class, colour and a lit strip. No outputs or power connector, because no model is known to count them from. A vertical mount stands the card upright.
+- **Cooler:** `aio360` became `aioCooler`, with any radiator size, top / front / side mount, round / square / screen pump and hoses to the nearer end tank. It still draws the showcase AIO exactly as before, so its tests are unchanged. A new air tower has a base, four heat pipes, a 100 mm fin stack and a front fan, about 135 mm tall.
+- **Memory:** the photo's stick count, with or without light bars.
+- **Board:** in the photo's colour; an open slot keeps the ghost.
+- All bodies take the photo's colour; lit rings and strips take its light colour.
+
+**Scene and labels**
+- `slotModel` draws a slot from its parameters when the slot is not confirmed. A confirmed catalog model swaps in its reference reconstruction (E2E checks the case).
+- Callouts and the disclosure line now read "Appearance from photo · proportions estimated" for whatever the scene draws from the photo, including memory. The disclosure lists slots in Build order.
+- In focus, an air tower turns its front fan to the camera.
+- Horizontal cases are still drawn upright, noted in the model's assumptions.
+
+**Samples** (local, no AI call)
+- The two white samples now carry parameters: a dual-chamber case with glass front and side, a 3-fan white card with blue light, a top 360 AIO with a round pump, 3 side and 2 bottom fans, and a white board.
+- New drawn sample `black-mesh-tower.png`: a mesh-front mid-tower, 2-fan black card, black air tower, 3 white-lit front fans, a rear fan and 2 plain black sticks.
+
+**Tests**
+- `appearance-models.test.ts` (5) covers four parameter sets:
+  - white dual-chamber, vertical 3-fan GPU and top 360 AIO;
+  - black mesh tower, 2-fan GPU and air tower with plain memory;
+  - ITX, 1-fan GPU and a front 240 AIO with a screen pump;
+  - all unknown.
+
+  It checks part counts (fans per position, rotors, radiator fans, heat pipes, sticks, light bars), panels, and placement: everything inside the case, a top radiator under the top panel, a front radiator upright at the front. It also checks that the enums reject anything else.
+- `slot-models.test.ts`: the parameter path, the older-analysis fallback, and memory drawn from the photo.
+- New E2E `appearance-layer.e2e.ts`: both samples with every suggestion unticked draw every photo part from parameters, with the new label and disclosure. Confirming the O11 swaps in its reference model.

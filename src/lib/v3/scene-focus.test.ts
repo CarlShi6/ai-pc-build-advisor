@@ -61,6 +61,8 @@ describe("showcase framing (E2)", () => {
     expect(showcaseRotation("gpu")[0]).toBeCloseTo(-Math.PI / 2 - 0.12);
     // Memory: side face (+x) forward, long edge (+y) across.
     expect(showcaseRotation("memory")).toEqual([-Math.PI / 2 - 0.12, 0, -Math.PI / 2]);
+    // An air tower turns its front fan to the camera.
+    expect(showcaseRotation("cooler", true)[1]).toBeCloseTo(-Math.PI / 2);
   });
 
   it("dims every other slot only while something is focused", () => {

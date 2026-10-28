@@ -19,7 +19,12 @@ import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import { inspectImage } from "@/lib/v3/image-input";
 
 /** Dev-only sample files with a keyless fixture analysis (`src/lib/v3/dev-image-fixture.ts`). */
-const devFixtureNames = ["og.png", "white-build-sketch.png", "white-build-glass-front.png"];
+const devFixtureNames = [
+  "og.png",
+  "white-build-sketch.png",
+  "white-build-glass-front.png",
+  "black-mesh-tower.png",
+];
 
 /**
  * Photo → observations → part review → "Build it in 3D" change list → confirm. Shared by the home hero and

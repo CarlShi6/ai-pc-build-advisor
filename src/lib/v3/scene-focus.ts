@@ -67,9 +67,11 @@ export const FOCUS_FILL = 0.66;
  * fans (facing down when installed) forward, memory's side forward, the AIO pump face forward.
  * Every turn ends with a tilt back by the camera's elevation.
  */
-export function showcaseRotation(slot: SlotId): Point {
+export function showcaseRotation(slot: SlotId, airTower = false): Point {
   const tilt = -FOCUS_ELEVATION;
   if (slot === "case") return [0, 0, 0];
+  // An air tower's fan faces the front (+x): a quarter turn brings it to the camera.
+  if (slot === "cooler" && airTower) return [tilt, -Math.PI / 2, 0];
   if (slot === "gpu") return [-Math.PI / 2 + tilt, 0, 0];
   // Memory stands upright in its slots: turn its side forward and lay it flat, long edge across.
   if (slot === "memory") return [-Math.PI / 2 + tilt, 0, -Math.PI / 2];

@@ -187,9 +187,118 @@ function whiteSketch(frontGlass: boolean): ImageAnalysisResult {
         },
       ],
       absentParts: [],
+      // What the drawing shows of each part's look; the side view hides the front glass.
+      appearance: {
+        case: {
+          type: frontGlass ? "dual-chamber" : "unknown",
+          color: "white",
+          glass: frontGlass ? "both" : "side",
+          orientation: "upright",
+        },
+        gpu: { fanCount: "3", length: "long", color: "white", mount: "horizontal", light: "blue" },
+        cooler: {
+          type: "aio",
+          radiatorSize: "360",
+          radiatorPosition: "top",
+          pumpStyle: "round",
+          color: "white",
+        },
+        fans: {
+          front: "unknown",
+          top: "unknown",
+          side: "3",
+          bottom: "2",
+          rear: "unknown",
+          ringColor: "blue",
+        },
+        memory: { sticks: "unknown", lightBar: "unknown", color: "unknown" },
+        motherboard: { color: "white" },
+      },
     },
     { mime: "image/png", width: 1200, height: 900 },
     frontGlass ? "local-white-glass-front-fixture" : "local-white-sketch-fixture",
+    "fixture",
+  );
+}
+
+/**
+ * A drawn black mesh-front mid-tower with a window: a two-fan black GPU, a black air tower,
+ * three white-lit front fans and two black memory sticks without light bars. No AI call.
+ */
+export function createBlackTowerFixture(): ImageAnalysisResult {
+  const region = { x: 0.25, y: 0.1, width: 0.5, height: 0.8 };
+  return createImageAnalysisResult(
+    {
+      summary:
+        "Local fixture: a drawn black mesh-front tower with a side window, a two-fan graphics card and an air cooler.",
+      quality: "clear",
+      qualityIssues: ["This is a drawing, not a hardware photograph."],
+      observations: [
+        obs("case", "color", "black", "The case panels are black.", region),
+        obs(
+          "case",
+          "front panel material",
+          "mesh",
+          "The front is a perforated mesh grille.",
+          region,
+        ),
+        obs(
+          "case",
+          "side panel",
+          "tempered glass",
+          "The interior shows through a side window.",
+          region,
+        ),
+        obs("gpu", "color", "black", "A black graphics card with two fans.", region),
+        obs("gpu", "fan count", "2 fans", "Two round fans on the card.", region),
+        obs(
+          "cooler",
+          "cooler type",
+          "air tower cooler",
+          "A finned tower with one fan sits on the CPU.",
+          region,
+        ),
+        obs("cooler", "color", "black", "The tower and its fan are black.", region),
+        obs("fan", "fan count", "3 fans", "Three fans behind the front mesh.", region),
+        obs("fan", "lighting", "white LED rings", "The front fans have white rings.", region),
+        obs("motherboard", "color", "black", "The board is black.", region, "medium"),
+      ],
+      absentParts: [],
+      appearance: {
+        case: {
+          type: "mesh-front-mid-tower",
+          color: "black",
+          glass: "side",
+          orientation: "upright",
+        },
+        gpu: {
+          fanCount: "2",
+          length: "medium",
+          color: "black",
+          mount: "horizontal",
+          light: "none",
+        },
+        cooler: {
+          type: "air-tower",
+          radiatorSize: "unknown",
+          radiatorPosition: "unknown",
+          pumpStyle: "unknown",
+          color: "black",
+        },
+        fans: {
+          front: "3",
+          top: "unknown",
+          side: "unknown",
+          bottom: "unknown",
+          rear: "1",
+          ringColor: "white",
+        },
+        memory: { sticks: "2", lightBar: "no", color: "black" },
+        motherboard: { color: "black" },
+      },
+    },
+    { mime: "image/png", width: 1200, height: 900 },
+    "local-black-tower-fixture",
     "fixture",
   );
 }
@@ -202,4 +311,5 @@ export const devImageFixtures: Record<string, () => ImageAnalysisResult> = {
   "og.png": createOgImageFixture,
   "white-build-sketch.png": createWhiteSketchFixture,
   "white-build-glass-front.png": createGlassFrontFixture,
+  "black-mesh-tower.png": createBlackTowerFixture,
 };

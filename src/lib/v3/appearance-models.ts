@@ -86,7 +86,7 @@ export function radiatorMount(params: AppearanceParams, caseMm: Point): Radiator
   const wall = params.case.type === "dual-chamber" ? dividerZ(caseMm) : -W / 2 + PANEL;
   return {
     position,
-    centreMm: [Math.min(D / 2 - fan / 2 - 30, 60), H / 2 - 30 - length / 2, wall + 43],
+    centreMm: [D / 2 - fan / 2 - 20, H / 2 - 30 - length / 2, wall + 43],
   };
 }
 
@@ -252,7 +252,7 @@ export function caseFanParts(params: AppearanceParams, caseMm: Point): Reference
       "side",
       rad === "side" ? 0 : 3,
       (i) => [
-        Math.min(D / 2 - FAN / 2 - 30, 60),
+        D / 2 - FAN / 2 - 20,
         H / 2 - 80 - i * pitch,
         (params.case.type === "dual-chamber" ? dividerZ(caseMm) : -W / 2 + PANEL) +
           FAN_DEPTH / 2 +
@@ -349,19 +349,20 @@ function towerLookModel(params: AppearanceParams): ReferenceModel {
   const rel = (world: Point): Point =>
     world.map((value, k) => value - ANCHOR_MM.cooler[k]) as Point;
   const [cx, cy] = [ANCHOR_MM.cpu[0], ANCHOR_MM.cpu[1]];
-  const base = 16.7 - 22; // on the CPU, at the board side
+  // Seated on the CPU at the board face; about 135 mm tall overall, a common single tower.
+  const base = ANCHOR_MM.motherboard[2] + 5;
   const finDepth = 50;
   const finHeight = 125;
-  const finReach = 120;
-  const finZ = base + 30 + finReach / 2;
+  const finReach = 100;
+  const finZ = base + 28 + finReach / 2;
   const parts: ReferenceModelPart[] = [
     box("cold-plate", [40, 40, 8], rel([cx, cy, base]), "cold-plate", 1),
     ...[-12, -4, 4, 12].map(
       (dx, index): ReferenceModelPart => ({
         id: `heat-pipe-${index + 1}`,
         shape: "cylinder",
-        sizeMm: [6, 6, finReach + 30],
-        positionMm: rel([cx + dx, cy, base + (finReach + 30) / 2]),
+        sizeMm: [6, 6, finReach + 28],
+        positionMm: rel([cx + dx, cy, base + (finReach + 28) / 2]),
         material: "cold-plate",
         axis: "z",
       }),

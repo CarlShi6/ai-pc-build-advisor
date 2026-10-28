@@ -117,7 +117,7 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
     "Reference reconstruction: Case, GPU",
   );
   await expect(disclosure.locator('[data-kind="photo"]')).toHaveText(
-    "Appearance from photo: Cooler, Motherboard, 5 fans",
+    "Appearance from photo: Motherboard, Cooler, 5 fans",
   );
   await expect(disclosure.locator('[data-kind="illustrative"]')).toHaveText(
     "Illustrative: CPU, Memory, Storage, Power supply",

@@ -1931,7 +1931,10 @@ export default function BuildScene({
     primarySlots.map((slot) => {
       const anchor = layout[slot].anchor;
       if (slot === showing) {
-        const rotation = showcaseRotation(slot);
+        const rotation = showcaseRotation(
+          slot,
+          !!slotModel(document, slot)?.model.parts.some((part) => part.id === "tower-fins"),
+        );
         // Put the part's own centre (off its origin for case-frame models) on the spot.
         const centre = new Vector3(
           ...boxes[slot].centre.map((value, k) => value - anchor[k]),
@@ -2319,6 +2322,8 @@ export default function BuildScene({
           const occupancy = slotOccupancy(document, slot);
           const link = part ? partLink?.(slot) : null;
           const look = looks[slot];
+          // Drawn from the photo (parameters or an older text look): the label says so.
+          const fromPhoto = !part && (!!look || slotModel(document, slot)?.kind === "appearance");
           return (
             <div
               key={slot}
@@ -2340,13 +2345,13 @@ export default function BuildScene({
                 // Tab through the labels: the part they name gets the same blue box as a hover.
                 onFocus={() => setKeyboardSlot(slot)}
                 onBlur={() => setKeyboardSlot((current) => (current === slot ? null : current))}
-                aria-label={`${slotLabel[slot]}: ${part?.displayName ?? (look ? PHOTO_APPEARANCE_LABEL : occupancy)}`}
+                aria-label={`${slotLabel[slot]}: ${part?.displayName ?? (fromPhoto ? PHOTO_APPEARANCE_LABEL : occupancy)}`}
                 title={look ? appearanceSummary(look) : undefined}
               >
                 <strong>{slotLabel[slot]}</strong>
                 <small>
                   {part?.model ??
-                    (look
+                    (fromPhoto
                       ? PHOTO_APPEARANCE_LABEL
                       : occupancy === "unresolved"
                         ? "Review match"

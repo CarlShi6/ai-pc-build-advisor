@@ -14,13 +14,20 @@ import { slotModel } from "@/lib/v3/slot-models";
 import { createWhiteShowcaseSample } from "@/lib/v3/showcase-sample";
 
 /** The reported photo run: the O11 confirmed, GPU and AIO from the photo, no board observation. */
-function photoDraft({ withBoard = false } = {}) {
+function photoDraft({ withBoard = false, params = true } = {}) {
   const fixture = createGlassFrontFixture();
+  const appearance = fixture.appearance!;
   const analysis = {
     ...fixture,
     observations: fixture.observations.filter(
       (item) => withBoard || item.category !== "motherboard",
     ),
+    // Without a board observation the photo shows no board colour either.
+    appearance: params
+      ? withBoard
+        ? appearance
+        : { ...appearance, motherboard: { color: "unknown" as const } }
+      : undefined,
   };
   const caseSet = matchVisualCandidates(analysis).find((set) => set.category === "case")!;
   const reviews = {
@@ -46,7 +53,7 @@ describe("what each slot draws", () => {
     expect(cooler.model.parts.filter((part) => /^hose-/.test(part.id))).toHaveLength(2);
 
     for (const item of [gpu, cooler]) {
-      expect(item.model.assumptions?.[0]).toMatch(/no model is identified/);
+      expect(item.model.assumptions?.[0]).toMatch(/Typical proportions/);
       expect(referenceModels.map((model) => model.partId)).not.toContain(item.model.partId);
     }
   });
@@ -59,6 +66,30 @@ describe("what each slot draws", () => {
     expect(shown.model.parts.find((part) => part.id === "pcb")?.sizeMm.slice(0, 2)).toEqual([
       244, 305,
     ]);
+  });
+
+  it("falls back to the older look-alikes for analyses without appearance parameters", () => {
+    const draft = photoDraft({ params: false });
+    expect(slotModel(draft, "gpu")?.model.partId).toBe("appearance-gpu-3-fan");
+    expect(slotModel(draft, "cooler")?.model.assumptions?.[0]).toMatch(/no model is identified/);
+  });
+
+  it("draws the photo's memory sticks when the photo shows them", () => {
+    const draft = photoDraft();
+    expect(slotModel(draft, "memory")).toBeNull();
+    const shown = {
+      ...draft,
+      imageContext: {
+        ...draft.imageContext!,
+        appearance: {
+          ...draft.imageContext!.appearance!,
+          memory: { sticks: "4" as const, lightBar: "yes" as const, color: "white" as const },
+        },
+      },
+    };
+    const memory = slotModel(shown, "memory")!;
+    expect(memory.kind).toBe("appearance");
+    expect(memory.model.parts.filter((part) => /-light-bar$/.test(part.id))).toHaveLength(4);
   });
 
   it("keeps reference models for selected parts and generic geometry for hidden slots", () => {
@@ -87,7 +118,7 @@ describe("scene disclosure", () => {
   it("matches the reported photo scene", () => {
     expect(sceneDisclosure(photoDraft())).toEqual([
       { kind: "reference", label: "Reference reconstruction", items: ["Case"] },
-      { kind: "photo", label: "Appearance from photo", items: ["GPU", "Cooler", "5 fans"] },
+      { kind: "photo", label: "Appearance from photo", items: ["Cooler", "GPU", "5 fans"] },
       {
         kind: "illustrative",
         label: "Illustrative",

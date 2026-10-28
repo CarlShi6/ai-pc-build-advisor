@@ -6,6 +6,7 @@ import {
 } from "@/lib/v3/build-document";
 import { photoAppearance, photoFans } from "@/lib/v3/photo-appearance";
 import { referenceModelSlots } from "@/lib/v3/reference-models";
+import { slotModel } from "@/lib/v3/slot-models";
 
 /**
  * The scene's one-line disclosure: every slot under exactly one kind of geometry.
@@ -26,7 +27,13 @@ export const DISCLOSURE_NOTE = "Nothing here checks physical fit.";
 
 export function sceneDisclosure(document: BuildDocumentV3): DisclosureGroup[] {
   const reference = referenceModelSlots(document);
-  const photo = Object.keys(photoAppearance(document)) as SlotId[];
+  // Photo look-alikes: what the scene draws from the photo (parameters or older text looks).
+  const looks = photoAppearance(document);
+  const photo = primarySlots.filter(
+    (slot) =>
+      !reference.includes(slot) &&
+      (slotModel(document, slot)?.kind === "appearance" || !!looks[slot]),
+  );
   const fans = photoFans(document);
   const illustrative = primarySlots.filter(
     (slot) => !reference.includes(slot) && !photo.includes(slot),
