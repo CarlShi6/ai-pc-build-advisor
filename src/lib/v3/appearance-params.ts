@@ -155,3 +155,88 @@ export const APPEARANCE_PROMPT = [
   "Memory: visible sticks and whether they have a lit bar. Motherboard color only when the board is visible.",
   "Never infer a model from these.",
 ].join(" ");
+
+/** One automatic correction, shown with the photo's appearance so nothing changes silently. */
+export interface AppearanceCorrection {
+  field: string;
+  from: string;
+  to: string;
+  reason: string;
+}
+
+const RADIATOR_FANS: Partial<Record<AppearanceParams["cooler"]["radiatorSize"], number>> = {
+  "240": 2,
+  "280": 2,
+  "360": 3,
+  "420": 3,
+};
+
+/**
+ * Fixes only contradictions that are certain from the parameters themselves, never a guess:
+ * - A radiator's fans belong to the cooler. When the analysis also counted them as case fans at
+ *   the radiator's position, they come off that count (never below 0). Needs a known radiator
+ *   size, position and fan count; with any of them unknown nothing changes.
+ */
+export function reconcileAppearance(params: AppearanceParams): {
+  params: AppearanceParams;
+  corrections: AppearanceCorrection[];
+} {
+  const corrections: AppearanceCorrection[] = [];
+  const next: AppearanceParams = structuredClone(params);
+  const { cooler } = params;
+  const radiatorFans = RADIATOR_FANS[cooler.radiatorSize];
+  const position = cooler.radiatorPosition;
+  if (cooler.type !== "air-tower" && radiatorFans && position !== "unknown") {
+    const counted = countOf(params.fans[position]);
+    if (counted !== null && counted > 0) {
+      const kept = Math.max(0, counted - radiatorFans);
+      next.fans[position] = String(kept) as AppearanceParams["fans"]["top"];
+      corrections.push({
+        field: `fans.${position}`,
+        from: String(counted),
+        to: String(kept),
+        reason: `The ${cooler.radiatorSize} mm ${position} radiator's own ${radiatorFans} fans belong to the cooler, not the case.`,
+      });
+    }
+  }
+  return { params: next, corrections };
+}
+
+export type AppearanceCategory = keyof AppearanceParams;
+
+/** Every appearance field with its fixed options (unknown included), in schema order. */
+export const appearanceFields: Array<{
+  category: AppearanceCategory;
+  field: string;
+  path: string;
+  options: readonly string[];
+}> = Object.entries(appearanceParamsSchema.shape).flatMap(([category, schema]) =>
+  Object.entries(schema.shape as Record<string, z.ZodEnum<[string, ...string[]]>>).map(
+    ([field, options]) => ({
+      category: category as AppearanceCategory,
+      field,
+      path: `${category}.${field}`,
+      options: options.options,
+    }),
+  ),
+);
+
+export function appearanceValue(params: AppearanceParams, path: string): string {
+  const [category, field] = path.split(".") as [AppearanceCategory, string];
+  return (params[category] as Record<string, string>)[field];
+}
+
+/** Sets one field to one of its fixed options; anything else is refused. */
+export function setAppearanceField(
+  params: AppearanceParams,
+  path: string,
+  value: string,
+): AppearanceParams {
+  const field = appearanceFields.find((item) => item.path === path);
+  if (!field || !field.options.includes(value))
+    throw new Error(`"${value}" is not an option for ${path}.`);
+  return {
+    ...params,
+    [field.category]: { ...params[field.category], [field.field]: value },
+  } as AppearanceParams;
+}

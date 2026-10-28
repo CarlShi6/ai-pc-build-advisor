@@ -74,6 +74,8 @@ export function proposeImageBuild(
   /** Photo drafts have no target budget (null); a number is kept for callers that set one. */
   budget: number | null,
   current: BuildDocumentV3 | null = null,
+  /** Appearance fields the user set on the review page (their values are in `analysis`). */
+  appearanceUserSet: string[] = [],
 ): ImageBuildProposal {
   if (budget !== null && (!Number.isFinite(budget) || budget < 0))
     throw new Error("Enter a valid budget.");
@@ -124,6 +126,7 @@ export function proposeImageBuild(
     imageStored: false,
     observations: analysis.observations,
     ...(analysis.appearance && { appearance: analysis.appearance }),
+    ...(analysis.appearance && appearanceUserSet.length > 0 && { appearanceUserSet }),
     reviews: structuredClone(reviews),
     visualPriorities: visualPrioritiesFromAnalysis(analysis),
     plannedSelections,
@@ -247,6 +250,7 @@ export function suggestParts(
   budget: number | null,
   draft: BuildDocumentV3 | null = null,
   declined: readonly VisibleCatalogCategory[] = [],
+  appearanceUserSet: string[] = [],
 ): SuggestedParts {
   const reviews: ImageReviews = { ...current };
   const picks: Partial<Record<VisibleCatalogCategory, AppearanceCandidate>> = {};
@@ -287,7 +291,7 @@ export function suggestParts(
     picks[set.category] = top;
     decisions[set.category] = "suggested";
   }
-  const proposal = proposeImageBuild(analysis, reviews, budget, draft);
+  const proposal = proposeImageBuild(analysis, reviews, budget, draft, appearanceUserSet);
   const observations = analysis.observations.filter(
     (item) => item.visibleInImage && item.origin !== "unknown",
   );

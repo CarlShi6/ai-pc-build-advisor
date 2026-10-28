@@ -4,6 +4,8 @@ import type { ImageMime } from "@/lib/v3/image-input";
 import {
   appearanceParamsJsonSchema,
   appearanceParamsSchema,
+  reconcileAppearance,
+  type AppearanceCorrection,
   type AppearanceParams,
 } from "@/lib/v3/appearance-params";
 
@@ -70,6 +72,8 @@ export interface ImageAnalysisResult {
   absentParts: AbsentPartCategory[];
   /** Per-category look (Step A); absent on older analyses, which then draw the older way. */
   appearance?: AppearanceParams;
+  /** Certain contradictions fixed in `appearance` (see reconcileAppearance), as received. */
+  appearanceCorrections?: AppearanceCorrection[];
 }
 
 export type ImageAnalyzer = (input: {
@@ -142,6 +146,14 @@ export const observationJsonSchema = {
   },
 } as const;
 
+function reconciled(appearance: AppearanceParams) {
+  const { params, corrections } = reconcileAppearance(appearance);
+  return {
+    appearance: params,
+    ...(corrections.length > 0 && { appearanceCorrections: corrections }),
+  };
+}
+
 export function createImageAnalysisResult(
   raw: unknown,
   image: ImageAnalysisResult["image"],
@@ -177,6 +189,6 @@ export function createImageAnalysisResult(
     unknownPartIdentities: [...primarySlots],
     // A poor photo can't show that something is missing.
     absentParts: draft.quality === "poor" ? [] : [...new Set(draft.absentParts)],
-    ...(draft.appearance && { appearance: draft.appearance }),
+    ...(draft.appearance && reconciled(draft.appearance)),
   };
 }

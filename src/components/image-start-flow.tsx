@@ -16,6 +16,12 @@ import {
 import { observationGroup, type ObservationGroup } from "@/lib/v3/observation-tags";
 import { prepareImageForAnalysis, requestImageAnalysis } from "@/lib/v3/image-client";
 import { hasReplay, loadReplay, replayKeyOf } from "@/lib/v3/image-replay";
+import { AppearanceReview } from "@/components/appearance-review";
+import {
+  appearanceValue,
+  setAppearanceField,
+  type AppearanceParams,
+} from "@/lib/v3/appearance-params";
 import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import { inspectImage } from "@/lib/v3/image-input";
 
@@ -50,6 +56,23 @@ export function ImageStartFlow({
   >("idle");
   const [analysisError, setAnalysisError] = useState("");
   const [reviews, setReviews] = useState<ImageReviews>({});
+  // Step A: the look as the user corrects it (null until the analysis has one), and which fields.
+  const [appearance, setAppearance] = useState<AppearanceParams | null>(null);
+  const [appearanceUserSet, setAppearanceUserSet] = useState<string[]>([]);
+  function showAnalysis(result: ImageAnalysisResult | null) {
+    setAnalysis(result);
+    setAppearance(result?.appearance ?? null);
+    setAppearanceUserSet([]);
+  }
+  function changeAppearance(path: string, value: string) {
+    if (!appearance || !analysis?.appearance) return;
+    setAppearance(setAppearanceField(appearance, path, value));
+    const read = appearanceValue(analysis.appearance, path);
+    setAppearanceUserSet((current) =>
+      value === read ? current.filter((item) => item !== path) : [...new Set([...current, path])],
+    );
+    setSuggested(null);
+  }
   const [activeGroup, setActiveGroup] = useState<ObservationGroup | null>(null);
   const [error, setError] = useState("");
   const analysisController = useRef<AbortController | null>(null);
@@ -82,7 +105,7 @@ export function ImageStartFlow({
     analysisController.current?.abort();
     analysisController.current = null;
     updateFile(null);
-    setAnalysis(null);
+    showAnalysis(null);
     setAnalysisState("idle");
     setAnalysisError("");
     setReviews({});
@@ -117,7 +140,7 @@ export function ImageStartFlow({
     analysisController.current?.abort();
     const controller = new AbortController();
     analysisController.current = controller;
-    setAnalysis(null);
+    showAnalysis(null);
     setReviews({});
     setSuggested(null);
     setAnalysisError("");
@@ -133,7 +156,7 @@ export function ImageStartFlow({
         import.meta.env.DEV ? (replayKey ?? undefined) : undefined,
       );
       if (requestId !== requestNumber.current) return;
-      setAnalysis(result);
+      showAnalysis(result);
       setAnalysisState("ready");
       funnel.imageAnalysisCompleted(result);
     } catch (caught) {
@@ -163,7 +186,7 @@ export function ImageStartFlow({
       devImageFixtures[file.name]?.();
     if (requestId !== requestNumber.current || !fixture) return;
     funnel.imageSubmitted({ fixture: true });
-    setAnalysis(fixture);
+    showAnalysis(fixture);
     setAnalysisState("ready");
     funnel.imageAnalysisCompleted(fixture);
     setAnalysisError("");
@@ -182,7 +205,17 @@ export function ImageStartFlow({
     if (!analysis) return;
     try {
       // Photo drafts carry no target budget (budget-aware photo optimization is deferred).
-      setSuggested(suggestParts(analysis, reviews, null, readDraft(), declined));
+      const looked = appearance ? { ...analysis, appearance } : analysis;
+      setSuggested(
+        suggestParts(
+          looked,
+          reviews,
+          null,
+          readDraft(),
+          declined,
+          appearance ? appearanceUserSet : [],
+        ),
+      );
       setError("");
     } catch (caught) {
       setError(
@@ -342,6 +375,15 @@ export function ImageStartFlow({
               onReviewChange={reviewCandidate}
               onActiveGroup={setActiveGroup}
             />
+            {appearance && analysis.appearance && (
+              <AppearanceReview
+                read={analysis.appearance}
+                value={appearance}
+                userSet={appearanceUserSet}
+                corrections={analysis.appearanceCorrections ?? []}
+                onChange={changeAppearance}
+              />
+            )}
             <section className="v3-image-build" aria-label="Image to Build preview">
               {!suggested && (
                 <>

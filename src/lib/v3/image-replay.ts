@@ -11,6 +11,8 @@ export interface ImageReplay {
   key: string;
   recordedAt: string;
   model: string | null;
+  /** Provider token usage for this one analysis, when recorded. */
+  usage?: { inputTokens: number; outputTokens: number } | null;
   image: { mime: ImageMime; width: number; height: number };
   raw: unknown;
 }

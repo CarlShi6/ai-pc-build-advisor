@@ -50,6 +50,9 @@ const systemPrompt = [
   APPEARANCE_PROMPT,
 ].join(" ");
 
+/** Reasoning models (o-series, gpt-5) reject a temperature setting. */
+const acceptsTemperature = (model: string) => !/^(od|gpt-5)/.test(model);
+
 /** Dev only: saves the raw provider response as a local replay (see image-replay.ts). */
 async function saveReplay(replay: ImageReplay) {
   const dir = process.env.IMAGE_REPLAY_DIR;
@@ -76,13 +79,23 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
       "IMAGE_AI_NOT_CONFIGURED",
     );
   reserveAnalysis();
+  const model = config.imageAiModel || config.aiProviderModel;
   try {
     const cleanBytes = stripImageMetadata(bytes, mime);
-    const client = new OpenAI({ apiKey, maxRetries: 0, timeout: 20_000 });
+    // Reasoning models take longer to answer than the 20 s the default model needs.
+    const client = new OpenAI({
+      apiKey,
+      maxRetries: 0,
+      timeout: acceptsTemperature(model) ? 20_000 : 60_000,
+    });
     const response = await client.responses.create({
-      model: config.aiProviderModel,
+      model,
+      // Same photo, same answer as far as the model allows; reasoning models take no temperature.
+      ...(acceptsTemperature(model) && { temperature: 0 }),
       store: false,
-      max_output_tokens: 2400,
+      // A reasoning model spends part of its output budget thinking; give it room, keep it brief.
+      max_output_tokens: acceptsTemperature(model) ? 2400 : 8000,
+      ...(!acceptsTemperature(model) && { reasoning: { effort: "low" as const } }),
       input: [
         { role: "system", content: systemPrompt },
         {
@@ -131,7 +144,13 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
         await saveReplay({
           key: replayKey,
           recordedAt: new Date().toISOString(),
-          model: config.aiProviderModel ?? null,
+          model,
+          usage: response.usage
+            ? {
+                inputTokens: response.usage.input_tokens,
+                outputTokens: response.usage.output_tokens,
+              }
+            : null,
           image: { mime, width, height },
           raw: parsed,
         }).catch(() => undefined);

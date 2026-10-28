@@ -37,6 +37,8 @@ export interface ImageBuildContext {
   observations: VisualObservation[];
   /** Step A: the photo's per-category look; absent on drafts from older analyses. */
   appearance?: AppearanceParams;
+  /** Fields the user set on the review page ("category.field"); the rest are as the AI read them. */
+  appearanceUserSet?: string[];
   reviews: Partial<Record<VisibleCatalogCategory, CandidateReview>>;
   visualPriorities: VisualPriority[];
   plannedSelections: Partial<
@@ -215,10 +217,14 @@ function readImageContext(value: unknown, build: Build): ImageBuildContext | und
       plannedSelections[slot] = selection as ImageBuildContext["plannedSelections"][SlotId];
   }
   const appearance = readAppearanceParams(value.appearance);
+  const userSet = Array.isArray(value.appearanceUserSet)
+    ? value.appearanceUserSet.filter((path): path is string => typeof path === "string")
+    : undefined;
   return {
     ...(value as unknown as ImageBuildContext),
     plannedSelections,
     appearance,
+    appearanceUserSet: appearance ? userSet : undefined,
   };
 }
 

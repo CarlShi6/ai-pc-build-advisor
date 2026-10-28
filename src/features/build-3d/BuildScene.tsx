@@ -2061,6 +2061,13 @@ export default function BuildScene({
           return drawn ? [`${slot}:${drawn.kind}`] : [];
         })
         .join(" ")}
+      // The drawn case shell's structure (dual-chamber divider, glass panels), for tests.
+      data-case-structure={slotModel(document, "case")
+        ?.model.parts.filter((part) =>
+          /^(tray-divider|front-glass|glass-side-panel)$/.test(part.id),
+        )
+        .map((part) => part.id)
+        .join(" ")}
       data-render-style={renderStyle}
       data-hover-slot={highlighted ?? undefined}
       data-selected-slot={picked ? selectedSlot : undefined}

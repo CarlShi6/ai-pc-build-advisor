@@ -49,6 +49,7 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - **the rule findings the swap would add**, so a new warning is explained rather than just counted
 
   Options sort with lock-safe parts first, then closest seed price, and the list is capped at 4 with a "more in the parts panel" note. Tested in `replace-options.test.ts` (3 tests).
+
 - `src/components/part-replace-card.tsx`: a dark glass card positioned by the scene next to the focused part, on whichever side has room.
   - It shows the current part and its link (manufacturer page or labeled retailer search), then the options.
   - Choosing one shows **PREVIEW · NOT APPLIED** with seed total, compatibility, look impact and any new findings. **Confirm** commits through `confirmPartSelection`, or through `confirmWithLockOverride` behind an explicit tick when a locked look would change. **Back** returns to the list.
@@ -64,18 +65,19 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 
 - `src/data/showcaseParts.ts`: **8 white parts**, every value read on 2026-10-25 from the manufacturer's own product page, with prices from the manufacturer's own store. No third-party data, no BuildCores.
 
-| Slot | Part (part number) | Key published specs | Price |
-|---|---|---|---|
-| Case | Lian Li O11 Dynamic EVO White (O11DEW) | 465 D × 285 W × 459 H mm; GPU 426, cooler 167, PSU 220 mm; 360 mm radiator | **Unknown** (no price on lian-li.com) |
-| Case | NZXT H5 Flow White (CC-H52FW-01) | 465 H × 225 W × 430 D mm; GPU 410, cooler 170, PSU 200 mm | $94.99 (nzxt.com) |
-| Case | Corsair 4000D Airflow White (CC-9011201-WW) | 466 × 453 × 230 mm; GPU 360 (340 with front AIO), cooler 170, PSU 220 mm; 360 mm front radiator | **Unknown** (no case price on corsair.com) |
-| GPU | MSI RTX 5070 Ti 16G GAMING TRIO OC WHITE (G507T-16GTCW) | 338 × 140 × 50 mm; 300 W; 16-pin; 750 W PSU | $1,249.99 (us-store.msi.com) |
-| GPU | ASUS PRIME RTX 5070 White OC (PRIME-RTX5070-O12G-WHITE) | 304 × 126 × 50 mm; 2.5 slot; 16-pin; 750 W PSU; board power not listed | $919.99 (eshop.asus.com) |
-| Cooler | Corsair iCUE LINK TITAN 360 RX RGB White (CW-9061021-WW) | 360 mm radiator; 450 mm tubing; LGA1851/1700, AM5/AM4; size printed without units | $199.99 (corsair.com) |
-| Memory | Corsair VENGEANCE RGB 32GB DDR5-6000 CL30 White (CMH32GX5M2B6000C30W) | 2 × 16 GB, XMP; no module dimensions | $657.99 (corsair.com) |
-| PSU | Corsair RM850x SHIFT White (CP-9020274-NA) | 850 W, 80+ Gold, ATX 3.1, 140 mm fan; no PSU length | $189.99 (corsair.com) |
+| Slot   | Part (part number)                                                    | Key published specs                                                                             | Price                                      |
+| ------ | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------ |
+| Case   | Lian Li O11 Dynamic EVO White (O11DEW)                                | 465 D × 285 W × 459 H mm; GPU 426, cooler 167, PSU 220 mm; 360 mm radiator                      | **Unknown** (no price on lian-li.com)      |
+| Case   | NZXT H5 Flow White (CC-H52FW-01)                                      | 465 H × 225 W × 430 D mm; GPU 410, cooler 170, PSU 200 mm                                       | $94.99 (nzxt.com)                          |
+| Case   | Corsair 4000D Airflow White (CC-9011201-WW)                           | 466 × 453 × 230 mm; GPU 360 (340 with front AIO), cooler 170, PSU 220 mm; 360 mm front radiator | **Unknown** (no case price on corsair.com) |
+| GPU    | MSI RTX 5070 Ti 16G GAMING TRIO OC WHITE (G507T-16GTCW)               | 338 × 140 × 50 mm; 300 W; 16-pin; 750 W PSU                                                     | $1,249.99 (us-store.msi.com)               |
+| GPU    | ASUS PRIME RTX 5070 White OC (PRIME-RTX5070-O12G-WHITE)               | 304 × 126 × 50 mm; 2.5 slot; 16-pin; 750 W PSU; board power not listed                          | $919.99 (eshop.asus.com)                   |
+| Cooler | Corsair iCUE LINK TITAN 360 RX RGB White (CW-9061021-WW)              | 360 mm radiator; 450 mm tubing; LGA1851/1700, AM5/AM4; size printed without units               | $199.99 (corsair.com)                      |
+| Memory | Corsair VENGEANCE RGB 32GB DDR5-6000 CL30 White (CMH32GX5M2B6000C30W) | 2 × 16 GB, XMP; no module dimensions                                                            | $657.99 (corsair.com)                      |
+| PSU    | Corsair RM850x SHIFT White (CP-9020274-NA)                            | 850 W, 80+ Gold, ATX 3.1, 140 mm fan; no PSU length                                             | $189.99 (corsair.com)                      |
 
-  Prices are labeled **"Manufacturer store price, verified 2026-10-25"**, not "MSRP". No page calls its price an MSRP; these are the list prices shown on each manufacturer's own store (none showed a strikethrough sale). Fields a page didn't state clearly are left out: ASUS board power, NZXT radiator support, unitless cooler size, RAM module size, PSU length. The rules then report "not enough data".
+Prices are labeled **"Manufacturer store price, verified 2026-10-25"**, not "MSRP". No page calls its price an MSRP; these are the list prices shown on each manufacturer's own store (none showed a strikethrough sale). Fields a page didn't state clearly are left out: ASUS board power, NZXT radiator support, unitless cooler size, RAM module size, PSU length. The rules then report "not enough data".
+
 - **Unknown prices** (`Part.priceStatus: "unknown"` plus `priceSource`): excluded from totals (`calculateBuildTotal`, `priceCoverage`). Studio shows "+ N unknown prices, not counted". The shopping plan shows "Unknown / Price unknown" and "7 of 8 slots priced · 1 price unknown". The replace card shows "price unknown" instead of a $0 difference. The optimizer never ranks or diffs against an unknown price.
 - `src/lib/v3/catalog.ts`: `v3Catalog` = `seedParts` + showcase parts, used by the Studio part lists, import matching, photo review and image drafts. **The pre-v3 pages still use `seedParts` only**, so legacy totals are unaffected.
 - Photo review: a white case in a photo now matches the white showcase cases as appearance-only candidates, with their manufacturer page as the source.
@@ -86,6 +88,7 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - shopping plan prices, sources and the "7 of 8 priced" summary, no ranking on unknown prices, white photo matching
 
   Three older tests were updated because white parts now exist: the "unsupported color" test uses pink, the white lock now offers only white cases (H5 Flow White is the only cheaper one), and an impossible pink lock is explained.
+
 - Browser (Import of 8 exact names → Studio): 8/8, **Pass**, "$3,374.96 + 1 unknown price, not counted". The white case renders in the studio scene, and labels for the showcase parts read "Manufacturer page ↗". The shopping plan shows each source and "7 of 8 slots priced · 1 price unknown". The fix for "All 8 slots priced" (it was wrongly shown with an unknown price) is in this slice.
 - Gate: lint 0, typecheck passed, **191 tests in 28 files** passed, build passed. E2E 7/7.
 - Not done yet in week 3: 1:1 millimetre part models (waiting on the img2threejs approval and Python), the white showcase demo configuration as a one-click sample, and real image recognition (needs `OPENAI_API_KEY`, to be requested from the user).
@@ -94,14 +97,15 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 
 - **img2threejs v2.0.0, full checklist, two parts** (installed with user approval: Python 3.12.10 via winget; tag v2.0.0 = `a669e9a` in `~/.claude/skills/img2threejs`, Claude Code only):
 
-  | Part | References (manufacturer gallery) | Passes | Final review | Parts / triangles | Envelope vs published |
-  |---|---|---|---|---|---|
-  | Lian Li O11 Dynamic EVO White | lian-li.com front + side views | 8/8 credited | vision 0.79, fidelity 0.78 | 34 / 408 | 467 × 459 × 286 vs 465 × 459 × 285 mm (glass border print stands ≤1.3 mm proud) |
-  | MSI RTX 5070 Ti GAMING TRIO OC WHITE | msi.com fan side, three-quarter and back views | 8/8 credited | vision 0.80, fidelity 0.79 | 22 / 3,576 | 338 × 140 × 49.7 mm card; the 120 mm PCIe bracket adds height |
+  | Part                                 | References (manufacturer gallery)              | Passes       | Final review               | Parts / triangles | Envelope vs published                                                           |
+  | ------------------------------------ | ---------------------------------------------- | ------------ | -------------------------- | ----------------- | ------------------------------------------------------------------------------- |
+  | Lian Li O11 Dynamic EVO White        | lian-li.com front + side views                 | 8/8 credited | vision 0.79, fidelity 0.78 | 34 / 408          | 467 × 459 × 286 vs 465 × 459 × 285 mm (glass border print stands ≤1.3 mm proud) |
+  | MSI RTX 5070 Ti GAMING TRIO OC WHITE | msi.com fan side, three-quarter and back views | 8/8 credited | vision 0.80, fidelity 0.79 | 22 / 3,576        | 338 × 140 × 49.7 mm card; the 120 mm PCIe bracket adds height                   |
 
   Each run went through intake, suitability (conditional: white on white), admission, assessment, detail inventory, material evidence and strict validation. Then blockout → structural → form → material → surface → lighting → interaction → optimization, each with renders, Tier 1, multi-angle, pass gate, comparison sheet and a recorded review, plus part coverage (0 errors), action-ready, emission and plugin gates.
 
   Sub-part placements were measured on the manufacturer images (0.79 mm/px for the O11, 0.394 mm/px for the MSI) inside the published envelope and recorded as assumptions. Brand marks, hub logos and printed text are not modelled.
+
 - **What the passes changed.**
   - O11: glass border print and frameless corner, pillar seam, slot covers, the I/O ports where the reference shows them, hex-zone tones at the reference's measured mean colours, near-neutral glass.
   - MSI: fans as flattened discs, because v2.0.0's endpoint cylinders are hard-coded to 8 segments (octagons). Each fan is an outline / ring / blade disc / hub stack, layered so the rims don't z-fight; shroud lips and end cap; albedo calibrated render-vs-reference.
@@ -116,6 +120,7 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - ASUS PRIME: "three Axial-tech fans", evenly spaced, because no pitch is published.
 
   Cooler, RAM and PSU publish no usable millimetres, so they stay illustrative.
+
 - **In the app.** `reference-models/<slug>/object-sculpt-spec.json` (local paths removed) → `tools/reference-models/export_reference_models.py` → `src/data/referenceModels.generated.ts`, as plain millimetre boxes and discs with material colour, roughness, metalness and transmission. Nothing from img2threejs ships.
   - `BuildScene` draws a selected part's reference model at mm/150 through the same dim-aware materials, so Focus/Isolate still works. GPU models rotate into the flat GPU slot (fans down, top edge to the glass, bracket at the rear). A focused GPU eases round to show its fans.
   - Labels:
@@ -149,6 +154,7 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - fresh draft each time, and the source survives a save round trip
 
   E2E: `e2e/showcase-sample.e2e.ts` covers home → Studio, with the heading, seed-parts note, 8/8, pass, unknown price and reconstruction label.
+
 - Gate: lint 0, typecheck passed, **202 tests in 30 files** passed, build passed, **E2E 8/8**. Before/after screenshots of the home page and the sample Studio were shared.
 - Still open in week 3: real image recognition (ask before `OPENAI_API_KEY`).
 
@@ -169,12 +175,14 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
   - `public/og.png` (dark build): upright silhouette, glass side, mesh front, green lighting, one rear fan; board form factor marked inferred, medium confidence.
 
   All eight part identities stayed unknown in every result, and no SKU was guessed.
+
 - UI checks (home hero upload → **Analyze image** → observations → candidate review → draft → Studio), headless Edge, 2 photos:
   - `og.png`: observations in 6.1 s, labelled "AI visual observations · review required" (6 observations). The case got appearance-only alternatives; GPU, fans and motherboard stayed unresolved with "Keep unknown". The Studio showed a reference-photo draft, 1/8, Incomplete.
   - O11 white front view: 8 observations in 5.6 s. The candidates were all three white cases as "Weak visual match · appearance only", each saying photo similarity doesn't verify the SKU; it didn't claim the case is an O11. Confirming the first (4000D White, no price) gave "$0 + 1 unknown price, not counted".
 
   One imprecision: it called the front glass "the left side panel". The review step is there for exactly this.
-- Observed gap: when the AI said a GPU, fans or motherboard were *not present* (empty case), candidate review still listed those slots as "Unresolved". Fixed in slice 10.
+
+- Observed gap: when the AI said a GPU, fans or motherboard were _not present_ (empty case), candidate review still listed those slots as "Unresolved". Fixed in slice 10.
 - Not verified: production/hosted environment, rate-limit behaviour against the real provider, cost per photo, photos from users' own builds. E2E stays keyless (7 flows + sample, keys blanked).
 
 ### Slice 10: "Not in photo" in candidate review — 2026-10-26
@@ -204,11 +212,11 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - **Bundles (production build):** the 3D scene is its own lazy chunk, `BuildScene` 1.30 MB / 393 KB gzip (three, R3F, drei, postprocessing), fetched only when the Studio shows 3D. Main entry 416 KB / 128 KB gzip; Studio route 49 KB / 15 KB gzip. With WebGL disabled, none of the 3D chunk is downloaded (checked in headless Edge with WebGL off).
 - **Frame rate, white showcase sample in 3D**, measured over 5 s with `requestAnimationFrame`:
 
-  | Renderer | Tier | fps | median / p95 frame |
-  |---|---|---|---|
-  | Software (SwiftShader, headless Edge), worst-case stand-in for weak hardware | before: always full | 1.6 | 720 / 750 ms |
-  | Same | after: light tier, entered automatically | **8.9–9.5** | 104–111 / 118 ms |
-  | NVIDIA RTX 5080 (D3D11 via ANGLE, headless Edge) | full, kept | **144** (display cap) | 6.9 / 7.0 ms |
+  | Renderer                                                                     | Tier                                     | fps                   | median / p95 frame |
+  | ---------------------------------------------------------------------------- | ---------------------------------------- | --------------------- | ------------------ |
+  | Software (SwiftShader, headless Edge), worst-case stand-in for weak hardware | before: always full                      | 1.6                   | 720 / 750 ms       |
+  | Same                                                                         | after: light tier, entered automatically | **8.9–9.5**           | 104–111 / 118 ms   |
+  | NVIDIA RTX 5080 (D3D11 via ANGLE, headless Edge)                             | full, kept                               | **144** (display cap) | 6.9 / 7.0 ms       |
 
 - **Adaptive quality** (`BuildScene.tsx`), using drei `PerformanceMonitor`, which was already a dependency.
   - If the scene can't hold ~30 fps (bounds 30/55), it switches once, for the session, to a light tier: 1× pixel ratio instead of up to 1.5×, plain floor instead of `MeshReflectorMaterial`, no SSAO, no depth of field, no multisampling, glass without the extra transmission pass, and contact shadow rendered once.
@@ -251,7 +259,6 @@ Plan and rules: CLAUDE.md "Demo track (4 weeks)". Branch `rebuild/image-to-build
 - Polish (slice 13): home hero layout after analysis, favicon/console error, scene lighting.
 - E2E grew from 8 to 11 flows: no-WebGL swap, phone width, 3D demo path.
 - Still open after the demo track (R7, per CLAUDE.md): E2E for lookalike correction (#2), old-format restore (#9), unauthorized access/deletion (#10); Focus/Isolate keyboard and mobile review; the curated image fixture set and visual regression; the user study. A real-GPU scene check on weaker hardware than the RTX 5080, and a hosted deployment, are not done.
-
 
 ## Visual redesign round
 
@@ -353,6 +360,7 @@ Before: upload, a long list of every observation with reasons, a candidate list 
 ### Slice B follow-up: untick a filled-in row (2026-10-26)
 
 The user accepted "Build it in 3D" filling open parts, and asked for a safeguard.
+
 - Every change-list row marked "Top match, filled in" has a checkbox, ticked by default.
 - Unticking re-runs `suggestParts(…, declined)`. The row stays in the list, struck through, and reads "Top match, not filled in" and "Not filled in; stays unconfirmed, drawn from the photo (…)". The total and compatibility update; confirming leaves that slot unconfirmed.
 - Rows from the user's own "Use this" have no checkbox.
@@ -551,6 +559,7 @@ The review came from a real photo run: the O11 confirmed, GPU and cooler "Appear
   - Illustrative: …
 
   It sits under the scene controls in one bottom stack, so a wrapped line pushes the controls up instead of running off the panel. The outdated "generic illustrative geometry" sentence is gone.
+
 - **Why the motherboard was "Add part":**
   - The server log for that run: the first analysis failed (`INVALID_ANALYSIS`); the retry returned 9 observations, 8 observed. Review chose only the case and excluded nothing (`excluded_count: 0`). The draft had 1 selected, 2 unresolved, 5 empty.
   - A slot is left empty only when the analysis has no observation of that category, or lists it in `absentParts`. Review cannot cause it.
@@ -634,6 +643,7 @@ Review: when exploded, CPU and memory were small with the case right behind them
 ## Stage 1: photo parts that "can't be found" (2026-10-28)
 
 **Diagnosis of the user's real-photo runs** (server log; the photo itself was not attached, so the AI's exact observations could not be replayed):
+
 - 2026-10-28 00:14 and 02:09 UTC: both analyses succeeded ("clear", 10–11 observations).
   - Visible categories: case, cooler, fan, GPU, motherboard. Nothing was judged absent.
   - Only the case was reviewed (chosen, nothing excluded). The drafts had 1 selected, 3 unresolved (GPU, cooler, motherboard) and 4 empty.
@@ -645,6 +655,7 @@ Review: when exploded, CPU and memory were small with the case right behind them
 - Until now the Studio showed these slots as "Identity unresolved" with a bare full-catalog dropdown.
 
 **Changes**
+
 - `slot-identity.ts`, `SlotIdentityPanel`: an unconfirmed photo slot shows the following, in both the slot detail panel and the 3D focus card:
   - the photo evidence ("Photo: 360 mm AIO liquid cooler · white");
   - the closest-looking catalog parts, each marked "Similar look, not this exact part" with its matched signals and "Use this". "Use this" only previews; the Build changes on Confirm;
@@ -653,6 +664,7 @@ Review: when exploded, CPU and memory were small with the case right behind them
   - "Not in catalog · keep unknown".
 
   The bare dropdown is gone for these slots; it remains for selected and hidden slots.
+
 - **Review → Studio:** parts excluded in the review stay hidden, with a count. A part the user chose in the review but didn't apply comes first, marked. Keep-unknown is shared with the review (`reviews[category].kept`).
 - `replaceOption()` previews any one catalog part (the 3D card can preview a similar look or a search result).
 - **No-match record:** on confirming a photo draft, a `v3_image_match_gaps` event records `gap_<category>` reason codes. The codes are `not_seen`, `judged_absent`, `no_catalog_category`, `no_close_match`, `all_excluded` and `tied`.
@@ -660,6 +672,7 @@ Review: when exploded, CPU and memory were small with the case right behind them
   - Codes only, never observation text. They will pick Step C's models.
 
 **Tests**
+
 - `slot-identity.test.ts` (5): reason codes; codes only in the event; evidence and similar looks; review exclusions and keep-unknown; search.
 - New E2E `unresolved-slot.e2e.ts`:
   - a cooler excluded in the review stays hidden in the Studio;
@@ -672,6 +685,7 @@ Review: when exploded, CPU and memory were small with the case right behind them
 What the 3D draws (appearance) is now separate from which model it is (identity). With no catalog match, the scene still looks like the photo.
 
 **Parameters** (`appearance-params.ts`). The analysis returns strict per-category enums; anything not clearly visible is `unknown`, and nothing is guessed:
+
 - Case: type (`dual-chamber`, `mesh-front-mid-tower`, `itx`, `other`), colour, glass (`side`, `front`, `both`, `none`), orientation.
 - GPU: fan count (1–3), length class (short, medium, long), colour, mount (horizontal, vertical), light colour.
 - Cooler: type (`air-tower`, `aio`), radiator size (240/280/360/420), radiator position (top, side, front), pump style (round, square, screen), colour.
@@ -682,6 +696,7 @@ What the 3D draws (appearance) is now separate from which model it is (identity)
 Validated with Zod (`.strict()`, enums only) and sent to the provider as a required JSON schema. A prompt line (`APPEARANCE_PROMPT`) says to use `unknown` when not visible and never to infer a model. The parameters travel with the draft (`ImageBuildContext.appearance`) and are re-validated when a saved draft is read. Older analyses without them draw the older way.
 
 **Generators** (`appearance-models.ts`). They reuse the detailed builders, with typical values where the photo leaves a field unknown:
+
 - **Case:** typical size per type. Glass front and/or side; mesh front for mesh towers; a divider for dual-chamber cases, a PSU shroud otherwise.
 - **Case fans:** drawn per position, never where the AIO radiator sits, so the radiator's own fans are not doubled. Dual-chamber "side" fans stand at the front of the main chamber.
 - **GPU:** fans, length class, colour and a lit strip. No outputs or power connector, because no model is known to count them from. A vertical mount stands the card upright.
@@ -691,16 +706,19 @@ Validated with Zod (`.strict()`, enums only) and sent to the provider as a requi
 - All bodies take the photo's colour; lit rings and strips take its light colour.
 
 **Scene and labels**
+
 - `slotModel` draws a slot from its parameters when the slot is not confirmed. A confirmed catalog model swaps in its reference reconstruction (E2E checks the case).
 - Callouts and the disclosure line now read "Appearance from photo · proportions estimated" for whatever the scene draws from the photo, including memory. The disclosure lists slots in Build order.
 - In focus, an air tower turns its front fan to the camera.
 - Horizontal cases are still drawn upright, noted in the model's assumptions.
 
 **Samples** (local, no AI call)
+
 - The two white samples now carry parameters: a dual-chamber case with glass front and side, a 3-fan white card with blue light, a top 360 AIO with a round pump, 3 side and 2 bottom fans, and a white board.
 - New drawn sample `black-mesh-tower.png`: a mesh-front mid-tower, 2-fan black card, black air tower, 3 white-lit front fans, a rear fan and 2 plain black sticks.
 
 **Tests**
+
 - `appearance-models.test.ts` (5) covers four parameter sets:
   - white dual-chamber, vertical 3-fan GPU and top 360 AIO;
   - black mesh tower, 2-fan GPU and air tower with plain memory;
@@ -708,5 +726,36 @@ Validated with Zod (`.strict()`, enums only) and sent to the provider as a requi
   - all unknown.
 
   It checks part counts (fans per position, rotors, radiator fans, heat pipes, sticks, light bars), panels, and placement: everything inside the case, a top radiator under the top panel, a front radiator upright at the front. It also checks that the enums reject anything else.
+
 - `slot-models.test.ts`: the parameter path, the older-analysis fallback, and memory drawn from the photo.
 - New E2E `appearance-layer.e2e.ts`: both samples with every suggestion unticked draw every photo part from parameters, with the new label and disclosure. Confirming the O11 swaps in its reference model.
+
+## Step A follow-up: real-photo check, consistency rule, review edits (2026-10-28)
+
+**Real photo, replayed.** One real photo was run through the analyzer, and its responses were saved under the gitignored `local-replays/`. Later runs, including E2E, replay them without an AI call. Neither the photo nor the responses are committed.
+
+**Consistency rule** (`reconcileAppearance`, applied when the analysis is built):
+
+- An AIO radiator's own fans are not case fans: at a top, front or side radiator, that position's case-fan count drops by the radiator's fans (240/280 → 2, 360/420 → 3), never below 0.
+- An unknown value is left alone, and so is an air tower.
+- Each change is kept as an `appearanceCorrection` and shown on the review page.
+- No other rule changes values.
+
+**Model switch.**
+
+- `IMAGE_AI_MODEL` (server-only, optional) picks the image model; the default is unchanged.
+- Temperature is 0 where the model accepts it.
+- Reasoning models get low effort, a larger output budget and a 60 s timeout.
+- Replays record token usage.
+
+**Review page "Appearance from photo".**
+
+- One dropdown per field, with exactly the schema's options, unknown included.
+- Each field is marked "AI read" or "You set". Setting a field back to the AI's value clears "You set".
+- Edits invalidate the preview and go through the existing proposal → confirm flow.
+- The draft stores the edited parameters and `appearanceUserSet`, and both survive a save round trip.
+
+**Tests.**
+
+- `appearance-params.test.ts` (7): the rule; the field list and options; `setAppearanceField` rejecting values outside the schema; and the edit reaching confirm and a save round trip.
+- New E2E `appearance-review.e2e.ts`, which skips without the local replay: it sets case type to dual-chamber and glass to both, then checks that the Studio's case shell draws a divider, front glass and side glass (`data-case-structure`), including after a reload.

@@ -7027,3 +7027,74 @@
 .v3-identity-search input {
   flex: 1;
 }
+
+/* Step A review: the photo's look, one dropdown per field. */
+.v3-appearance-review {
+  display: grid;
+  gap: 10px;
+  margin-top: 20px;
+  padding: 20px;
+  border: 1px solid var(--g-line-strong);
+  border-radius: 13px;
+}
+.v3-appearance-note {
+  margin: 0;
+  color: var(--g-muted);
+  font-size: 13px;
+}
+.v3-appearance-corrections {
+  margin: 0;
+  padding-left: 18px;
+  color: var(--g-muted);
+  font-size: 12px;
+}
+.v3-appearance-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+}
+.v3-appearance-grid fieldset {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--g-line);
+  border-radius: 10px;
+}
+.v3-appearance-grid legend {
+  padding: 0 4px;
+  color: var(--g-text);
+  font-weight: 600;
+  font-size: 13px;
+}
+.v3-appearance-grid label {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  gap: 2px 8px;
+  font-size: 12px;
+  color: var(--g-muted);
+}
+.v3-appearance-grid select {
+  grid-column: 1 / -1;
+  min-height: 32px;
+  padding: 4px 8px;
+  border: 1px solid var(--g-line-strong);
+  border-radius: 7px;
+  background: var(--g-surface, transparent);
+  color: var(--g-text);
+  font: inherit;
+}
+.v3-appearance-grid label > span {
+  grid-row: 1;
+}
+.v3-appearance-grid small {
+  grid-row: 1;
+  grid-column: 2;
+  font-size: 11px;
+}
+.v3-appearance-grid small.you-set {
+  color: var(--g-accent-strong, var(--g-text));
+  font-weight: 600;
+}
