@@ -8,6 +8,7 @@ import {
 } from "@/lib/v3/image-contract";
 import { stripImageMetadata } from "@/lib/v3/image-input";
 import { APPEARANCE_PROMPT } from "@/lib/v3/appearance-params";
+import type { ImageReplay } from "@/lib/v3/image-replay";
 
 export class ImageAnalysisError extends Error {
   constructor(
@@ -49,7 +50,23 @@ const systemPrompt = [
   APPEARANCE_PROMPT,
 ].join(" ");
 
-export const analyzeReferenceImage: ImageAnalyzer = async ({ bytes, mime, width, height }) => {
+/** Dev only: saves the raw provider response as a local replay (see image-replay.ts). */
+async function saveReplay(replay: ImageReplay) {
+  const dir = process.env.IMAGE_REPLAY_DIR;
+  if (!dir) return;
+  const { mkdir, writeFile } = await import("node:fs/promises");
+  const { join } = await import("node:path");
+  await mkdir(dir, { recursive: true });
+  await writeFile(join(dir, `${replay.key}.json`), JSON.stringify(replay, null, 2));
+}
+
+export const analyzeReferenceImage: ImageAnalyzer = async ({
+  bytes,
+  mime,
+  width,
+  height,
+  replayKey,
+}) => {
   const config = getServerConfig();
   const apiKey = config.openAiApiKey || config.aiProviderApiKey;
   if (config.aiProvider !== "openai" || !apiKey)
@@ -109,7 +126,16 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({ bytes, mime, width,
       );
     }
     try {
-      return createImageAnalysisResult(parsed, { mime, width, height });
+      const result = createImageAnalysisResult(parsed, { mime, width, height });
+      if (import.meta.env.DEV && replayKey)
+        await saveReplay({
+          key: replayKey,
+          recordedAt: new Date().toISOString(),
+          model: config.aiProviderModel ?? null,
+          image: { mime, width, height },
+          raw: parsed,
+        }).catch(() => undefined);
+      return result;
     } catch {
       throw new ImageAnalysisError(
         "The image analysis was incomplete. Please retry.",

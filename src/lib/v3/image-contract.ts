@@ -77,6 +77,8 @@ export type ImageAnalyzer = (input: {
   mime: ImageMime;
   width: number;
   height: number;
+  /** Dev only: hash of the original photo, to save the response as a local replay. */
+  replayKey?: string;
 }) => Promise<ImageAnalysisResult>;
 
 export const observationJsonSchema = {

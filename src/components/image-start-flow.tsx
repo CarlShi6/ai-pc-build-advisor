@@ -15,6 +15,7 @@ import {
 } from "@/lib/v3/image-build";
 import { observationGroup, type ObservationGroup } from "@/lib/v3/observation-tags";
 import { prepareImageForAnalysis, requestImageAnalysis } from "@/lib/v3/image-client";
+import { hasReplay, loadReplay, replayKeyOf } from "@/lib/v3/image-replay";
 import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import { inspectImage } from "@/lib/v3/image-input";
 
@@ -66,10 +67,15 @@ export function ImageStartFlow({
 
   useEffect(() => () => analysisController.current?.abort(), []);
 
+  // Dev only: a recorded analysis of this exact photo (see image-replay.ts).
+  const [replayKey, setReplayKey] = useState<string | null>(null);
   function updateFile(next: File | null) {
     setFile(next);
+    setReplayKey(null);
     onFileChange?.(next);
+    if (import.meta.env.DEV && next) void replayKeyOf(next).then((key) => setReplayKey(key));
   }
+  const replayable = !!replayKey && hasReplay(replayKey);
 
   function clearImage() {
     requestNumber.current += 1;
@@ -121,7 +127,11 @@ export function ImageStartFlow({
       const prepared = await prepareImageForAnalysis(file);
       if (requestId !== requestNumber.current) return;
       setAnalysisState("analyzing");
-      const result = await requestImageAnalysis(prepared, controller.signal);
+      const result = await requestImageAnalysis(
+        prepared,
+        controller.signal,
+        import.meta.env.DEV ? (replayKey ?? undefined) : undefined,
+      );
       if (requestId !== requestNumber.current) return;
       setAnalysis(result);
       setAnalysisState("ready");
@@ -142,12 +152,16 @@ export function ImageStartFlow({
   }
 
   async function loadLocalFixture() {
-    if (!import.meta.env.DEV || !file || !devFixtureNames.includes(file.name)) return;
+    if (!import.meta.env.DEV || !file) return;
+    if (!devFixtureNames.includes(file.name) && !replayable) return;
     const requestId = ++requestNumber.current;
     analysisController.current?.abort();
     const { devImageFixtures } = await import("@/lib/v3/dev-image-fixture");
-    if (requestId !== requestNumber.current) return;
-    const fixture = devImageFixtures[file.name]();
+    // A recorded real analysis of this photo wins over a name-based fixture.
+    const fixture =
+      (replayable && replayKey ? await loadReplay(replayKey) : null) ??
+      devImageFixtures[file.name]?.();
+    if (requestId !== requestNumber.current || !fixture) return;
     funnel.imageSubmitted({ fixture: true });
     setAnalysis(fixture);
     setAnalysisState("ready");
@@ -256,7 +270,7 @@ export function ImageStartFlow({
           <button type="button" className="v3-text-button" onClick={clearImage}>
             Remove image
           </button>
-          {import.meta.env.DEV && devFixtureNames.includes(file.name) && (
+          {import.meta.env.DEV && (devFixtureNames.includes(file.name) || replayable) && (
             <button
               type="button"
               className="v3-text-button"

@@ -72,6 +72,7 @@ import type {
 } from "@/types/api";
 import type { PriceApiErrorCode, PriceApiErrorResponse } from "@/types/pricing";
 import type { RetailPriceProvider } from "@/types/current-offer";
+import { isReplayKey } from "@/lib/v3/image-replay";
 
 class ApiRouteError extends Error {
   status: number;
@@ -197,7 +198,14 @@ export async function handleInternalApiRequest(
       let release: (() => void) | undefined;
       try {
         release = (dependencies.imageLimiter ?? imageSessionLimiter).reserve(key);
-        const result = await (dependencies.imageAnalyzer ?? analyzeReferenceImage)(image);
+        // Dev only: the client names the original photo so the response can be saved as a replay.
+        const replayKey = import.meta.env.DEV
+          ? (request.headers.get("x-aipc-replay-key") ?? undefined)
+          : undefined;
+        const result = await (dependencies.imageAnalyzer ?? analyzeReferenceImage)({
+          ...image,
+          ...(isReplayKey(replayKey) && { replayKey }),
+        });
         return jsonResponse(result, { headers });
       } catch (error) {
         if (!(error instanceof ImageAnalysisError)) throw error;

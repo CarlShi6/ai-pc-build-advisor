@@ -58,12 +58,17 @@ export async function prepareImageForAnalysis(file: File): Promise<Blob> {
 export async function requestImageAnalysis(
   image: Blob,
   signal?: AbortSignal,
+  /** Dev only: hash of the original photo, so the dev server can save a local replay. */
+  replayKey?: string,
 ): Promise<ImageAnalysisResult> {
   let response: Response;
   try {
     response = await fetch("/api/image-analyses", {
       method: "POST",
-      headers: { "content-type": image.type },
+      headers: {
+        "content-type": image.type,
+        ...(replayKey && { "x-aipc-replay-key": replayKey }),
+      },
       body: image,
       cache: "no-store",
       signal,
