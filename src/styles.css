@@ -6959,7 +6959,9 @@
 /* The picked part's label: outlined in the same blue as its 3D box. */
 .v3-scene-canvas .v3-scene-callout.active {
   border-color: #6aa6ff;
-  box-shadow: 0 0 0 1px #6aa6ff80, 0 8px 22px #00000066;
+  box-shadow:
+    0 0 0 1px #6aa6ff80,
+    0 8px 22px #00000066;
 }
 /* Stage 1: an unconfirmed photo slot — evidence, similar looks, search, keep unknown. */
 .v3-identity {

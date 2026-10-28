@@ -123,6 +123,7 @@ export function proposeImageBuild(
     analysisId: analysis.analysisId,
     imageStored: false,
     observations: analysis.observations,
+    ...(analysis.appearance && { appearance: analysis.appearance }),
     reviews: structuredClone(reviews),
     visualPriorities: visualPrioritiesFromAnalysis(analysis),
     plannedSelections,

@@ -7,6 +7,7 @@ import {
   type ImageAnalyzer,
 } from "@/lib/v3/image-contract";
 import { stripImageMetadata } from "@/lib/v3/image-input";
+import { APPEARANCE_PROMPT } from "@/lib/v3/appearance-params";
 
 export class ImageAnalysisError extends Error {
   constructor(
@@ -45,6 +46,7 @@ const systemPrompt = [
   "Use normalized region coordinates only when a specific visible area supports the observation; otherwise use null.",
   "Each observation needs a short evidence explanation. If you cannot see a detail, mark it unknown or omit it.",
   "List in absentParts only a GPU, cooler, fan or motherboard you can clearly see is not installed because the area where it would sit is plainly visible (for example an empty case interior). If a part could be hidden, out of frame or obscured, do not list it; leave absentParts empty when unsure.",
+  APPEARANCE_PROMPT,
 ].join(" ");
 
 export const analyzeReferenceImage: ImageAnalyzer = async ({ bytes, mime, width, height }) => {
@@ -63,7 +65,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({ bytes, mime, width,
     const response = await client.responses.create({
       model: config.aiProviderModel,
       store: false,
-      max_output_tokens: 1800,
+      max_output_tokens: 2400,
       input: [
         { role: "system", content: systemPrompt },
         {

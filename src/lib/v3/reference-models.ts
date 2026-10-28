@@ -107,11 +107,15 @@ const sharedMaterials: Record<string, ReferenceMaterial> = {
   light: { color: "#FFFFFF", roughness: 0.4, metalness: 0 },
 };
 
-function pick(ids: string[]) {
+export function sharedMaterial(id: string): ReferenceMaterial {
+  return sharedMaterials[id];
+}
+
+export function pick(ids: string[]) {
   return Object.fromEntries(ids.map((id) => [id, sharedMaterials[id]]));
 }
 
-function box(
+export function box(
   id: string,
   sizeMm: Point,
   positionMm: Point,
@@ -130,7 +134,11 @@ export function cornerRadius(part: ReferenceModelPart): number {
  * Softened edges for a whole model: every box at least `minSideMm` thick gets `radiusMm`
  * (glass panes and thin trims stay square). Edge radii are a visual estimate.
  */
-function withRounding(model: ReferenceModel, radiusMm: number, minSideMm = 4): ReferenceModel {
+export function withRounding(
+  model: ReferenceModel,
+  radiusMm: number,
+  minSideMm = 4,
+): ReferenceModel {
   return {
     ...model,
     parts: model.parts.map((part) =>
@@ -317,7 +325,7 @@ const GPU_DETAIL_ASSUMPTION =
  * manufacturer states the count, not the pitch); the 11 mm PCIe-finger band and the 120 mm
  * bracket follow the img2threejs MSI reconstruction's proportions.
  */
-function gpuEnvelope(options: {
+export function gpuEnvelope(options: {
   partId: string;
   slug: string;
   lengthMm: number;
@@ -328,6 +336,8 @@ function gpuEnvelope(options: {
   hdmiPorts: number;
   /** False for a look-alike with no model behind it: no outputs, vents or power connector. */
   details?: boolean;
+  /** A lit strip along the top edge (it glows in the build's or the photo's light colour). */
+  lightStrip?: boolean;
 }): ReferenceModel {
   const { lengthMm: L, heightMm: H, thicknessMm: T, fans } = options;
   const fingers = 11;
@@ -345,6 +355,9 @@ function gpuEnvelope(options: {
       "gold-contacts",
     ),
     box("io-bracket", [40, 120, 1.5], [-2, H / 2 - 30 - 60, L / 2 + 3], "bracket-steel"),
+    ...(options.lightStrip
+      ? [box("light-strip", [T * 0.5, 3, L * 0.55], [0, H / 2 - 1.5, -L * 0.12], "light", 1)]
+      : []),
     ...(options.details === false
       ? []
       : gpuDetailParts({
@@ -403,11 +416,12 @@ function gpuEnvelope(options: {
       "port-dark",
       "slot-plastic",
       "fitting-steel",
+      "light",
     ]),
   };
 }
 
-const GPU_ROTOR_ASSUMPTION =
+export const GPU_ROTOR_ASSUMPTION =
   "Fan blades drawn as nine pitched blades around a hub; blade count and shape are not published.";
 
 /** GPU fans read as fans: the flat blade discs become pitched rotors of the same diameter. */
@@ -430,7 +444,7 @@ const along = (axis: ReferenceAxis, thickness: number, span: number): Point =>
  * A square-frame case fan of `sizeMm` x `thicknessMm` facing along `axis`: four frame rails, a
  * pitched rotor and a light ring. Rail width and ring diameter are visual estimates.
  */
-function fanParts(
+export function fanParts(
   prefix: string,
   centre: Point,
   axis: ReferenceAxis,
@@ -476,7 +490,7 @@ function fanParts(
 }
 
 /** Envelope and centre from the parts, for models placed off their slot anchor. */
-function placed(
+export function placed(
   model: Omit<ReferenceModel, "envelopeMm" | "centreMm" | "geometryAccuracy" | "frame" | "source">,
 ): ReferenceModel {
   const lo = [0, 1, 2].map((k) =>
@@ -498,7 +512,7 @@ function placed(
 
 // Slot anchors in millimetres (scene-focus `slotLayout` x 150). Parts inside the case are placed
 // relative to their own anchor so a model lines up with the others; placement stays illustrative.
-const ANCHOR_MM = {
+export const ANCHOR_MM = {
   motherboard: [-37.5, 15, -33],
   cpu: [-36, 93, -10.5],
   cooler: [-37.5, 96, 34.5],
@@ -512,7 +526,7 @@ const rel = (slot: keyof typeof ANCHOR_MM, worldMm: Point): Point =>
  * edge; the socket sits on the CPU anchor. Slot counts are from the manufacturer page; the
  * position and size of every sub-part is a visual estimate.
  */
-function atxBoard(options: {
+export function atxBoard(options: {
   partId: string;
   slug: string;
   dimmSlots: number;
@@ -633,20 +647,64 @@ function atxBoard(options: {
  * A 360 mm AIO: pump head on the CPU, radiator under the case top with three fans below it and two
  * hoses. Radiator length is the published product length; everything else is labeled below.
  */
-function aio360(options: {
+/** Where an AIO radiator sits, in the case frame (millimetres, case centre at the origin). */
+export interface RadiatorMount {
+  position: "top" | "front" | "side";
+  /** Radiator centre. */
+  centreMm: Point;
+}
+
+/** The O11 showcase's top mount: under the top panel, towards the glass side. */
+const SHOWCASE_TOP_MOUNT: RadiatorMount = {
+  position: "top",
+  centreMm: [0, 186.5, 40],
+};
+
+/**
+ * An AIO: pump head on the CPU, a radiator of `fanCount` fans at a mount (top: fans below it;
+ * front: fans behind it; side: fans inside it) and two hoses. Sizes beyond what a page states
+ * are estimates and listed by the caller.
+ */
+export function aioCooler(options: {
   partId: string;
   slug: string;
   radiatorLengthMm: number;
   fanSizeMm: number;
   fanThicknessMm: number;
+  fanCount?: number;
+  mount?: RadiatorMount;
+  pumpStyle?: "round" | "square" | "screen";
+  assumptions: string[];
 }): ReferenceModel {
   const { radiatorLengthMm: L, fanSizeMm: F, fanThicknessMm: T } = options;
+  const fanCount = options.fanCount ?? 3;
+  const mount = options.mount ?? SHOWCASE_TOP_MOUNT;
+  const style = options.pumpStyle ?? "square";
   const radThickness = 27;
-  const radWidth = F;
   const tank = 20;
-  const radiator = rel("cooler", [0, 186.5, 40]);
+  // Axes in the case frame: `len` runs along the radiator, `thick` through it, `wide` across it.
+  const [len, thick, wide]: [0 | 1 | 2, 0 | 1 | 2, 0 | 1 | 2] =
+    mount.position === "top" ? [0, 1, 2] : mount.position === "front" ? [1, 0, 2] : [1, 2, 0];
+  // Fans sit on the inner face: below a top radiator, behind a front one, inside a side one.
+  const inward = mount.position === "top" ? -1 : mount.position === "front" ? -1 : 1;
+  const radiator = rel("cooler", mount.centreMm);
+  const sized = (along: number, through: number, across: number): Point => {
+    const size: Point = [0, 0, 0];
+    size[len] = along;
+    size[thick] = through;
+    size[wide] = across;
+    return size;
+  };
+  const at = (along: number, through: number): Point => {
+    const point = [...radiator] as Point;
+    point[len] += along;
+    point[thick] += through;
+    return point;
+  };
+  const fanAxis = (["x", "y", "z"] as const)[thick];
   const pump = rel("cooler", [ANCHOR_MM.cpu[0], ANCHOR_MM.cpu[1], 16.7]);
-  const pumpSize: Point = [72, 72, 45];
+  const pumpSize: Point = style === "round" ? [72, 72, 42] : [72, 72, 45];
+  const face = pump[2] + pumpSize[2] / 2;
   const parts: ReferenceModelPart[] = [
     box(
       "cold-plate",
@@ -654,55 +712,83 @@ function aio360(options: {
       [pump[0], pump[1], pump[2] - pumpSize[2] / 2 - 1.5],
       "cold-plate",
     ),
-    box("pump-body", pumpSize, pump, "fan-white", 8),
+    style === "round"
+      ? {
+          id: "pump-body",
+          shape: "cylinder",
+          sizeMm: pumpSize,
+          positionMm: pump,
+          material: "fan-white",
+          axis: "z",
+        }
+      : box("pump-body", pumpSize, pump, "fan-white", 8),
+    ...(style === "screen"
+      ? [box("pump-screen", [58, 58, 1.5], [pump[0], pump[1], face + 0.75], "port-dark", 2)]
+      : []),
     {
       id: "pump-light-ring",
       shape: "ring",
-      sizeMm: [58, 58, 2],
-      positionMm: [pump[0], pump[1], pump[2] + pumpSize[2] / 2 + 0.5],
+      sizeMm: [style === "screen" ? 64 : 58, style === "screen" ? 64 : 58, 2],
+      positionMm: [pump[0], pump[1], face + 0.5],
       material: "light",
       axis: "z",
     },
     {
       id: "radiator-core",
       shape: "fins",
-      sizeMm: [L - 2 * tank, radThickness, radWidth],
+      sizeMm: sized(L - 2 * tank, radThickness, F),
       positionMm: radiator,
       material: "radiator-fins",
-      axis: "x",
+      axis: (["x", "y", "z"] as const)[len],
     },
   ];
   for (const sign of [-1, 1])
     parts.push(
       box(
         `end-tank-${sign < 0 ? "rear" : "front"}`,
-        [tank, radThickness, radWidth],
-        [radiator[0] + sign * (L / 2 - tank / 2), radiator[1], radiator[2]],
+        sized(tank, radThickness, F),
+        at(sign * (L / 2 - tank / 2), 0),
         "fan-white",
         4,
       ),
     );
-  const fanY = radiator[1] - radThickness / 2 - T / 2;
-  for (let index = 0; index < 3; index += 1)
+  const fanOffset = inward * (radThickness / 2 + T / 2);
+  for (let index = 0; index < fanCount; index += 1)
     parts.push(
       ...fanParts(
         `fan-${index + 1}`,
-        [radiator[0] + (index - 1) * F, fanY, radiator[2]],
-        "y",
+        at((index - (fanCount - 1) / 2) * F, fanOffset),
+        fanAxis,
         F,
         T,
         "fan-white",
       ),
     );
-  // Hoses leave fittings on the pump's rear face and bend up into fittings under the rear tank.
-  const tankX = radiator[0] - (L / 2 - tank / 2);
-  const hoseTop = radiator[1] - radThickness / 2;
+  // Hoses leave fittings on the pump's rear face and bend into fittings on the nearer end tank.
+  const tanks = [-1, 1].map((sign) => at(sign * (L / 2 - tank / 2), inward * (radThickness / 2)));
+  const near = tanks.reduce((best, tankPoint) =>
+    Math.hypot(...tankPoint.map((value, k) => value - pump[k])) <
+    Math.hypot(...best.map((value, k) => value - pump[k]))
+      ? tankPoint
+      : best,
+  );
   const pumpRear = pump[0] - pumpSize[0] / 2;
   for (const [name, dz] of [
     ["a", -14],
     ["b", 14],
   ] as const) {
     const z = pump[2] + dz;
+    const end: Point = [...near] as Point;
+    end[thick] += inward * 9;
+    const fitting: Point = [...near] as Point;
+    fitting[thick] += inward * 5;
+    if (wide === 2 || wide === 0) end[2] = fitting[2] = mount.position === "side" ? end[2] : z;
+    const start: Point = [pumpRear - 11, pump[1], z];
+    const mid: Point = [
+      (start[0] + end[0]) / 2 + 20,
+      (start[1] + end[1]) / 2 + 20,
+      (start[2] + end[2]) / 2,
+    ];
     parts.push(
       {
         id: `fitting-${name}-pump`,
@@ -715,34 +801,18 @@ function aio360(options: {
       {
         id: `fitting-${name}-tank`,
         shape: "cylinder",
-        sizeMm: [16, 10, 16],
-        positionMm: [tankX, hoseTop - 5, z],
+        sizeMm: sized(16, 10, 16),
+        positionMm: fitting,
         material: "fitting-steel",
-        axis: "y",
+        axis: fanAxis,
       },
-      tube(
-        `hose-${name}`,
-        [
-          [pumpRear - 11, pump[1], z],
-          [tankX + 30, pump[1] + 6, z],
-          [tankX + 2, pump[1] + 45, z],
-          [tankX, hoseTop - 9, z],
-        ],
-        12,
-        "hose-white",
-      ),
+      tube(`hose-${name}`, [start, mid, end], 12, "hose-white"),
     );
   }
   return placed({
     partId: options.partId,
     slug: options.slug,
-    assumptions: [
-      'Radiator length is the page\'s "Product Length 396", read as millimetres (the page gives no unit).',
-      "Radiator width is one fan width (the page states 360 mm radiator size and RX120 fans); thickness 27 mm and 20 mm end tanks are estimates.",
-      "Pump head size, the hose route and the fittings are estimates; the published 450 mm tubing length is not drawn.",
-      "Edge radii of the pump, end tanks and fan frames are visual estimates.",
-      "Fan frame rails, blade count and light-ring size are visual estimates.",
-    ],
+    assumptions: options.assumptions,
     parts,
     materials: pick([
       "fan-white",
@@ -751,25 +821,50 @@ function aio360(options: {
       "cold-plate",
       "light",
       "fitting-steel",
+      "port-dark",
     ]),
   });
 }
 
+function aio360(options: {
+  partId: string;
+  slug: string;
+  radiatorLengthMm: number;
+  fanSizeMm: number;
+  fanThicknessMm: number;
+}): ReferenceModel {
+  return aioCooler({
+    ...options,
+    assumptions: [
+      'Radiator length is the page\'s "Product Length 396", read as millimetres (the page gives no unit).',
+      "Radiator width is one fan width (the page states 360 mm radiator size and RX120 fans); thickness 27 mm and 20 mm end tanks are estimates.",
+      "Pump head size, the hose route and the fittings are estimates; the published 450 mm tubing length is not drawn.",
+      "Edge radii of the pump, end tanks and fan frames are visual estimates.",
+      "Fan frame rails, blade count and light-ring size are visual estimates.",
+    ],
+  });
+}
+
 /** A two-module kit seated in the board's 2nd and 4th DIMM slots, light bar on the top edge. */
-function memoryKit(options: {
+export function memoryKit(options: {
   partId: string;
   slug: string;
   lengthMm: number;
   widthMm: number;
   heightMm: number;
+  /** Board DIMM slots (0–3) to fill; default the 2nd and 4th. */
+  slots?: number[];
+  /** False: no lit bar, the heatspreader takes the full height. */
+  lightBar?: boolean;
+  assumptions?: string[];
 }): ReferenceModel {
   const { lengthMm: L, widthMm: W, heightMm: H } = options;
-  const lightBar = 10;
+  const lightBar = options.lightBar === false ? 0 : 10;
   const bottom = ANCHOR_MM.motherboard[2] + 3; // seated a few millimetres into the slot
   const parts: ReferenceModelPart[] = [];
   // Board slot positions: x(158 + i * 9.5) on the board (see atxBoard), board-relative.
   const slotX = (index: number) => ANCHOR_MM.cpu[0] - 110 + 158 + index * 9.5;
-  for (const index of [1, 3]) {
+  for (const index of options.slots ?? [1, 3]) {
     const [x, y] = rel("memory", [slotX(index), ANCHOR_MM.cpu[1] + 72 - 80, 0]);
     const z = (zWorld: number) => zWorld - ANCHOR_MM.memory[2];
     // Bottom up: PCB edge with gold contacts, heatspreader, light bar; together the module height.
@@ -789,19 +884,23 @@ function memoryKit(options: {
         "fan-white",
         1.5,
       ),
-      box(
-        `module-${index + 1}-light-bar`,
-        [W - 1, L - 4, lightBar],
-        [x, y, z(bottom + H - lightBar / 2)],
-        "light",
-        1.5,
-      ),
+      ...(lightBar
+        ? [
+            box(
+              `module-${index + 1}-light-bar`,
+              [W - 1, L - 4, lightBar],
+              [x, y, z(bottom + H - lightBar / 2)],
+              "light",
+              1.5,
+            ),
+          ]
+        : []),
     );
   }
   return placed({
     partId: options.partId,
     slug: options.slug,
-    assumptions: [
+    assumptions: options.assumptions ?? [
       "Light-bar height (10 mm) is an estimate; module length, width and height are from the manufacturer.",
       "The 4 mm PCB edge with gold contacts, and edge radii, are visual estimates.",
       "Modules shown in the 2nd and 4th slots of the reference board.",

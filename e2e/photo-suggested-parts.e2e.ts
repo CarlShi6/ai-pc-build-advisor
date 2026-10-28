@@ -105,7 +105,7 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   );
   const board = page.locator('.v3-scene-callout[data-scene-slot="motherboard"]');
   await expect(board).toHaveAttribute("data-look", "photo");
-  await expect(board).toContainText("Appearance from photo · model not confirmed");
+  await expect(board).toContainText("Appearance from photo · proportions estimated");
   // Unconfirmed parts are detailed look-alikes in the photo's colour, not models.
   await expect(scene).toHaveAttribute(
     "data-slot-models",

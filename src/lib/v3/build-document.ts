@@ -5,6 +5,7 @@ import type { Part, PartCategory } from "@/types/parts";
 import type { CandidateReview } from "@/lib/v3/candidate-matcher";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
 import type { VisualObservation } from "@/lib/v3/image-contract";
+import { readAppearanceParams, type AppearanceParams } from "@/lib/v3/appearance-params";
 
 export const primarySlots = [
   "case",
@@ -34,6 +35,8 @@ export interface ImageBuildContext {
   analysisId: string;
   imageStored: false;
   observations: VisualObservation[];
+  /** Step A: the photo's per-category look; absent on drafts from older analyses. */
+  appearance?: AppearanceParams;
   reviews: Partial<Record<VisibleCatalogCategory, CandidateReview>>;
   visualPriorities: VisualPriority[];
   plannedSelections: Partial<
@@ -211,7 +214,12 @@ function readImageContext(value: unknown, build: Build): ImageBuildContext | und
     )
       plannedSelections[slot] = selection as ImageBuildContext["plannedSelections"][SlotId];
   }
-  return { ...(value as unknown as ImageBuildContext), plannedSelections };
+  const appearance = readAppearanceParams(value.appearance);
+  return {
+    ...(value as unknown as ImageBuildContext),
+    plannedSelections,
+    appearance,
+  };
 }
 
 function readDraftEnvelope(value: unknown, build: Build): StoredDraftEnvelope | null {

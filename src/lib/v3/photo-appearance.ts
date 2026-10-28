@@ -6,7 +6,7 @@ import type { VisualObservation } from "@/lib/v3/image-contract";
  * still unresolved. It drives a look-alike placeholder in the scene, never a part identity, so
  * nothing here names a model, sets a price or affects compatibility.
  */
-export const PHOTO_APPEARANCE_LABEL = "Appearance from photo · model not confirmed";
+export const PHOTO_APPEARANCE_LABEL = "Appearance from photo · proportions estimated";
 
 export type AppearanceColor = "white" | "black" | "silver" | "gray" | "pink";
 

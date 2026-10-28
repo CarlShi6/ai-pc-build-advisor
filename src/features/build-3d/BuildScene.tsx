@@ -1280,10 +1280,12 @@ function SlotMesh({
           // A detailed look-alike in the photo's colour and light; the label says no model.
           <ReferenceModelMesh
             model={drawn.model}
+            panels={slot === "case"}
             accent={
-              look?.lightColor
+              drawn.accent ??
+              (look?.lightColor
                 ? (lightHex[look.lightColor] ?? presentation.accentColor)
-                : presentation.accentColor
+                : presentation.accentColor)
             }
           />
         ) : look ? (
