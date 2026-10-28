@@ -73,12 +73,16 @@ describe("exploded view layout (E1)", () => {
       );
       expect(along, item.id).toBeGreaterThan(0);
     }
-    expect(explodeDirection.top).toEqual([0, 1, 0]);
+    // The top lifts up and back, off the radiator.
+    expect(explodeDirection.top[1]).toBeGreaterThan(0.8);
+    expect(explodeDirection.top[0]).toBeLessThan(0);
     expect(explodeDirection.glass).toEqual([0, 0, 1]);
     expect(explodeDirection.back).toEqual([0, 0, -1]);
     expect(explodeDirection.front).toEqual([1, 0, 0]);
     expect(explodeDirection.motherboard).toEqual([-1, 0, 0]);
-    expect(explodeDirection.psu[1]).toBeLessThan(-0.8);
+    // The PSU goes down and out the glass side, clear of the case floor and the radiator.
+    expect(explodeDirection.psu[1]).toBeLessThan(-0.4);
+    expect(explodeDirection.psu[2]).toBeGreaterThan(0.5);
   });
 
   it("interpolates continuously between 0% and 100%", () => {

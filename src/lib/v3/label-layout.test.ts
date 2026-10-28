@@ -31,3 +31,12 @@ describe("label cards", () => {
     expect(separated(cards, 640).map((card) => card.y)).toEqual([200, 200]);
   });
 });
+
+describe("label cards and part centres", () => {
+  it("move off another part's on-screen centre", () => {
+    const cards: Card[] = [{ id: "case", x: 500, y: 200, w: 90, h: 30 }];
+    const centre = { x: 505, y: 205, w: 36, h: 36 };
+    const [card] = separated(cards, 640, [centre]);
+    expect(overlap(card, { id: "centre", ...centre })).toBe(false);
+  });
+});

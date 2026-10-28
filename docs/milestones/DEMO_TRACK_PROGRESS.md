@@ -607,3 +607,26 @@ A second look beside "Studio", switched in the scene toolbar (Studio | Diorama).
   - `shopping-plan.test.ts`: photo draft budget unset, surviving a save round trip; "Not set" in both exports; no budget comparison.
   - New E2E `scene-interaction.e2e.ts`: hint dismiss and memory; hover outline and cursor on and off; Tab outline; pick and select in Diorama and Studio; Diorama explode at 0/25/50/75/100% keeps elevation ≥ 25° with zero label overlaps.
   - `image-to-build` checks there is no budget field and no budget card, before and after a save. `describe` checks its budget field remains. The demo and diorama specs follow the new default.
+
+### Exploded parts are easy to point at (2026-10-27)
+
+Review: when exploded, CPU and memory were small with the case right behind them (clicks landed on the case), and from above the radiator sat under the top panel.
+
+- **Priority** (`scene-picking.ts`, `pickSlot`): every part on the pointer's ray sees the same hit list, and only the part `pickSlot` names acts. The nearest part surface wins. Next come the exploded box areas. The case (its frame) wins only when no other part is on the ray.
+- **Hit areas:** invisible boxes, at least 44 px on screen from the current camera.
+  - CPU, memory and storage always have one, and it counts as their surface.
+  - While exploded, every other part gets a box-sized area. It loses to any real surface on the ray, since an AIO's box is mostly air.
+  - Hover and selection outlines keep the real size.
+- **Exploded panels** (top, glass, solid side, front, shroud) turn translucent (30%) and let pointing pass through to parts behind them. The case is picked by its frame or its label.
+- **Layout** (`scene-explode.ts`):
+  - The top panel lifts up and towards the rear, off the radiator.
+  - CPU and memory come off the board towards the viewer, fanned apart, with 1.1 units of extra travel (`EXPLODE_EXTRA`).
+  - The PSU goes down and out the glass side, so from above it lands clear of the radiator.
+- **Labels:** a label or exploded name chip under the mouse highlights its part, and clicking it does what clicking the model does. Chips also keep clear of every part's on-screen centre, their own included (`separated(..., obstacles)`), so a chip never hides the part it names or a neighbour.
+- **Readouts for checks:** `data-slot-rects` gives each part's on-screen box, hit area included.
+- **Tests:**
+  - `scene-picking.test.ts` (4): case last, nearest part, pass-through, box areas below real surfaces.
+  - `label-layout.test.ts`: chips move off another part's centre.
+  - `scene-explode.test.ts`: the new top and PSU directions.
+  - New E2E `clickability.e2e.ts`: in the default Diorama view and from straight above, exploded 100%, hovering the centre of each part's on-screen box hovers that part, and every clickable area is at least 40 px. A name chip focuses its part, and the case label focuses the case.
+  - Measured on GPU rendering, the smallest clickable area is about 64 x 64 px.

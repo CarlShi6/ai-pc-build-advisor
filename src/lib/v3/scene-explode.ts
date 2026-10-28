@@ -45,17 +45,20 @@ function normalize([x, y, z]: Point): Point {
 export const explodeDirection: Record<ExplodeId, Point> = {
   case: [0, 0, 0],
   motherboard: [-1, 0, 0],
-  cpu: [0, 0, 1],
+  // CPU and memory come off the board towards the viewer, fanned slightly apart.
+  cpu: normalize([0.25, 0.2, 1]),
   cooler: [0, 1, 0],
-  memory: [0, 0, 1],
+  memory: normalize([0.45, 0.05, 1]),
   gpu: normalize([1, -0.35, 0]),
   storage: [0, 0, 1],
-  // Down, and a little out the glass side: straight down it would hide under the case floor.
-  psu: normalize([0, -1, 0.6]),
+  // Down and out the glass side: straight down it would hide under the case floor, and from above
+  // it must land clear of the radiator.
+  psu: normalize([0, -0.6, 1]),
   glass: [0, 0, 1],
   back: [0, 0, -1],
   front: [1, 0, 0],
-  top: [0, 1, 0],
+  // Up and towards the rear, so it never parks right above the radiator it would hide.
+  top: normalize([-0.6, 1, 0]),
   // Out the rear, low: under the board, clear of the PSU and GPU paths.
   shroud: normalize([-1, -0.35, 0]),
 };
@@ -76,6 +79,12 @@ export const explodeOrder: ExplodeId[] = [
   "back",
   "shroud",
 ];
+
+/**
+ * Extra travel beyond the first clear position: small parts that sit against the board are pulled
+ * well clear of the case outline, so they are easy to see and to click.
+ */
+export const EXPLODE_EXTRA: Partial<Record<ExplodeId, number>> = { cpu: 1.1, memory: 1.1 };
 
 /** Clear space kept between any two exploded boxes, and the least a part or panel moves. */
 export const EXPLODE_GAP = 0.12;
@@ -130,15 +139,19 @@ export function explodeDistances(
     const ranges = placed
       .map((other) => blockedRange(box, direction, other, EXPLODE_GAP))
       .filter((range): range is [number, number] => range !== null);
-    let distance = EXPLODE_MIN_PULL;
-    for (let moved = true; moved; ) {
-      moved = false;
-      for (const [lo, hi] of ranges)
-        if (distance > lo && distance < hi) {
-          distance = hi + 1e-6;
-          moved = true;
-        }
-    }
+    const clear = (start: number) => {
+      let distance = start;
+      for (let moved = true; moved; ) {
+        moved = false;
+        for (const [lo, hi] of ranges)
+          if (distance > lo && distance < hi) {
+            distance = hi + 1e-6;
+            moved = true;
+          }
+      }
+      return distance;
+    };
+    const distance = clear(clear(EXPLODE_MIN_PULL) + (EXPLODE_EXTRA[id] ?? 0));
     distances[id] = distance;
     placed.push(shiftBox(box, direction.map((value) => value * distance) as Point));
   }
