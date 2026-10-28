@@ -3,6 +3,7 @@ import { completeness, type BuildDocumentV3, type SlotId } from "@/lib/v3/build-
 import type { CandidateReview } from "@/lib/v3/candidate-matcher";
 import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
+import { matchGaps } from "@/lib/v3/slot-identity";
 
 /**
  * v3 funnel (PRD §19.1): image submitted → analysis completed → candidate reviewed → draft
@@ -47,6 +48,22 @@ export function analysisProperties(result: ImageAnalysisResult): AnalyticsProper
   };
 }
 
+/**
+ * Why each visible category has no leading catalog match when a photo draft is confirmed, as
+ * category → reason code (never observation text). These records pick the catalog's next parts.
+ */
+export function matchGapProperties(
+  analysis: ImageAnalysisResult,
+  reviews: Partial<Record<VisibleCatalogCategory, CandidateReview>>,
+): AnalyticsProperties {
+  const gaps = matchGaps(analysis, reviews);
+  return {
+    fixture: analysis.provider === "fixture",
+    gap_count: Object.keys(gaps).length,
+    ...Object.fromEntries(Object.entries(gaps).map(([category, gap]) => [`gap_${category}`, gap])),
+  };
+}
+
 export function reviewProperties(
   category: VisibleCatalogCategory,
   review: CandidateReview,
@@ -69,6 +86,10 @@ export const funnel = {
     }),
   candidateReviewed: (category: VisibleCatalogCategory, review: CandidateReview) =>
     trackAnalyticsEvent("v3_candidate_reviewed", reviewProperties(category, review)),
+  matchGaps: (
+    analysis: ImageAnalysisResult,
+    reviews: Partial<Record<VisibleCatalogCategory, CandidateReview>>,
+  ) => trackAnalyticsEvent("v3_image_match_gaps", matchGapProperties(analysis, reviews)),
   draftCreated: (document: BuildDocumentV3) =>
     trackAnalyticsEvent("v3_draft_created", draftProperties(document)),
   buildSaved: (document: BuildDocumentV3, firstSave: boolean) =>

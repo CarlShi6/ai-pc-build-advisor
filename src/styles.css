@@ -6961,3 +6961,67 @@
   border-color: #6aa6ff;
   box-shadow: 0 0 0 1px #6aa6ff80, 0 8px 22px #00000066;
 }
+/* Stage 1: an unconfirmed photo slot — evidence, similar looks, search, keep unknown. */
+.v3-identity {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 4px 0 14px;
+}
+.v3-identity-evidence {
+  margin: 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: #ffffff0d;
+  color: var(--g-text);
+  font-size: 12px;
+}
+.v3-identity-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.v3-identity-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid #ffffff1a;
+  border-radius: 8px;
+}
+.v3-identity-list li > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.v3-identity-list strong {
+  font-size: 12px;
+}
+.v3-identity-list small {
+  font-size: 10px;
+  color: var(--g-text-muted);
+}
+.v3-identity-list button {
+  flex: none;
+  padding: 5px 10px;
+  font-size: 11px;
+}
+.v3-identity-empty,
+.v3-identity-note {
+  margin: 0;
+  font-size: 11px;
+  color: var(--g-text-muted);
+}
+.v3-identity-search span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.v3-identity-search input {
+  flex: 1;
+}

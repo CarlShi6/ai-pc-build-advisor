@@ -44,35 +44,38 @@ export function compatibilitySummary(document: BuildDocumentV3): CompatibilitySu
 }
 
 /** Candidates for one slot: lock-safe parts first, then the closest seed price. */
+/** The preview of putting one catalog part in a slot (nothing changes until it is confirmed). */
+export function replaceOption(document: BuildDocumentV3, slot: SlotId, part: Part): ReplaceOption {
+  const current = selectedPart(document, slot);
+  const beforeIds = new Set(document.build.compatibilityWarnings.map((warning) => warning.id));
+  const proposal = proposePartSelection(document, slot, part);
+  return {
+    part,
+    proposal,
+    priceDelta:
+      priceUnknown(part) || (current && priceUnknown(current))
+        ? null
+        : part.price - (current?.price ?? 0),
+    totalAfter: priceCoverage(proposal.candidate.build.parts),
+    before: compatibilitySummary(document),
+    after: compatibilitySummary(proposal.candidate),
+    traitImpacts: traitImpacts(document, slot, part),
+    lockConflicts: lockConflicts(document, slot, part),
+    newFindings: proposal.candidate.build.compatibilityWarnings
+      .filter((warning) => !beforeIds.has(warning.id))
+      .map((warning) => warning.message),
+  };
+}
+
 export function replaceOptions(
   document: BuildDocumentV3,
   slot: SlotId,
   limit = 4,
 ): { options: ReplaceOption[]; total: number } {
   const current = selectedPart(document, slot);
-  const before = compatibilitySummary(document);
-  const beforeIds = new Set(document.build.compatibilityWarnings.map((warning) => warning.id));
   const all = catalogForSlot(slot)
     .filter((part) => part.id !== current?.id)
-    .map((part): ReplaceOption => {
-      const proposal = proposePartSelection(document, slot, part);
-      return {
-        part,
-        proposal,
-        priceDelta:
-          priceUnknown(part) || (current && priceUnknown(current))
-            ? null
-            : part.price - (current?.price ?? 0),
-        totalAfter: priceCoverage(proposal.candidate.build.parts),
-        before,
-        after: compatibilitySummary(proposal.candidate),
-        traitImpacts: traitImpacts(document, slot, part),
-        lockConflicts: lockConflicts(document, slot, part),
-        newFindings: proposal.candidate.build.compatibilityWarnings
-          .filter((warning) => !beforeIds.has(warning.id))
-          .map((warning) => warning.message),
-      };
-    })
+    .map((part) => replaceOption(document, slot, part))
     .sort(
       (a, b) =>
         a.lockConflicts.length - b.lockConflicts.length ||

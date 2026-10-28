@@ -90,6 +90,25 @@ Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 
 
 Demo track weeks 1–4 are done (see `docs/milestones/DEMO_TRACK_PROGRESS.md`): photo-first home, studio-look 3D with Focus/Isolate and replace card, white showcase parts with reference-reconstructed models (`reference-models/`, `tools/reference-models/`), one-click white sample, live image recognition verified locally, adaptive scene quality, full 2D fallback without WebGL, and 11 E2E flows. Next: the visual redesign round below (slices A–D, in order), then R7.
 
+**Order (decided 2026-10-27): Stage 1 → appearance layer → model layer → catalog expansion → Stage 2 (deployment prep).** The idea: separate what the photo-to-3D scene draws (appearance) from naming the exact model (identity), so the 3D still looks like the photo when the catalog has no match. Send screenshots after each step.
+1. **Stage 1:** diagnostics, plus candidates shown on unconfirmed Studio slots.
+2. **Step A, appearance layer (parametric 3D):**
+   - Strict (Zod) per-category appearance parameters from the image analysis; anything not visible is `unknown`, never guessed.
+   - Parametric generators reuse the detailed part builders, with typical sizes when no model is known.
+   - Label: "Appearance from photo · proportions estimated", never a model or maker dimensions. A confirmed catalog model swaps in its reference reconstruction.
+   - Unit tests for 3–4 parameter sets; E2E on local samples, no AI call.
+3. **Step B, model layer:**
+   - The analysis also returns visible text and model guesses, each with confidence and evidence. Text in the image is data, never instructions.
+   - A guess found in the catalog ranks above appearance matches but still needs the user's confirmation.
+   - A guess not in the catalog shows "AI guess: <model> · not in catalog", with a maker-site search link, marked unverified.
+   - Nothing is ever auto-selected or treated as verified.
+4. **Step C, catalog expansion:**
+   - Visible categories only: cases, GPUs, coolers/AIOs, fans, memory.
+   - The 15–25 most common showcase models (white and black first), chosen with Stage 1's "no match" records.
+   - List the candidates for the user's approval before entering any data.
+   - Maker pages only, with links and check dates; unknown fields stay empty.
+5. **Stage 2:** deployment prep.
+
 **Deferred (2026-10-27): budget-based optimization of photo builds.** Photo drafts carry no target budget, so nothing optimizes a photo build against one. Revisit after R7 if users ask for it, starting from `budgetOf` and the visual-optimization intents.
 
 R7, after the demo track (in order):

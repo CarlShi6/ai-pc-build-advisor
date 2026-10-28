@@ -34,6 +34,7 @@ export const ANALYTICS_EVENT_NAMES = [
   "v3_build_save_conflict",
   "v3_report_exported",
   "v3_shopping_link_opened",
+  "v3_image_match_gaps",
 ] as const;
 
 export type AnalyticsEventName = (typeof ANALYTICS_EVENT_NAMES)[number];

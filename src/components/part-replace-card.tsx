@@ -9,6 +9,7 @@ import {
 } from "@/lib/v3/build-document";
 import { confirmPartSelection } from "@/lib/v3/build-proposal";
 import {
+  replaceOption,
   replaceOptions,
   type CompatibilitySummary,
   type ReplaceOption,
@@ -16,6 +17,9 @@ import {
 import { confirmWithLockOverride } from "@/lib/v3/visual-optimization";
 import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
 import { REFERENCE_MODEL_LABEL, referenceModelFor } from "@/lib/v3/reference-models";
+import { keepSlotUnknown, slotIdentityHelp } from "@/lib/v3/slot-identity";
+import { SlotIdentityPanel } from "@/components/slot-identity-panel";
+import { catalogPartById } from "@/lib/v3/catalog";
 
 function totalText(total: { known: number; unknown: number }) {
   return `${total.known.toLocaleString()}${total.unknown ? ` + ${total.unknown} unknown` : ""}`;
@@ -54,7 +58,12 @@ export function PartReplaceCard({
   const [chosenId, setChosenId] = useState<string | null>(null);
   const [override, setOverride] = useState(false);
   const [error, setError] = useState("");
-  const chosen: ReplaceOption | undefined = options.find((item) => item.part.id === chosenId);
+  // Any catalog part can be previewed: one of the options, a similar look or a search result.
+  const chosenPart = chosenId ? catalogPartById(chosenId) : undefined;
+  const chosen: ReplaceOption | undefined =
+    options.find((item) => item.part.id === chosenId) ??
+    (chosenPart ? replaceOption(document, slot, chosenPart) : undefined);
+  const identity = !current && slotIdentityHelp(document, slot);
 
   function confirm() {
     if (!chosen) return;
@@ -103,7 +112,18 @@ export function PartReplaceCard({
           <X size={15} />
         </button>
       </header>
-      {!chosen ? (
+      {!chosen && identity ? (
+        <SlotIdentityPanel
+          document={document}
+          slot={slot}
+          onUse={(part) => {
+            setChosenId(part.id);
+            setOverride(false);
+            setError("");
+          }}
+          onKeepUnknown={() => onCommit(keepSlotUnknown(document, slot))}
+        />
+      ) : !chosen ? (
         <>
           <p className="v3-replace-hint">{current ? "Swap for" : "Add a part"}</p>
           <ul className="v3-replace-options">

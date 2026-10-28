@@ -66,6 +66,8 @@ const balanceLabels: Array<[BalanceWeight, string]> = [
 import { getValidatedOfficialUrl } from "@/lib/product-trust";
 import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
 import { DISCLOSURE_NOTE, sceneDisclosure } from "@/lib/v3/scene-disclosure";
+import { keepSlotUnknown, slotIdentityHelp } from "@/lib/v3/slot-identity";
+import { SlotIdentityPanel } from "@/components/slot-identity-panel";
 import { renderStyles, type RenderStyle } from "@/lib/v3/scene-diorama";
 
 const RENDER_STYLE_KEY = "aipc-v3-render-style";
@@ -726,27 +728,42 @@ function StudioPage() {
                 )}
               </section>
             )}
-            <label className="v3-field">
-              {current ? "Compare with another part" : "Choose a catalog part"}
-              <select
-                value={candidate?.id ?? ""}
-                onChange={(event) => {
+            {/* A slot the photo shows but nobody confirmed: evidence, similar looks, search. */}
+            {!current && slotIdentityHelp(document, selectedSlot) && (
+              <SlotIdentityPanel
+                document={document}
+                slot={selectedSlot}
+                onUse={(part) => {
                   setRemovalProposal(null);
                   setOptimizationCandidate(null);
-                  setCandidate(
-                    catalogForSlot(selectedSlot).find((part) => part.id === event.target.value) ??
-                      null,
-                  );
+                  setCandidate(part);
                 }}
-              >
-                <option value="">Select a part…</option>
-                {catalogForSlot(selectedSlot).map((part) => (
-                  <option key={part.id} value={part.id}>
-                    {part.displayName}
-                  </option>
-                ))}
-              </select>
-            </label>
+                onKeepUnknown={() => commit(keepSlotUnknown(document, selectedSlot))}
+              />
+            )}
+            {(current || !slotIdentityHelp(document, selectedSlot)) && (
+              <label className="v3-field">
+                {current ? "Compare with another part" : "Choose a catalog part"}
+                <select
+                  value={candidate?.id ?? ""}
+                  onChange={(event) => {
+                    setRemovalProposal(null);
+                    setOptimizationCandidate(null);
+                    setCandidate(
+                      catalogForSlot(selectedSlot).find((part) => part.id === event.target.value) ??
+                        null,
+                    );
+                  }}
+                >
+                  <option value="">Select a part…</option>
+                  {catalogForSlot(selectedSlot).map((part) => (
+                    <option key={part.id} value={part.id}>
+                      {part.displayName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             {removalProposal && (
               <div className="v3-proposal">
                 <span className="v3-kicker">REMOVAL PREVIEW · NOT APPLIED</span>

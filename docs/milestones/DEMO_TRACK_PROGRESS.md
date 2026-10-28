@@ -630,3 +630,39 @@ Review: when exploded, CPU and memory were small with the case right behind them
   - `scene-explode.test.ts`: the new top and PSU directions.
   - New E2E `clickability.e2e.ts`: in the default Diorama view and from straight above, exploded 100%, hovering the centre of each part's on-screen box hovers that part, and every clickable area is at least 40 px. A name chip focuses its part, and the case label focuses the case.
   - Measured on GPU rendering, the smallest clickable area is about 64 x 64 px.
+
+## Stage 1: photo parts that "can't be found" (2026-10-28)
+
+**Diagnosis of the user's real-photo runs** (server log; the photo itself was not attached, so the AI's exact observations could not be replayed):
+- 2026-10-28 00:14 and 02:09 UTC: both analyses succeeded ("clear", 10–11 observations).
+  - Visible categories: case, cooler, fan, GPU, motherboard. Nothing was judged absent.
+  - Only the case was reviewed (chosen, nothing excluded). The drafts had 1 selected, 3 unresolved (GPU, cooler, motherboard) and 4 empty.
+- So the parts were seen, and the user neither excluded nor rejected them. "Build it in 3D" filled in only the case, because GPU, cooler and motherboard had no single leading candidate.
+- The white glass-front sample shows why. It is a structural catalog gap, not a recognition failure:
+  - **Motherboard:** none of the 5 catalog boards has a recorded colour, so a white board matches nothing (`no_close_match`).
+  - **GPU:** only 2 catalog GPUs are white, and the photo can't tell them apart (`tied`).
+  - **Cooler:** 1 white cooler. It leads only when the photo also says "AIO"; otherwise the AIOs tie.
+- Until now the Studio showed these slots as "Identity unresolved" with a bare full-catalog dropdown.
+
+**Changes**
+- `slot-identity.ts`, `SlotIdentityPanel`: an unconfirmed photo slot shows the following, in both the slot detail panel and the 3D focus card:
+  - the photo evidence ("Photo: 360 mm AIO liquid cooler · white");
+  - the closest-looking catalog parts, each marked "Similar look, not this exact part" with its matched signals and "Use this". "Use this" only previews; the Build changes on Confirm;
+  - the reason when nothing is close, or when the photo can't tell candidates apart;
+  - "Search by model name" (every word must match);
+  - "Not in catalog · keep unknown".
+
+  The bare dropdown is gone for these slots; it remains for selected and hidden slots.
+- **Review → Studio:** parts excluded in the review stay hidden, with a count. A part the user chose in the review but didn't apply comes first, marked. Keep-unknown is shared with the review (`reviews[category].kept`).
+- `replaceOption()` previews any one catalog part (the 3D card can preview a similar look or a search result).
+- **No-match record:** on confirming a photo draft, a `v3_image_match_gaps` event records `gap_<category>` reason codes. The codes are `not_seen`, `judged_absent`, `no_catalog_category`, `no_close_match`, `all_excluded` and `tied`.
+  - `no_close_match` is a sixth code: catalog parts of the category exist but none looks alike. This was the motherboard case.
+  - Codes only, never observation text. They will pick Step C's models.
+
+**Tests**
+- `slot-identity.test.ts` (5): reason codes; codes only in the event; evidence and similar looks; review exclusions and keep-unknown; search.
+- New E2E `unresolved-slot.e2e.ts`:
+  - a cooler excluded in the review stays hidden in the Studio;
+  - the GPU shows evidence and similar looks, with no bare dropdown;
+  - "Use this" previews, and Confirm selects;
+  - the motherboard shows "No catalog part looks like this yet", search works, and keep-unknown works.

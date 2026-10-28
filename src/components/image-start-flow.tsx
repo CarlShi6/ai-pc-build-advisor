@@ -181,6 +181,7 @@ export function ImageStartFlow({
         if (review && review !== reviews[category as VisibleCatalogCategory])
           funnel.candidateReviewed(category as VisibleCatalogCategory, review);
       writeDraft(draft);
+      if (analysis) funnel.matchGaps(analysis, suggested.reviews);
       funnel.draftCreated(draft);
       void navigate({ to: "/studio" });
     } catch (caught) {
