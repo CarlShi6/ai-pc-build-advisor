@@ -78,6 +78,7 @@ import {
   type SceneMode,
 } from "@/lib/v3/scene-focus";
 import { slotModel } from "@/lib/v3/slot-models";
+import { separated } from "@/lib/v3/label-layout";
 import { sceneCables, type SceneCable } from "@/lib/v3/scene-cables";
 import {
   DIORAMA_AZIMUTH,
@@ -151,6 +152,8 @@ export interface BuildSceneProps {
 }
 
 const FLOOR_Y = -1.7;
+/** First visit hint ("Click a part to inspect it"), remembered once closed. */
+const HINT_KEY = "aipc-v3-scene-hint";
 
 // PBR material presets for the illustrative parts; per-SKU reference models bring their own.
 const metal = { color: "#c3c8cf", metalness: 1, roughness: 0.3 };
@@ -1092,13 +1095,19 @@ function SlotMesh({
   focusSlot,
   onPick,
   onGroup,
+  hovered,
+  onHover,
   presentation,
   look,
   fans,
 }: {
   slot: SlotId;
   document: BuildDocumentV3;
+  /** The part the user picked: a thick, bright outline (its label is marked too). */
   selected: boolean;
+  /** Under the mouse or keyboard focus: a thin blue outline. */
+  hovered: boolean;
+  onHover: (slot: SlotId | null) => void;
   mode: SceneMode;
   /** Resting position and turn: assembled, exploded, stepped back or on the showcase spot. */
   target: Point;
@@ -1147,16 +1156,34 @@ function SlotMesh({
       warning.affectedPartIds.includes(selectedPart(document, slot)?.id ?? ""),
     );
   // A photo look-alike already reads as a part; its "not confirmed" state is on the label.
-  const edgeColor = selected
-    ? "#6aa6ff"
-    : (occupancy === "unresolved" && !look) || flagged
+  // Status outline (needs review, empty, flagged); hover and selection draw their own box.
+  const edgeColor =
+    (occupancy === "unresolved" && !look) || flagged
       ? "#f2b65f"
       : occupancy === "unselected"
         ? "#7d8690"
         : null;
+  const outline = selected
+    ? { color: "#8cc4ff", lineWidth: 2.6, opacity: 1 }
+    : hovered
+      ? { color: "#6aa6ff", lineWidth: 1, opacity: 0.85 }
+      : edgeColor && !dimmed && !(slot === "case" && (occupancy === "selected" || look))
+        ? { color: edgeColor, lineWidth: 0.8, opacity: 0.45 }
+        : null;
+  const pickable = !(dimmed && slot === "case");
   function handleClick(event: ThreeEvent<MouseEvent>) {
     event.stopPropagation();
     onPick(slot);
+  }
+  // Mouse and pen only: a touch has no hover, its tap selects.
+  function handleOver(event: ThreeEvent<PointerEvent>) {
+    if (event.pointerType === "touch") return;
+    event.stopPropagation();
+    onHover(slot);
+  }
+  function handleOut(event: ThreeEvent<PointerEvent>) {
+    if (event.pointerType === "touch") return;
+    onHover(null);
   }
   return (
     <DimContext.Provider value={dimmed}>
@@ -1166,7 +1193,9 @@ function SlotMesh({
           onGroup(slot, node);
         }}
         // A dimmed case would swallow clicks meant for the parts around it.
-        onClick={dimmed && slot === "case" ? undefined : handleClick}
+        onClick={pickable ? handleClick : undefined}
+        onPointerOver={pickable ? handleOver : undefined}
+        onPointerOut={pickable ? handleOut : undefined}
       >
         {occupancy === "selected" ? (
           model ? (
@@ -1236,15 +1265,19 @@ function SlotMesh({
             />
           </mesh>
         )}
-        {edgeColor && !dimmed && !(slot === "case" && (occupancy === "selected" || look)) && (
-          <mesh position={model && model.frame === "case" ? sceneCentre(model) : undefined}>
+        {outline && (
+          <mesh
+            position={model && model.frame === "case" ? sceneCentre(model) : undefined}
+            raycast={() => null}
+          >
             <boxGeometry args={[size[0] * 1.02, size[1] * 1.02, size[2] * 1.02]} />
             <meshBasicMaterial visible={false} />
             <Edges
-              color={edgeColor}
-              lineWidth={selected && slot !== "case" ? 1.4 : 0.8}
+              key={`${outline.color}-${outline.lineWidth}`}
+              color={outline.color}
+              lineWidth={outline.lineWidth}
               transparent
-              opacity={selected ? 0.75 : 0.45}
+              opacity={outline.opacity}
             />
           </mesh>
         )}
@@ -1290,14 +1323,23 @@ function ProjectOverlay({
   labels: Record<SlotId, Point>;
 }) {
   useFrame(({ camera, size }) => {
-    for (const slot of primarySlots) {
+    const placed = primarySlots.flatMap((slot) => {
       const element = labelRefs.current?.[slot];
-      if (!element) continue;
+      if (!element || element.offsetParent === null) return [];
       const point = new Vector3(...labels[slot]).project(camera);
-      const x = Math.max(78, Math.min(size.width - 78, ((point.x + 1) * size.width) / 2));
-      const y = Math.max(25, Math.min(size.height - 25, ((1 - point.y) * size.height) / 2));
-      element.style.left = `${x}px`;
-      element.style.top = `${y}px`;
+      return [
+        {
+          element,
+          x: Math.max(78, Math.min(size.width - 78, ((point.x + 1) * size.width) / 2)),
+          y: ((1 - point.y) * size.height) / 2,
+          w: element.offsetWidth,
+          h: element.offsetHeight,
+        },
+      ];
+    });
+    for (const label of separated(placed, size.height)) {
+      label.element.style.left = `${label.x}px`;
+      label.element.style.top = `${label.y}px`;
     }
   });
   return null;
@@ -1444,6 +1486,14 @@ function CameraRig({
               ? fitBoxes(homeBoxes, DIORAMA_VIEW, fov, size, wide, DIORAMA_FILL)
               : { position: DEFAULT_CAMERA, target: ORIGIN }));
     }
+    if (sceneRef.current && controls && frames.current % 10 === 0) {
+      // Degrees above the horizon the camera looks down from (for checks of the diorama view).
+      const offset = camera.position.clone().sub(controls.target);
+      sceneRef.current.dataset.cameraElevation = String(
+        Math.round((Math.asin(offset.y / offset.length()) * 180) / Math.PI),
+      );
+    }
+    if (!shown) frames.current += 1;
     if (!active.current || !controls) return;
     const step = prefersReducedMotion() ? 1 : 1 - Math.exp(-delta * 4);
     camera.position.lerp(rigGoal.set(...goal.position), step);
@@ -1705,6 +1755,8 @@ export default function BuildScene({
     (looks.motherboard?.color ?? colorName(selectedPart(document, "motherboard")?.color)) ===
     "white";
   const pick = (slot: SlotId) => {
+    setPicked(true);
+    dismissHint();
     onSelect(slot);
     onFocus?.(slot);
   };
@@ -1799,6 +1851,33 @@ export default function BuildScene({
   const [quality, setQuality] = useState<"high" | "low">("high");
   const lowerQuality = () => setQuality("low");
   const [panelFaded, setPanelFaded] = useState(false);
+  // Hover (mouse) and keyboard focus (a label button) both outline a part in thin blue.
+  const [hoveredSlot, setHoveredSlot] = useState<SlotId | null>(null);
+  const [keyboardSlot, setKeyboardSlot] = useState<SlotId | null>(null);
+  // Keyboard focus wins over a resting mouse: Tab is the more recent intent.
+  const highlighted = keyboardSlot ?? hoveredSlot;
+  // The default selection is not a pick: the bold outline appears once the user picks a part.
+  const [picked, setPicked] = useState(false);
+  const [hint, setHint] = useState(false);
+  useEffect(() => {
+    try {
+      setHint(window.localStorage.getItem(HINT_KEY) !== "dismissed");
+    } catch {
+      setHint(true);
+    }
+  }, []);
+  const dismissHint = () => {
+    setHint(false);
+    try {
+      window.localStorage.setItem(HINT_KEY, "dismissed");
+    } catch {
+      // Storage blocked: the hint stays closed for this page.
+    }
+  };
+  useEffect(() => {
+    const element = sceneRef.current;
+    if (element) element.style.cursor = hoveredSlot ? "pointer" : "";
+  }, [hoveredSlot]);
   // Bloom only above 1.6: lit white panels stay below it, emissive RGB (2.2+) glows.
   return (
     <div
@@ -1815,6 +1894,8 @@ export default function BuildScene({
         })
         .join(" ")}
       data-render-style={renderStyle}
+      data-hover-slot={highlighted ?? undefined}
+      data-selected-slot={picked ? selectedSlot : undefined}
       data-side-panel={
         (diorama ? removedPanels.includes("glass") : sidePanelRemoved)
           ? "removed"
@@ -1902,7 +1983,9 @@ export default function BuildScene({
                       key={slot}
                       slot={slot}
                       document={document}
-                      selected={selectedSlot === slot}
+                      selected={picked && selectedSlot === slot}
+                      hovered={highlighted === slot}
+                      onHover={setHoveredSlot}
                       mode={mode}
                       target={placements[slot].target}
                       rotation={placements[slot].rotation}
@@ -2054,11 +2137,14 @@ export default function BuildScene({
               data-scene-slot={slot}
               data-color={look?.color ?? colorName(part?.color) ?? undefined}
               data-look={look ? "photo" : undefined}
-              className={`v3-scene-callout ${selectedSlot === slot ? "active" : ""} ${occupancy} ${look ? "photo-look" : ""} ${isDimmed(slot, focusSlot) ? "dimmed" : ""}`}
+              className={`v3-scene-callout ${picked && selectedSlot === slot ? "active" : ""} ${occupancy} ${look ? "photo-look" : ""} ${isDimmed(slot, focusSlot) ? "dimmed" : ""}`}
             >
               <button
                 type="button"
                 onClick={() => pick(slot)}
+                // Tab through the labels: the part they name gets the same blue box as a hover.
+                onFocus={() => setKeyboardSlot(slot)}
+                onBlur={() => setKeyboardSlot((current) => (current === slot ? null : current))}
                 aria-label={`${slotLabel[slot]}: ${part?.displayName ?? (look ? PHOTO_APPEARANCE_LABEL : occupancy)}`}
                 title={look ? appearanceSummary(look) : undefined}
               >
@@ -2085,6 +2171,14 @@ export default function BuildScene({
             </div>
           );
         })}
+        {hint && !focusSlot && (
+          <div className="v3-scene-hint" role="status">
+            Click a part to inspect it
+            <button type="button" aria-label="Dismiss hint" onClick={dismissHint}>
+              ×
+            </button>
+          </div>
+        )}
         {focusSlot && (
           <button type="button" className="v3-focus-exit" onClick={() => onClearFocus?.()}>
             Show full build <kbd>Esc</kbd>

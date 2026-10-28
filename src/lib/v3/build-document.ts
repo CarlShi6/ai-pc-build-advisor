@@ -55,6 +55,16 @@ export interface BuildDocumentV3 {
   savedBuildId?: string;
   /** `updatedAt` of the saved record this draft was last loaded from or saved as. */
   savedVersion?: string;
+  /**
+   * True when the user never set a target budget (photo drafts). `build.budget` then holds 0 as a
+   * placeholder that is never shown; read the budget with `budgetOf`.
+   */
+  budgetUnset?: true;
+}
+
+/** The draft's target budget, or null when none was set (never a $0 budget). */
+export function budgetOf(document: BuildDocumentV3): number | null {
+  return document.budgetUnset ? null : document.build.budget;
 }
 
 export const slotCategory: Record<SlotId, PartCategory> = {
@@ -83,7 +93,8 @@ export function createDraft(
   source: DraftSource,
   options: {
     name?: string;
-    budget?: number;
+    /** Null: no target budget (photo drafts); omitted: the 2500 default. */
+    budget?: number | null;
     useCases?: string[];
     sourceInput?: string;
     parts?: Part[];
@@ -94,7 +105,7 @@ export function createDraft(
   const build = recalculateBuild({
     id: crypto.randomUUID(),
     name: options.name ?? "Untitled build",
-    budget: options.budget ?? 2500,
+    budget: options.budget === null ? 0 : (options.budget ?? 2500),
     targetUseCase: options.useCases ?? [],
     totalPrice: 0,
     parts: options.parts ?? [],
@@ -118,6 +129,7 @@ export function createDraft(
     build,
     unresolved: options.unresolved ?? {},
     imageContext: options.imageContext,
+    ...(options.budget === null && { budgetUnset: true as const }),
   };
 }
 
@@ -144,6 +156,7 @@ export interface StoredDraftEnvelope {
   sourceInput?: string;
   unresolved: Partial<Record<SlotId, string>>;
   imageContext?: ImageBuildContext;
+  budgetUnset?: true;
 }
 
 type BuildWithDraft = Build & { v3Draft?: unknown };
@@ -227,6 +240,7 @@ function readDraftEnvelope(value: unknown, build: Build): StoredDraftEnvelope | 
         : undefined,
     unresolved,
     imageContext: readImageContext(value.imageContext, build),
+    ...(value.budgetUnset === true && { budgetUnset: true as const }),
   };
 }
 
@@ -274,6 +288,7 @@ export function toSavedBuildPayload(document: BuildDocumentV3): Build {
     sourceInput: document.sourceInput?.slice(0, MAX_SOURCE_INPUT),
     unresolved,
     imageContext: document.imageContext,
+    ...(document.budgetUnset && { budgetUnset: true as const }),
   };
   return { ...build, v3Draft } as Build;
 }

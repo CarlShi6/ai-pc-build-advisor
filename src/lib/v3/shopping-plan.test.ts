@@ -1,6 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { seedParts } from "@/data/seedParts";
-import { createDraft, primarySlots, selectPart, slotCategory } from "@/lib/v3/build-document";
+import {
+  budgetOf,
+  createDraft,
+  fromLegacyBuild,
+  primarySlots,
+  selectPart,
+  slotCategory,
+  toSavedBuildPayload,
+} from "@/lib/v3/build-document";
+import { createGlassFrontFixture } from "@/lib/v3/dev-image-fixture";
+import { proposeImageBuild } from "@/lib/v3/image-build";
 import { buildShoppingPlan, shoppingPlanJson, shoppingPlanMarkdown } from "@/lib/v3/shopping-plan";
 
 const first = (category: string) => seedParts.find((part) => part.category === category)!;
@@ -111,5 +121,29 @@ describe("rule checks that cannot run yet", () => {
     let draft = createDraft("blank");
     for (const slot of primarySlots) draft = selectPart(draft, slot, first(slotCategory[slot]));
     expect(buildShoppingPlan(draft).notChecked).toEqual([]);
+  });
+});
+
+describe("photo drafts without a target budget", () => {
+  const fixture = createGlassFrontFixture();
+  const photo = proposeImageBuild(fixture, {}, null).candidate;
+
+  it("keeps the budget unset instead of $0, and survives a save round trip", () => {
+    expect(photo.budgetUnset).toBe(true);
+    expect(budgetOf(photo)).toBeNull();
+    const restored = fromLegacyBuild(toSavedBuildPayload(photo));
+    expect(restored && budgetOf(restored)).toBeNull();
+    // Describe and other drafts keep their number.
+    expect(budgetOf(createDraft("describe", { budget: 1800 }))).toBe(1800);
+  });
+
+  it("reports the budget as Not set and makes no budget comparison", () => {
+    const plan = buildShoppingPlan(photo);
+    expect(plan.budget).toBeNull();
+    const markdown = shoppingPlanMarkdown(plan);
+    expect(markdown).toContain("Budget: Not set");
+    // The parts subtotal may be $0 (unknown prices); no budget figure or comparison appears.
+    expect(markdown).not.toMatch(/Budget: \$|over budget|under budget|exceed budget/);
+    expect(shoppingPlanJson(plan, photo).budget).toBe("Not set");
   });
 });

@@ -585,3 +585,25 @@ A second look beside "Studio", switched in the scene toolbar (Studio | Diorama).
   - `scene-diorama.test.ts`: the view angle; plinth thickness and margins; the plinth dropping under exploded parts; props clear of the case; cables ending in grommets inside the case; no cables without reference models.
   - New E2E `diorama.e2e.ts`: switching keeps the same models, slot kinds and disclosure; cutaway by default with a working "Show side panel"; GPU focus framed in Standard and memory in Exploded; the choice survives a reload; back to Studio.
   - The framing helpers moved to `e2e/scene-framing.ts`.
+
+### Diorama default, part feedback, photo drafts without a budget (2026-10-27)
+
+- **Diorama is the default render style**; Studio is the alternative. The choice is still remembered per browser. E2E and CLAUDE.md are updated.
+- **Hover and selection** (both styles, Standard / Exploded / Review):
+  - Mouse over a part: a thin blue box around it and a hand cursor (`data-hover-slot`). Touch has no hover; a tap selects.
+  - Tab to a part's label: the same thin box. Keyboard focus wins over a resting mouse.
+  - A picked part: a bold, brighter box, and its label is outlined in blue and keeps its model line, even as an exploded chip (`data-selected-slot`). The default selection is not a pick, so nothing is outlined until the user picks a part.
+  - First visit: a dismissible hint, "Click a part to inspect it". It closes on × or on the first pick and stays closed (`localStorage`).
+- **Labels never overlap:** `label-layout.ts` `separated()` pushes a card below any card it would cover, then back up if that leaves the canvas. It runs every frame, in every mode and at every explode amount.
+- **Diorama explode, checked:** the camera keeps the diorama angle (about 30° down) at every explode amount, and parts spread on all three axes: up/down, front/rear, and towards/away from the glass side. The scene reports `data-camera-elevation`.
+- **Photo drafts have no target budget:**
+  - Neither the home hero nor `/start/image` asks for one. Describe, Import and Blank keep theirs.
+  - `BuildDocumentV3.budgetUnset` is saved in the draft envelope and read through `budgetOf()`; `build.budget` holds an unseen 0.
+  - The shopping plan drops its budget card. Markdown says "Budget: Not set" and JSON `"budget": "Not set"`.
+  - Saving sends no budget need.
+  - Budget-based optimization of photo builds is deferred (CLAUDE.md).
+- **Tests:**
+  - `label-layout.test.ts`: no overlap even when all cards want one spot; clear cards stay put.
+  - `shopping-plan.test.ts`: photo draft budget unset, surviving a save round trip; "Not set" in both exports; no budget comparison.
+  - New E2E `scene-interaction.e2e.ts`: hint dismiss and memory; hover outline and cursor on and off; Tab outline; pick and select in Diorama and Studio; Diorama explode at 0/25/50/75/100% keeps elevation ≥ 25° with zero label overlaps.
+  - `image-to-build` checks there is no budget field and no budget card, before and after a save. `describe` checks its budget field remains. The demo and diorama specs follow the new default.

@@ -71,10 +71,12 @@ export interface ImageBuildProposal {
 export function proposeImageBuild(
   analysis: ImageAnalysisResult,
   reviews: ImageReviews,
-  budget: number,
+  /** Photo drafts have no target budget (null); a number is kept for callers that set one. */
+  budget: number | null,
   current: BuildDocumentV3 | null = null,
 ): ImageBuildProposal {
-  if (!Number.isFinite(budget) || budget < 0) throw new Error("Enter a valid budget.");
+  if (budget !== null && (!Number.isFinite(budget) || budget < 0))
+    throw new Error("Enter a valid budget.");
   const candidateSets = matchVisualCandidates(analysis);
   const selected: ImageBuildProposal["selected"] = [];
   const unresolved: ImageBuildProposal["unresolved"] = [];
@@ -241,7 +243,7 @@ export interface SuggestedParts {
 export function suggestParts(
   analysis: ImageAnalysisResult,
   current: ImageReviews,
-  budget: number,
+  budget: number | null,
   draft: BuildDocumentV3 | null = null,
   declined: readonly VisibleCatalogCategory[] = [],
 ): SuggestedParts {

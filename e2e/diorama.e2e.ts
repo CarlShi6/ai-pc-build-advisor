@@ -9,7 +9,7 @@ test.use({
   },
 });
 
-test("3D Studio: the Diorama style is a cutaway on a plinth with the same parts and interactions", async ({
+test("3D Studio: Diorama, the default style, is a cutaway on a plinth with the same parts and interactions", async ({
   page,
 }) => {
   test.setTimeout(150_000);
@@ -25,7 +25,11 @@ test("3D Studio: the Diorama style is a cutaway on a plinth with the same parts 
   const scene = page.locator(".v3-scene-canvas");
   await expect(scene.locator("canvas")).toHaveCount(1, { timeout: 30_000 });
   const styles = page.getByRole("group", { name: "Render style" });
+  await expect(scene).toHaveAttribute("data-render-style", "diorama");
+  // Studio first (Diorama is the default), to compare the same build in both looks.
+  await styles.getByRole("button", { name: "Studio" }).click();
   await expect(scene).toHaveAttribute("data-render-style", "studio");
+  await expect(scene.locator("canvas")).toHaveCount(1, { timeout: 30_000 });
   const before = {
     models: await scene.getAttribute("data-reference-models"),
     slots: await scene.getAttribute("data-slot-models"),
@@ -64,16 +68,16 @@ test("3D Studio: the Diorama style is a cutaway on a plinth with the same parts 
   await page.keyboard.press("Escape");
   await expect(scene).not.toHaveAttribute("data-focus-slot", /.+/);
 
-  // The choice is remembered in this browser.
-  await page.reload();
-  await expect(page.locator(".v3-scene-canvas")).toHaveAttribute("data-render-style", "diorama", {
-    timeout: 30_000,
-  });
+  // The choice is remembered in this browser, Studio included.
   await page
     .getByRole("group", { name: "Render style" })
     .getByRole("button", { name: "Studio" })
     .click();
   await expect(page.locator(".v3-scene-canvas")).toHaveAttribute("data-render-style", "studio");
   await expect(page.getByRole("checkbox", { name: "Remove side panel" })).toBeVisible();
+  await page.reload();
+  await expect(page.locator(".v3-scene-canvas")).toHaveAttribute("data-render-style", "studio", {
+    timeout: 30_000,
+  });
   expect(errors).toEqual([]);
 });

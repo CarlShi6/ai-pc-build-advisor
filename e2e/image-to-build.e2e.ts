@@ -15,6 +15,8 @@ test("image → observations → review → draft → Studio → save keeps unkn
 }) => {
   await signInTestUser(page);
   await openReady(page, "/start/image");
+  // Photo drafts ask for no target budget.
+  await expect(page.getByLabel(/Target budget/)).toHaveCount(0);
   await page.locator("input[type=file]").setInputFiles(fixtureImage);
   const loadFixture = page.getByRole("button", { name: "Load local fixture (no AI call)" });
   await clickUntil(loadFixture, async () => {
@@ -43,6 +45,10 @@ test("image → observations → review → draft → Studio → save keeps unkn
   await expect(slotRow(page, "Power supply").locator(".v3-slot-status")).toHaveText("Add part");
   // An incomplete build never reports an overall pass.
   await expect(compatibility(page)).toHaveText("Incomplete");
+  // No budget was set: no budget card, no $0 budget, no over/under-budget text.
+  const plan = page.locator("section.v3-plan");
+  await expect(plan).not.toContainText("BUDGET");
+  await expect(plan).not.toContainText(/over budget|under budget|exceed budget/);
 
   await page.getByRole("button", { name: "Save build" }).click();
   await expect(page.getByRole("status").filter({ hasText: "Saved to My Builds" })).toBeVisible();
@@ -55,6 +61,8 @@ test("image → observations → review → draft → Studio → save keeps unkn
   await expect(selectedCount(page)).toHaveText("1 / 8");
   await expect(slotRow(page, "Case").locator(".v3-slot-status")).toHaveText("Review");
   await expect(compatibility(page)).toHaveText("Incomplete");
+  // Still no budget after the save round trip.
+  await expect(page.locator("section.v3-plan")).not.toContainText("BUDGET");
 });
 
 // Demo track week 1: the home hero is the photo entry (PRD §4.2).

@@ -5840,9 +5840,6 @@
 .v3-other-starts a:hover {
   text-decoration: underline;
 }
-.v3-inline-budget {
-  max-width: 220px;
-}
 /* Demo track week 1: studio-look 3D panel, chrome floats over the canvas. */
 .v3-scene-panel {
   position: relative;
@@ -6921,4 +6918,46 @@
   background: #1b1e22c7;
   border-color: #ffffff1a;
   backdrop-filter: blur(16px);
+}
+/* First-visit hint over the scene; closes on × or the first pick. */
+.v3-scene-hint {
+  position: absolute;
+  z-index: 3;
+  top: 70px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px 6px 14px;
+  border-radius: 999px;
+  border: 1px solid #ffffff24;
+  background: #1d2024d9;
+  color: var(--g-text);
+  font-size: 12px;
+  font-weight: 600;
+  backdrop-filter: blur(10px);
+  pointer-events: auto;
+}
+.v3-scene-hint button {
+  border: 0;
+  background: none;
+  color: var(--g-text-muted);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+/* Keyboard: the focused label shows a ring; its part gets the hover outline in 3D. */
+.v3-scene-callout button:focus-visible {
+  outline: 2px solid #6aa6ff;
+  outline-offset: 2px;
+}
+/* The picked part's label keeps its model line, even as an exploded chip. */
+.v3-scene-canvas[data-scene-mode="exploded"] .v3-scene-callout.active small {
+  display: block;
+}
+/* The picked part's label: outlined in the same blue as its 3D box. */
+.v3-scene-canvas .v3-scene-callout.active {
+  border-color: #6aa6ff;
+  box-shadow: 0 0 0 1px #6aa6ff80, 0 8px 22px #00000066;
 }

@@ -8,6 +8,7 @@ import {
   slotOccupancy,
   type BuildDocumentV3,
   type SlotId,
+  budgetOf,
 } from "@/lib/v3/build-document";
 import type { CompatibilitySeverity } from "@/types/build";
 
@@ -42,7 +43,8 @@ export interface PlanFinding {
 export interface ShoppingPlan {
   name: string;
   source: BuildDocumentV3["source"];
-  budget: number;
+  /** Null when no target budget was set (photo drafts): no budget comparison is made. */
+  budget: number | null;
   lines: PlanLine[];
   /** Sum of known prices for parts still to buy. Owned parts count as $0. */
   knownSubtotal: number;
@@ -150,7 +152,7 @@ export function buildShoppingPlan(document: BuildDocumentV3): ShoppingPlan {
   return {
     name: document.build.name,
     source: document.source,
-    budget: document.build.budget,
+    budget: budgetOf(document),
     lines,
     knownSubtotal: priced.reduce((sum, line) => sum + (line.price ?? 0), 0),
     pricedCount: priced.length,
@@ -195,7 +197,7 @@ export function shoppingPlanMarkdown(plan: ShoppingPlan, generatedAt = new Date(
   return [
     `# ${plan.name}`,
     "",
-    `Generated ${generatedAt.toISOString()} · Source: ${plan.source} · Budget: ${money(plan.budget)}`,
+    `Generated ${generatedAt.toISOString()} · Source: ${plan.source} · Budget: ${plan.budget === null ? "Not set" : money(plan.budget)}`,
     "",
     "## Parts plan",
     "",
@@ -240,6 +242,7 @@ export function shoppingPlanJson(
     buildRevision: document.revision,
     savedBuildId: document.savedBuildId ?? null,
     ...plan,
+    budget: plan.budget ?? "Not set",
     // Visual priorities only; observations and the reference photo are not exported.
     visualPriorities:
       document.imageContext?.visualPriorities.map(({ category, value, locked }) => ({

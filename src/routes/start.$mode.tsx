@@ -178,7 +178,7 @@ function StartPage() {
         </div>
         <div className="v3-form-layout">
           <section className="v3-form-card">
-            {mode === "image" && <ImageStartFlow budget={budget} onFileChange={setFile} />}
+            {mode === "image" && <ImageStartFlow onFileChange={setFile} />}
             {mode === "describe" && (
               <>
                 <fieldset className="v3-field v3-wizard">
@@ -360,18 +360,21 @@ function StartPage() {
                 </p>
               </div>
             )}
-            <label className="v3-field">
-              Target budget (USD)
-              <input
-                type="number"
-                min="0"
-                value={budget}
-                onChange={(event) => {
-                  setBudget(event.target.value);
-                  setDescribeProposal(null);
-                }}
-              />
-            </label>
+            {/* Photo drafts have no target budget; Describe, Import and Blank keep one. */}
+            {mode !== "image" && (
+              <label className="v3-field">
+                Target budget (USD)
+                <input
+                  type="number"
+                  min="0"
+                  value={budget}
+                  onChange={(event) => {
+                    setBudget(event.target.value);
+                    setDescribeProposal(null);
+                  }}
+                />
+              </label>
+            )}
             {error && (
               <p className="v3-error" role="alert">
                 {error}

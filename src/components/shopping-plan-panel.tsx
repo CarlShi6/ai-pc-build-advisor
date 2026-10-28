@@ -36,6 +36,35 @@ function download(filename: string, content: string, type: string) {
   URL.revokeObjectURL(url);
 }
 
+/** Budget against the known subtotal; only drawn when the user set a target budget. */
+function BudgetCard({
+  budget,
+  knownSubtotal,
+  openCount,
+  unknownPriceCount,
+}: {
+  budget: number;
+  knownSubtotal: number;
+  openCount: number;
+  unknownPriceCount: number;
+}) {
+  return (
+    <div>
+      <small>BUDGET</small>
+      <strong>${budget.toLocaleString()}</strong>
+      <em>
+        {knownSubtotal > budget
+          ? `Known parts already exceed budget by $${(knownSubtotal - budget).toLocaleString()}`
+          : openCount
+            ? `$${(budget - knownSubtotal).toLocaleString()} left for ${openCount} open slot(s)`
+            : unknownPriceCount
+              ? `${(budget - knownSubtotal).toLocaleString()} left before ${unknownPriceCount} unknown price(s)`
+              : `${(budget - knownSubtotal).toLocaleString()} under budget`}
+      </em>
+    </div>
+  );
+}
+
 export function ShoppingPlanPanel({
   document,
   onSelectSlot,
@@ -170,19 +199,15 @@ export function ShoppingPlanPanel({
             {" · tax and shipping not included"}
           </em>
         </div>
-        <div>
-          <small>BUDGET</small>
-          <strong>${plan.budget.toLocaleString()}</strong>
-          <em>
-            {plan.knownSubtotal > plan.budget
-              ? `Known parts already exceed budget by $${(plan.knownSubtotal - plan.budget).toLocaleString()}`
-              : plan.openCount
-                ? `$${(plan.budget - plan.knownSubtotal).toLocaleString()} left for ${plan.openCount} open slot(s)`
-                : plan.unknownPriceCount
-                  ? `${(plan.budget - plan.knownSubtotal).toLocaleString()} left before ${plan.unknownPriceCount} unknown price(s)`
-                  : `${(plan.budget - plan.knownSubtotal).toLocaleString()} under budget`}
-          </em>
-        </div>
+        {/* No target budget (photo drafts): no comparison card at all, never a $0 budget. */}
+        {plan.budget !== null && (
+          <BudgetCard
+            budget={plan.budget}
+            knownSubtotal={plan.knownSubtotal}
+            openCount={plan.openCount}
+            unknownPriceCount={plan.unknownPriceCount}
+          />
+        )}
         <div>
           <small>COMPATIBILITY</small>
           <strong>{plan.compatibility === "incomplete" ? "Incomplete" : plan.compatibility}</strong>

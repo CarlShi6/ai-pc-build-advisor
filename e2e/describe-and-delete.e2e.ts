@@ -5,6 +5,8 @@ import { clickUntil, openReady, selectedCount, signInTestUser } from "./helpers"
 test("Describe recommends eight parts and says what it couldn't honor", async ({ page }) => {
   await signInTestUser(page);
   await openReady(page, "/start/describe");
+  // Describe keeps its target budget (photo drafts do not ask for one).
+  await expect(page.getByLabel(/Target budget/)).toBeVisible();
   await page.getByLabel("Local AI").check();
   await page.getByLabel("Look").selectOption("white");
   await clickUntil(page.getByRole("button", { name: "Preview recommended parts" }), async () => {

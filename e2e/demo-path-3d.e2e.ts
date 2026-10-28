@@ -72,7 +72,14 @@ test("3D Studio: the white showcase AIO, memory and board render as labeled refe
     "case motherboard cooler gpu memory",
   );
 
-  // The default camera looks in past the glass; the toggle removes the side panel.
+  // Diorama (the default) is a cutaway; in Studio the camera looks in past the glass and a
+  // toggle removes the side panel.
+  await expect(scene).toHaveAttribute("data-render-style", "diorama");
+  await expect(scene).toHaveAttribute("data-side-panel", "removed");
+  await page
+    .getByRole("group", { name: "Render style" })
+    .getByRole("button", { name: "Studio" })
+    .click();
   await expect(scene).toHaveAttribute("data-side-panel", "shown");
   const panelToggle = page.getByRole("checkbox", { name: "Remove side panel" });
   await panelToggle.check();

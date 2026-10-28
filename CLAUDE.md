@@ -64,6 +64,10 @@ npm.cmd run lint; if ($?) { npm.cmd run typecheck }; if ($?) { npm.cmd test }; i
 - Build domain: `src/lib/v3/build-document.ts` (BuildDocumentV3, slots, import matching, saved-draft envelope), `build-proposal.ts`, `draft-session.ts` (sessionStorage for the active tab).
 - Image path: `image-input.ts`, `image-contract.ts`, `image-analysis.server.ts`, `image-client.ts`, `candidate-matcher.ts`, `appearance-catalog.ts`, `image-build.ts`, `dev-image-fixture.ts`. The UI is `src/components/image-candidate-review.tsx`.
 - Studio: `src/features/build-3d/BuildScene.tsx`, `src/lib/v3/scene-presentation.ts`, `visual-optimization.ts`, `shopping-plan.ts` and `src/components/shopping-plan-panel.tsx`.
+- 3D scene logic, kept pure and tested: `scene-explode.ts` (explode layout), `scene-focus.ts` (showcase framing), `scene-diorama.ts` (render styles, plinth), `slot-models.ts` (what each slot draws), `scene-cables.ts`, `scene-disclosure.ts`, `label-layout.ts`.
+- Render style: **Diorama is the default**; Studio is the alternative. Both are switched in the scene toolbar, and the choice is kept in `localStorage` (`aipc-v3-render-style`). Styles change only camera, materials, lighting and set dressing, never Build data, sizes or interactions.
+- Scene feedback: hover and Tab focus draw a thin blue box; a picked part gets a bold one and its label is marked. The first-visit hint "Click a part to inspect it" is dismissible (`aipc-v3-scene-hint`).
+- Budget: photo drafts have no target budget (`BuildDocumentV3.budgetUnset`; read it with `budgetOf`, never `build.budget`). Without a budget, the shopping plan shows no budget card and exports say "Budget: Not set". Describe, Import and Blank keep their budget.
 - Reused domain services: `src/lib/compatibility.ts` (rules), `product-trust.ts` (recalculation and trust labels), `build-advisor.ts`, `src/lib/persistence/*` (mock and Supabase stores), `src/lib/api-router.ts` (HTTP endpoints), `src/data/seedParts.ts` (catalog).
 
 ## Gotchas
@@ -85,6 +89,8 @@ Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 
 **Decision (2026-10-25): the 4-week demo track comes first.** The user needs a demonstrable visual result within a month, so the demo track below runs before the rest of R7. The R7 user study moves to after the demo track.
 
 Demo track weeks 1–4 are done (see `docs/milestones/DEMO_TRACK_PROGRESS.md`): photo-first home, studio-look 3D with Focus/Isolate and replace card, white showcase parts with reference-reconstructed models (`reference-models/`, `tools/reference-models/`), one-click white sample, live image recognition verified locally, adaptive scene quality, full 2D fallback without WebGL, and 11 E2E flows. Next: the visual redesign round below (slices A–D, in order), then R7.
+
+**Deferred (2026-10-27): budget-based optimization of photo builds.** Photo drafts carry no target budget, so nothing optimizes a photo build against one. Revisit after R7 if users ask for it, starting from `budgetOf` and the visual-optimization intents.
 
 R7, after the demo track (in order):
 1. R7 E2E: the remaining §19.3 flows (#2 lookalike correction, #4 replace from the 3D scene, #9 old-format restore, #10 unauthorized access/deletion, an explicit no-WebGL launch).

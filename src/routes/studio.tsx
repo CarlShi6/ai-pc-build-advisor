@@ -12,6 +12,7 @@ import {
 } from "lucide-react";
 import { V3Shell } from "@/components/v3-shell";
 import {
+  budgetOf,
   catalogForSlot,
   completeness,
   fromSavedBuild,
@@ -107,8 +108,8 @@ function StudioPage() {
   const [explode, setExplode] = useState(55);
   const [resetKey, setResetKey] = useState(0);
   const [sidePanelRemoved, setSidePanelRemoved] = useState(false);
-  // Render style: a per-viewer preference, remembered in this browser when storage allows.
-  const [renderStyle, setRenderStyle] = useState<RenderStyle>("studio");
+  // Render style: Diorama by default; a per-viewer choice, remembered in this browser when storage allows.
+  const [renderStyle, setRenderStyle] = useState<RenderStyle>("diorama");
   const [casePanelsShown, setCasePanelsShown] = useState(false);
   useEffect(() => {
     try {
@@ -170,7 +171,10 @@ function StudioPage() {
         id: current.savedBuildId,
         name: current.build.name,
         build: toSavedBuildPayload(current),
-        buildNeeds: { budget: current.build.budget, targetUseCase: current.build.targetUseCase },
+        buildNeeds: {
+          budget: budgetOf(current) ?? undefined,
+          targetUseCase: current.build.targetUseCase,
+        },
         expectedUpdatedAt: current.savedBuildId ? current.savedVersion : undefined,
       });
       const next = {

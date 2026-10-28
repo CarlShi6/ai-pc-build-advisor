@@ -27,17 +27,12 @@ const devFixtureNames = ["og.png", "white-build-sketch.png", "white-build-glass-
  */
 export function ImageStartFlow({
   variant = "page",
-  budget: budgetProp,
   onFileChange,
 }: {
   variant?: "hero" | "page";
-  /** Budget from the host page; the flow keeps its own when omitted. */
-  budget?: string;
   onFileChange?: (file: File | null) => void;
 }) {
   const navigate = useNavigate();
-  const [ownBudget, setOwnBudget] = useState("2500");
-  const budget = budgetProp ?? ownBudget;
   const [file, setFile] = useState<File | null>(null);
   const [suggested, setSuggested] = useState<SuggestedParts | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
@@ -167,7 +162,8 @@ export function ImageStartFlow({
   function previewSuggestedParts(declined: VisibleCatalogCategory[] = []) {
     if (!analysis) return;
     try {
-      setSuggested(suggestParts(analysis, reviews, Number(budget), readDraft(), declined));
+      // Photo drafts carry no target budget (budget-aware photo optimization is deferred).
+      setSuggested(suggestParts(analysis, reviews, null, readDraft(), declined));
       setError("");
     } catch (caught) {
       setError(
@@ -327,20 +323,6 @@ export function ImageStartFlow({
               onActiveGroup={setActiveGroup}
             />
             <section className="v3-image-build" aria-label="Image to Build preview">
-              {budgetProp === undefined && (
-                <label className="v3-field v3-inline-budget">
-                  Target budget (USD)
-                  <input
-                    type="number"
-                    min="0"
-                    value={ownBudget}
-                    onChange={(event) => {
-                      setOwnBudget(event.target.value);
-                      setSuggested(null);
-                    }}
-                  />
-                </label>
-              )}
               {!suggested && (
                 <>
                   <button
