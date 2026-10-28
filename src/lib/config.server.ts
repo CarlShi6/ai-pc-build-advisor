@@ -26,8 +26,9 @@ export function getServerConfig() {
     openAiApiKey: process.env.OPENAI_API_KEY,
     aiProviderApiKey: process.env.AI_PROVIDER_API_KEY,
     aiProviderModel: process.env.AI_PROVIDER_MODEL ?? "gpt-4.1-mini",
-    // Photo analysis model; falls back to AI_PROVIDER_MODEL so the default is unchanged.
-    imageAiModel: process.env.IMAGE_AI_MODEL,
+    // Photo analysis model. gpt-5.4 read a real photo far better than gpt-4.1-mini (about 9x the
+    // cost per photo); set IMAGE_AI_MODEL=gpt-4.1-mini for the cheaper model.
+    imageAiModel: process.env.IMAGE_AI_MODEL || "gpt-5.4",
     priceProvider: process.env.PRICE_PROVIDER,
     bestBuyApiKey: process.env.BEST_BUY_API_KEY,
     persistenceProvider: process.env.PERSISTENCE_PROVIDER,

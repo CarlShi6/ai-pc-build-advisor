@@ -80,3 +80,23 @@ test("a stale tab gets a save conflict instead of overwriting", async ({ page, c
   await expect(slotRow(page, "Case").locator("small")).toHaveText("NZXT H5 Flow");
   await expect(page.getByRole("status").filter({ hasText: "Saved to My Builds" })).toBeVisible();
 });
+
+// A careful read takes about 35 s: the wait names the step being read and the elapsed time.
+test("the analysis wait shows what is being read, not a blank spinner", async ({ page }) => {
+  test.setTimeout(45_000);
+  await page.route("**/api/image-analyses", async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 8_000));
+    await route.abort();
+  });
+  await openReady(page, "/start/image");
+  await page.locator("input[type=file]").setInputFiles(fixtureImage);
+  await page.getByRole("button", { name: "Analyze image" }).click();
+  const wait = page.locator(".v3-analysis-wait");
+  await expect(wait.locator(".v3-analysis-status")).toContainText("Reading the case…");
+  await expect(wait.getByRole("listitem")).toHaveCount(6);
+  await expect(wait).toContainText("not live progress");
+  await expect(wait.locator(".v3-analysis-status")).toContainText("Reading the graphics card…", {
+    timeout: 8_000,
+  });
+  await expect(wait.locator('li[aria-current="step"]')).toHaveText("Reading the graphics card");
+});

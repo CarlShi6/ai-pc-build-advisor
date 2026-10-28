@@ -6,6 +6,12 @@ import type { CandidateReview } from "@/lib/v3/candidate-matcher";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
 import type { VisualObservation } from "@/lib/v3/image-contract";
 import { readAppearanceParams, type AppearanceParams } from "@/lib/v3/appearance-params";
+import {
+  modelGuessSchema,
+  visibleTextSchema,
+  type ModelGuess,
+  type VisibleText,
+} from "@/lib/v3/model-guess";
 
 export const primarySlots = [
   "case",
@@ -39,6 +45,9 @@ export interface ImageBuildContext {
   appearance?: AppearanceParams;
   /** Fields the user set on the review page ("category.field"); the rest are as the AI read them. */
   appearanceUserSet?: string[];
+  /** Step B: the AI model guesses and legible text, shown as guesses; they never select a part. */
+  modelGuesses?: ModelGuess[];
+  visibleText?: VisibleText[];
   reviews: Partial<Record<VisibleCatalogCategory, CandidateReview>>;
   visualPriorities: VisualPriority[];
   plannedSelections: Partial<
@@ -220,11 +229,15 @@ function readImageContext(value: unknown, build: Build): ImageBuildContext | und
   const userSet = Array.isArray(value.appearanceUserSet)
     ? value.appearanceUserSet.filter((path): path is string => typeof path === "string")
     : undefined;
+  const guesses = modelGuessSchema.array().max(8).safeParse(value.modelGuesses);
+  const text = visibleTextSchema.array().max(12).safeParse(value.visibleText);
   return {
     ...(value as unknown as ImageBuildContext),
     plannedSelections,
     appearance,
     appearanceUserSet: appearance ? userSet : undefined,
+    modelGuesses: guesses.success ? guesses.data : undefined,
+    visibleText: text.success ? text.data : undefined,
   };
 }
 

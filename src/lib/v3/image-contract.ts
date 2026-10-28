@@ -8,6 +8,16 @@ import {
   type AppearanceCorrection,
   type AppearanceParams,
 } from "@/lib/v3/appearance-params";
+import {
+  cleanGuesses,
+  cleanVisibleText,
+  modelGuessJsonSchema,
+  modelGuessSchema,
+  visibleTextJsonSchema,
+  visibleTextSchema,
+  type ModelGuess,
+  type VisibleText,
+} from "@/lib/v3/model-guess";
 
 /** Visible parts a photo can show are *not installed* (an empty case). Hidden parts never qualify. */
 export const absentPartCategories = ["gpu", "cooler", "fan", "motherboard"] as const;
@@ -47,6 +57,15 @@ export const observationDraftSchema = z
     absentParts: z.array(z.enum(absentPartCategories)).max(4).default([]),
     // Step A appearance parameters; optional for older fixtures and saved analyses.
     appearance: appearanceParamsSchema.optional(),
+    // Step B guesses; optional for older fixtures and saved analyses.
+    modelGuesses: z
+      .array(modelGuessSchema)
+      .default([])
+      .transform((items) => items.slice(0, 8)),
+    visibleText: z
+      .array(visibleTextSchema)
+      .default([])
+      .transform((items) => items.slice(0, 12)),
   })
   .strict();
 
@@ -74,6 +93,9 @@ export interface ImageAnalysisResult {
   appearance?: AppearanceParams;
   /** Certain contradictions fixed in `appearance` (see reconcileAppearance), as received. */
   appearanceCorrections?: AppearanceCorrection[];
+  /** Step B: AI model guesses and legible text; guesses only, never a selection. */
+  modelGuesses?: ModelGuess[];
+  visibleText?: VisibleText[];
 }
 
 export type ImageAnalyzer = (input: {
@@ -88,9 +110,20 @@ export type ImageAnalyzer = (input: {
 export const observationJsonSchema = {
   type: "object",
   additionalProperties: false,
-  required: ["summary", "quality", "qualityIssues", "observations", "absentParts", "appearance"],
+  required: [
+    "summary",
+    "quality",
+    "qualityIssues",
+    "observations",
+    "absentParts",
+    "appearance",
+    "modelGuesses",
+    "visibleText",
+  ],
   properties: {
     appearance: appearanceParamsJsonSchema,
+    modelGuesses: modelGuessJsonSchema,
+    visibleText: visibleTextJsonSchema,
     summary: { type: "string" },
     quality: { type: "string", enum: ["clear", "limited", "poor"] },
     qualityIssues: { type: "array", items: { type: "string" } },
@@ -190,5 +223,7 @@ export function createImageAnalysisResult(
     // A poor photo can't show that something is missing.
     absentParts: draft.quality === "poor" ? [] : [...new Set(draft.absentParts)],
     ...(draft.appearance && reconciled(draft.appearance)),
+    modelGuesses: cleanGuesses(draft.modelGuesses),
+    visibleText: cleanVisibleText(draft.visibleText),
   };
 }

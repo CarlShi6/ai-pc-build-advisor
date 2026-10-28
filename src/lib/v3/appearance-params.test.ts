@@ -57,12 +57,79 @@ describe("appearance consistency check", () => {
       with_({ type: "aio", radiatorSize: "360", radiatorPosition: "top" }, { top: "unknown" }),
       with_({ type: "aio", radiatorSize: "360", radiatorPosition: "top" }, { top: "0" }),
       with_({ type: "air-tower" }, { top: "3" }),
+      // Never two-sided: only certain contradictions change a value.
+      with_({ type: "aio", pumpStyle: "screen" }, { front: "3" }),
     ];
     for (const params of cases) {
       const result = reconcileAppearance(params);
       expect(result.params).toEqual(params);
       expect(result.corrections).toEqual([]);
     }
+  });
+
+  it("an air tower drops any radiator or pump values to unknown, and its case fans stay", () => {
+    const { params, corrections } = reconcileAppearance(
+      with_(
+        { type: "air-tower", radiatorSize: "360", radiatorPosition: "top", pumpStyle: "round" },
+        { top: "3" },
+      ),
+    );
+    expect(params.cooler).toMatchObject({
+      type: "air-tower",
+      radiatorSize: "unknown",
+      radiatorPosition: "unknown",
+      pumpStyle: "unknown",
+    });
+    expect(params.fans.top).toBe("3");
+    expect(corrections.map((item) => item.field)).toEqual([
+      "cooler.radiatorSize",
+      "cooler.radiatorPosition",
+      "cooler.pumpStyle",
+    ]);
+  });
+
+  it("a mesh-front case with a glass front: the case type becomes unknown, the glass stays", () => {
+    for (const glass of ["front", "both"] as const) {
+      const { params, corrections } = reconcileAppearance({
+        ...unknownAppearance,
+        case: { ...unknownAppearance.case, type: "mesh-front-mid-tower", glass },
+      });
+      expect(params.case).toMatchObject({ type: "unknown", glass });
+      expect(corrections).toEqual([
+        expect.objectContaining({
+          field: "case.type",
+          from: "mesh-front-mid-tower",
+          to: "unknown",
+        }),
+      ]);
+    }
+    const sideGlass = {
+      ...unknownAppearance,
+      case: {
+        ...unknownAppearance.case,
+        type: "mesh-front-mid-tower" as const,
+        glass: "side" as const,
+      },
+    };
+    expect(reconcileAppearance(sideGlass).corrections).toEqual([]);
+  });
+
+  it("three fans on a short card: the length becomes unknown, the fan count stays", () => {
+    const { params, corrections } = reconcileAppearance({
+      ...unknownAppearance,
+      gpu: { ...unknownAppearance.gpu, fanCount: "3", length: "short" },
+    });
+    expect(params.gpu).toMatchObject({ fanCount: "3", length: "unknown" });
+    expect(corrections).toEqual([
+      expect.objectContaining({ field: "gpu.length", from: "short", to: "unknown" }),
+    ]);
+    for (const length of ["medium", "long"] as const)
+      expect(
+        reconcileAppearance({
+          ...unknownAppearance,
+          gpu: { ...unknownAppearance.gpu, fanCount: "3", length },
+        }).corrections,
+      ).toEqual([]);
   });
 
   it("runs on every analysis result and records what it changed", () => {

@@ -183,7 +183,26 @@ export function reconcileAppearance(params: AppearanceParams): {
 } {
   const corrections: AppearanceCorrection[] = [];
   const next: AppearanceParams = structuredClone(params);
-  const { cooler } = params;
+  // Two values that cannot both be true: which one is wrong is not certain, so the dependent one
+  // becomes unknown; nothing is replaced with a guessed value.
+  const toUnknown = (path: string, reason: string) => {
+    const [category, field] = path.split(".") as [AppearanceCategory, string];
+    const values = next[category] as Record<string, string>;
+    if (values[field] === "unknown") return;
+    corrections.push({ field: path, from: values[field], to: "unknown", reason });
+    values[field] = "unknown";
+  };
+  if (params.cooler.type === "air-tower")
+    for (const field of ["radiatorSize", "radiatorPosition", "pumpStyle"])
+      toUnknown(`cooler.${field}`, "An air tower has no radiator or pump.");
+  if (
+    params.case.type === "mesh-front-mid-tower" &&
+    (params.case.glass === "front" || params.case.glass === "both")
+  )
+    toUnknown("case.type", "A mesh-front case cannot also have a glass front.");
+  if (params.gpu.fanCount === "3" && params.gpu.length === "short")
+    toUnknown("gpu.length", "A short card fits at most two fans, but three were read.");
+  const cooler = next.cooler;
   const radiatorFans = RADIATOR_FANS[cooler.radiatorSize];
   const position = cooler.radiatorPosition;
   if (cooler.type !== "air-tower" && radiatorFans && position !== "unknown") {

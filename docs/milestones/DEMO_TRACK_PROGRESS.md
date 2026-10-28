@@ -759,3 +759,43 @@ Validated with Zod (`.strict()`, enums only) and sent to the provider as a requi
 
 - `appearance-params.test.ts` (7): the rule; the field list and options; `setAppearanceField` rejecting values outside the schema; and the edit reaching confirm and a save round trip.
 - New E2E `appearance-review.e2e.ts`, which skips without the local replay: it sets case type to dual-chamber and glass to both, then checks that the Studio's case shell draws a divider, front glass and side glass (`data-case-structure`), including after a reload.
+
+## Image model switch, more consistency rules, Step B: model layer (2026-10-28)
+
+**Image model.**
+
+- Photo analysis now defaults to `gpt-5.4`; `IMAGE_AI_MODEL=gpt-4.1-mini` keeps the cheaper model available.
+- One live run on the real photo took 35.1 s on the server, with 3999 input and 2465 output tokens (about $0.047).
+- The reasoning-model check had lost its digit class (`o\d` read as `od`) and is fixed.
+- Replays now record `durationMs`.
+
+**Analysis wait.** The single request has no live progress, so the wait screen shows the elapsed seconds and a step list that advances every 6 s: case → graphics card → cooler and fans → memory and motherboard → visible text → contradiction check. It says plainly that the steps are a guide, not live progress.
+
+**Consistency rules.** Three more rules, each changing a value only to unknown and each shown as "Adjusted …":
+
+- An air tower: any radiator size, position or pump becomes unknown.
+- A mesh-front case with front or both glass: the case type becomes unknown.
+- Three fans on a short card: the length becomes unknown.
+
+**Step B, model layer** (`model-guess.ts`).
+
+- **Analysis fields.** The analysis returns `modelGuesses` (category, brand, model, basis, evidence) and `visibleText` (text, location, category). Both are optional for older analyses. Over-long fields are clipped, so they never fail the analysis.
+- **Prompt.** Model names go only into these two fields, and visible text is copied exactly, never completed.
+- **Review page: "AI model guesses".**
+  - Each guess reads "AI guess: X · not in catalog" or "· in catalog", with its basis and evidence.
+  - A guess not in the catalog links to a search of the maker's site (`site:` search), or to a web search for an unknown brand.
+  - Visible text is listed separately as "AI read, may be misread".
+- **Catalog match.** A guess names a catalog part only when the model words agree, colour and memory size aside, so an AERO card never matches the Founders Edition. A match only highlights that option ("Matches AI guess"); ranking and suggestions are unchanged.
+- **Never.** A guess never selects a part, adds a price or changes the 3D: the scene still draws from the appearance parameters.
+- **Saved and shown in the Studio.** Guesses are saved with the draft, and the Studio's "Find this part" panel shows the slot's guesses and text.
+
+**Replays (local, gitignored).**
+
+- `<hash>.json` is now the gpt-5.4 reading with guesses (`.v4.json`).
+- The mini reading that the correction E2E needs moved to `real-photo-1-mini.jpg`, a copy one byte longer with its own hash.
+
+**Tests.**
+
+- `appearance-params.test.ts` (10) and `model-guess.test.ts` (4): matching, search links, clipping, older analyses, and "never selects, prices or redraws".
+- E2E `model-guess.e2e.ts`: the real photo's GPU guess from "AERO" stays a guess through to the Studio, and the sample's O11 guess is highlighted, never chosen.
+- An analysis-wait E2E holds the request and checks the step advances.

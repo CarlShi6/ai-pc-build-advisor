@@ -20,6 +20,8 @@ import {
   observationTagLine,
   type ObservationGroup,
 } from "@/lib/v3/observation-tags";
+import { catalogMatchesForGuess } from "@/lib/v3/model-guess";
+import { ModelGuesses } from "@/components/model-guesses";
 
 const categoryLabels: Record<VisibleCatalogCategory, string> = {
   case: "Case",
@@ -62,6 +64,16 @@ export function ImageCandidateReview({
   const sets = useMemo(() => matchVisualCandidates(analysis), [analysis]);
   const [message, setMessage] = useState("");
   const look = observationTagLine(analysis.observations, "look");
+  const guesses = useMemo(() => analysis.modelGuesses ?? [], [analysis]);
+  // Catalog parts an AI guess names: highlighted where they are offered, never chosen for the user.
+  const guessed = useMemo(
+    () => new Set(guesses.flatMap((guess) => catalogMatchesForGuess(guess).map((part) => part.id))),
+    [guesses],
+  );
+  const shown = useMemo(
+    () => new Set(sets.flatMap((set) => set.candidates.map((candidate) => candidate.partId))),
+    [sets],
+  );
 
   function update(category: VisibleCatalogCategory, next: CandidateReview) {
     onReviewChange?.(category, next);
@@ -97,8 +109,14 @@ export function ImageCandidateReview({
           <ObservationTags observations={analysis.observations} group="look" />
         </article>
       )}
+      <ModelGuesses
+        guesses={guesses}
+        visibleText={analysis.visibleText}
+        shownCandidateIds={shown}
+      />
       {sets.map((set) => (
         <PartCard
+          guessed={guessed}
           key={set.category}
           set={set}
           observations={analysis.observations}
@@ -133,7 +151,9 @@ function PartCard({
   onChange,
   onMessage,
   onActive,
+  guessed,
 }: {
+  guessed: Set<string>;
   set: CandidateSet;
   observations: VisualObservation[];
   review: CandidateReview;
@@ -214,12 +234,16 @@ function PartCard({
           key={candidate.partId}
           candidate={candidate}
           selected={candidate.partId === review.chosenPartId}
+          guessed={guessed.has(candidate.partId)}
           primary={!tied.length || !!chosen}
           onUse={() => use(candidate)}
         />
       ))}
       {others.length > 0 && (
-        <details className="v3-other-options">
+        <details
+          className="v3-other-options"
+          open={others.some((candidate) => guessed.has(candidate.partId)) || undefined}
+        >
           <summary>
             {main.length ? "Other options" : "Options"} ({others.length})
           </summary>
@@ -228,6 +252,7 @@ function PartCard({
               key={candidate.partId}
               candidate={candidate}
               selected={candidate.partId === review.chosenPartId}
+              guessed={guessed.has(candidate.partId)}
               onUse={() => use(candidate)}
             />
           ))}
@@ -241,10 +266,13 @@ function CandidateOption({
   candidate,
   selected,
   primary = false,
+  guessed = false,
   onUse,
 }: {
   candidate: AppearanceCandidate;
   selected: boolean;
+  /** An AI model guess names this part: highlighted only, the user still chooses. */
+  guessed?: boolean;
   primary?: boolean;
   onUse: () => void;
 }) {
@@ -256,9 +284,13 @@ function CandidateOption({
         ? "Price unknown"
         : `$${part.price.toLocaleString()}`;
   return (
-    <div className={`v3-candidate-card ${selected ? "chosen" : ""}`}>
+    <div
+      className={`v3-candidate-card ${selected ? "chosen" : ""} ${guessed ? "guessed" : ""}`}
+      data-part-id={candidate.partId}
+    >
       <div className="v3-candidate-main">
         <strong>{candidate.displayName}</strong>
+        {guessed && <span className="v3-guess-badge">Matches AI guess</span>}
         <small>
           {candidateMatchLabel(candidate)} · {price}
         </small>

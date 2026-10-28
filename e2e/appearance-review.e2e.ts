@@ -12,7 +12,9 @@ test.use({
   },
 });
 
-const photo = "local-replays/real-photo-1.jpg";
+// The gpt-4.1-mini reading of real-photo-1 (a copy one byte longer, so it has its own replay): it
+// misread the case, which is what the user corrects here.
+const photo = "local-replays/real-photo-1-mini.jpg";
 const recorded =
   existsSync(photo) &&
   existsSync(
@@ -22,7 +24,7 @@ const recorded =
 test("correcting the case to a dual-chamber showcase redraws it in the Studio", async ({
   page,
 }) => {
-  test.skip(!recorded, "No real-photo-1 replay on this machine.");
+  test.skip(!recorded, "No real-photo-1 mini replay on this machine.");
   test.setTimeout(90_000);
   let aiCalls = 0;
   page.on("request", (request) => {

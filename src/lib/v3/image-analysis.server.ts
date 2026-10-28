@@ -8,6 +8,7 @@ import {
 } from "@/lib/v3/image-contract";
 import { stripImageMetadata } from "@/lib/v3/image-input";
 import { APPEARANCE_PROMPT } from "@/lib/v3/appearance-params";
+import { MODEL_GUESS_PROMPT } from "@/lib/v3/model-guess";
 import type { ImageReplay } from "@/lib/v3/image-replay";
 
 export class ImageAnalysisError extends Error {
@@ -42,16 +43,17 @@ const systemPrompt = [
   "Separate directly observed features from visual inference and unknowns. Use fewer observations for poor or occluded images.",
   "Describe case silhouette, orientation, side panel, color/material, lighting, visible fan layout/count, and visible GPU/cooler/motherboard features when supported.",
   'When the case front is visible, add a case observation with attribute "front panel material" and a value of glass, mesh, perforated or solid; if the front is not visible, omit it. When the case visibly has a separate rear chamber, add attribute "layout" with value "dual-chamber".',
-  "A model marking may be transcribed only if it is actually legible in the image. Never guess an exact model or SKU from visual similarity.",
+  "Observations describe looks only; model names and legible text go only in modelGuesses and visibleText, which are shown to the user as guesses.",
   "Never identify hidden CPU, power supply, storage, memory specification, or physical clearance. Do not infer compatibility, price, or ownership.",
   "Use normalized region coordinates only when a specific visible area supports the observation; otherwise use null.",
   "Each observation needs a short evidence explanation. If you cannot see a detail, mark it unknown or omit it.",
   "List in absentParts only a GPU, cooler, fan or motherboard you can clearly see is not installed because the area where it would sit is plainly visible (for example an empty case interior). If a part could be hidden, out of frame or obscured, do not list it; leave absentParts empty when unsure.",
   APPEARANCE_PROMPT,
+  MODEL_GUESS_PROMPT,
 ].join(" ");
 
 /** Reasoning models (o-series, gpt-5) reject a temperature setting. */
-const acceptsTemperature = (model: string) => !/^(od|gpt-5)/.test(model);
+const acceptsTemperature = (model: string) => !/^(o[0-9]|gpt-5)/.test(model);
 
 /** Dev only: saves the raw provider response as a local replay (see image-replay.ts). */
 async function saveReplay(replay: ImageReplay) {
@@ -79,7 +81,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
       "IMAGE_AI_NOT_CONFIGURED",
     );
   reserveAnalysis();
-  const model = config.imageAiModel || config.aiProviderModel;
+  const model = config.imageAiModel;
   try {
     const cleanBytes = stripImageMetadata(bytes, mime);
     // Reasoning models take longer to answer than the 20 s the default model needs.
@@ -88,6 +90,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
       maxRetries: 0,
       timeout: acceptsTemperature(model) ? 20_000 : 60_000,
     });
+    const startedAt = Date.now();
     const response = await client.responses.create({
       model,
       // Same photo, same answer as far as the model allows; reasoning models take no temperature.
@@ -145,6 +148,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
           key: replayKey,
           recordedAt: new Date().toISOString(),
           model,
+          durationMs: Date.now() - startedAt,
           usage: response.usage
             ? {
                 inputTokens: response.usage.input_tokens,

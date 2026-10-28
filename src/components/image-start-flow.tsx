@@ -17,6 +17,7 @@ import { observationGroup, type ObservationGroup } from "@/lib/v3/observation-ta
 import { prepareImageForAnalysis, requestImageAnalysis } from "@/lib/v3/image-client";
 import { hasReplay, loadReplay, replayKeyOf } from "@/lib/v3/image-replay";
 import { AppearanceReview } from "@/components/appearance-review";
+import { AnalysisWait } from "@/components/analysis-wait";
 import {
   appearanceValue,
   setAppearanceField,
@@ -314,13 +315,12 @@ export function ImageStartFlow({
           )}
         </div>
       )}
-      {(analysisState === "preparing" || analysisState === "analyzing") && (
+      {analysisState === "preparing" && (
         <p role="status" className="v3-analysis-status">
-          {analysisState === "preparing"
-            ? "Preparing a private, resized copy…"
-            : "Analyzing visible details…"}
+          Preparing a private, resized copy…
         </p>
       )}
+      {analysisState === "analyzing" && <AnalysisWait />}
       {analysisState === "error" && (
         <p className="v3-error" role="alert">
           {analysisError} You can retry or continue manually.

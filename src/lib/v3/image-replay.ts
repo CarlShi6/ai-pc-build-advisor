@@ -11,6 +11,8 @@ export interface ImageReplay {
   key: string;
   recordedAt: string;
   model: string | null;
+  /** How long the provider took to answer, when recorded. */
+  durationMs?: number;
   /** Provider token usage for this one analysis, when recorded. */
   usage?: { inputTokens: number; outputTokens: number } | null;
   image: { mime: ImageMime; width: number; height: number };

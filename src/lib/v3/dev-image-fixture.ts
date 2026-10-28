@@ -214,6 +214,20 @@ function whiteSketch(frontGlass: boolean): ImageAnalysisResult {
         memory: { sticks: "unknown", lightBar: "unknown", color: "unknown" },
         motherboard: { color: "white" },
       },
+      // A look-only guess the catalog happens to hold: it is highlighted, never chosen.
+      modelGuesses: frontGlass
+        ? [
+            {
+              category: "case",
+              brand: "Lian Li",
+              model: "O11 Dynamic EVO",
+              basis: "appearance",
+              evidence:
+                "Glass front and side meet at a pillarless corner, as on this showcase case.",
+            },
+          ]
+        : [],
+      visibleText: [],
     },
     { mime: "image/png", width: 1200, height: 900 },
     frontGlass ? "local-white-glass-front-fixture" : "local-white-sketch-fixture",

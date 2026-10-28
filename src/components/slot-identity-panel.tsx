@@ -9,6 +9,8 @@ import {
   type MatchGap,
 } from "@/lib/v3/slot-identity";
 import type { Part } from "@/types/parts";
+import { ModelGuesses } from "@/components/model-guesses";
+import { catalogMatchesForGuess } from "@/lib/v3/model-guess";
 
 const gapText: Partial<Record<MatchGap, string>> = {
   no_close_match: "No catalog part looks like this yet.",
@@ -37,9 +39,23 @@ export function SlotIdentityPanel({
   const help = slotIdentityHelp(document, slot);
   if (!help) return null;
   const results = searchCatalog(slot, query);
+  const guesses = (document.imageContext?.modelGuesses ?? []).filter(
+    (guess) => guess.category === slot,
+  );
+  const guessed = new Set(
+    guesses.flatMap((guess) => catalogMatchesForGuess(guess).map((part) => part.id)),
+  );
   return (
     <section className="v3-identity" aria-label="Find this part">
       {help.evidence && <p className="v3-identity-evidence">{help.evidence}</p>}
+      <ModelGuesses
+        compact
+        guesses={guesses}
+        visibleText={(document.imageContext?.visibleText ?? []).filter(
+          (item) => item.category === slot,
+        )}
+        shownCandidateIds={new Set(help.candidates.slice(0, 4).map((item) => item.partId))}
+      />
       <span className="v3-kicker">CLOSEST LOOK IN THE CATALOG</span>
       {help.candidates.length ? (
         <ul className="v3-identity-list">
@@ -53,6 +69,9 @@ export function SlotIdentityPanel({
                     {SIMILAR_LOOK_LABEL}
                     {candidate.reviewChoice && " · you chose this in the review"}
                   </small>
+                  {guessed.has(candidate.partId) && (
+                    <span className="v3-guess-badge">Matches AI guess</span>
+                  )}
                   {candidate.matchedSignals.length > 0 && (
                     <small className="v3-identity-signals">
                       {candidate.matchedSignals.slice(0, 2).join(" · ")}

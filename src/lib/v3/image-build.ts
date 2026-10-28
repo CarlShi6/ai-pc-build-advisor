@@ -127,6 +127,8 @@ export function proposeImageBuild(
     observations: analysis.observations,
     ...(analysis.appearance && { appearance: analysis.appearance }),
     ...(analysis.appearance && appearanceUserSet.length > 0 && { appearanceUserSet }),
+    ...(analysis.modelGuesses?.length && { modelGuesses: analysis.modelGuesses }),
+    ...(analysis.visibleText?.length && { visibleText: analysis.visibleText }),
     reviews: structuredClone(reviews),
     visualPriorities: visualPrioritiesFromAnalysis(analysis),
     plannedSelections,
