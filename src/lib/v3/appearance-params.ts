@@ -145,5 +145,13 @@ export const appearanceParamsJsonSchema = {
   ),
 };
 
-export const APPEARANCE_PROMPT =
-  'Fill "appearance" only from what the photo clearly shows; use "unknown" for any field you cannot see. Case type: dual-chamber (separate rear chamber, glass front and side), mesh-front-mid-tower, itx (small form factor), other. Glass: where the case has glass panels. GPU length: short (about 2 fans long or less), medium, long (3 fans). Cooler: air-tower or aio; radiator size and position (top, side, front) only for an aio. Fans: how many case fans at each position, not counting radiator fans. Memory: visible sticks and whether they have a lit bar. Motherboard color only when the board is visible. Never infer a model from these.';
+export const APPEARANCE_PROMPT = [
+  'Fill "appearance" only from what the photo clearly shows; use "unknown" for any field you cannot see, and never fill a field from what a part usually has.',
+  "Case type: dual-chamber (a showcase case with glass on both the front and the side, usually with a separate rear chamber), mesh-front-mid-tower (the front panel itself is a mesh or perforated grille), itx (small form factor), other.",
+  'A perforated PSU shroud, bottom cover or top vent is not a mesh front. If the front corner of the case is clear glass, glass is "both" and the case is not mesh-front.',
+  "GPU fan count: count only fans you can actually see. A horizontally mounted card seen from the side shows its edge, not its fans (they face down), so the fan count is unknown then. Length can still be judged from its span: short (about 2 fan widths or less), medium, long (about 3 fan widths).",
+  "Cooler: air-tower or aio; radiator size and position (top, side, front) only for an aio. Pump style: screen when the pump top shows a display, picture or numbers; round or square only for a plain cap.",
+  "Fans: case fans at each position. The fans on a radiator belong to the cooler; never count them as top, front or side case fans.",
+  "Memory: visible sticks and whether they have a lit bar. Motherboard color only when the board is visible.",
+  "Never infer a model from these.",
+].join(" ");
