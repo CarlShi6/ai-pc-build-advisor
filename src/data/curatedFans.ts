@@ -22,7 +22,8 @@ export interface CuratedFan {
   /** Dimensions exactly as published (formats differ between manufacturers). */
   dimensionsAsPublished: string;
   thicknessMm: number | null;
-  lighting: "ARGB" | "RGB";
+  /** As the manufacturer names it ("D-RGB" is Phanteks' term; "LED" when only LEDs are stated). */
+  lighting: "ARGB" | "RGB" | "D-RGB" | "LED";
   lightingConnector: string | null;
   fanConnector: string | null;
   fansInPackage: number | null;
@@ -36,6 +37,30 @@ export interface CuratedFan {
 }
 
 const VERIFIED = "2026-10-25";
+
+/** Step C additions (docs/milestones/STEP_C_CATALOG_CANDIDATES.md). */
+const STEP_C_VERIFIED = "2026-10-28";
+
+const lianLiTl = {
+  brand: "Lian Li",
+  model: "UNI FAN TL 120",
+  sizeMm: 120 as const,
+  dimensionsAsPublished: "124 x 120 x 28 mm",
+  thicknessMm: 28,
+  lighting: "LED" as const,
+  lightingConnector: null,
+  fanConnector: null,
+  fansInPackage: 3,
+  maxRpm: 2600,
+  maxAirflowCfm: null,
+  maxNoiseDba: null,
+  notes: [
+    '"UNI FAN TL series fans without the controller will not be functional." The triple pack includes the controller.',
+    "Each fan has 26 LEDs.",
+  ],
+  sourceUrl: "https://lian-li.com/product/uni-fan-tl/",
+  verifiedAt: STEP_C_VERIFIED,
+};
 
 const lianLiSlInf = {
   brand: "Lian Li",
@@ -278,5 +303,40 @@ export const curatedFans: CuratedFan[] = [
     maxAirflowCfm: 56,
     maxNoiseDba: 23.3,
     sourceUrl: "https://www.bequiet.com/en/casefans/3453",
+  },
+  {
+    ...lianLiTl,
+    id: "fan-lianli-12tl3w",
+    displayName: "Lian Li UNI FAN TL 120 White (3-pack)",
+    partNumber: "12TL3W",
+    color: "white",
+  },
+  {
+    ...lianLiTl,
+    id: "fan-lianli-12tl3b",
+    displayName: "Lian Li UNI FAN TL 120 Black (3-pack)",
+    partNumber: "12TL3B",
+    color: "black",
+  },
+  {
+    id: "fan-phanteks-ph-f120d30-drgb-pwm-wt01-3p",
+    brand: "Phanteks",
+    model: "D30-120 DRGB PWM",
+    displayName: "Phanteks D30-120 DRGB PWM White (3-pack)",
+    partNumber: "PH-F120D30_DRGB_PWM_WT01_3P",
+    color: "white",
+    sizeMm: 120,
+    dimensionsAsPublished: "120 x 120 x 30 mm | 4.72 x 4.72 x 1.18 in",
+    thicknessMm: 30,
+    lighting: "D-RGB",
+    lightingConnector: null,
+    fanConnector: null,
+    fansInPackage: 3,
+    maxRpm: 2000,
+    maxAirflowCfm: null,
+    maxNoiseDba: null,
+    notes: ["Speed 250~2000 ± 10% RPM."],
+    sourceUrl: "https://phanteks.com/product/d30-120-white/",
+    verifiedAt: STEP_C_VERIFIED,
   },
 ];

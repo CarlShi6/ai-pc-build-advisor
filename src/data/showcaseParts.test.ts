@@ -142,7 +142,8 @@ describe("white showcase parts in photo review", () => {
     const cases = matchVisualCandidates(analysis).find((set) => set.category === "case")!;
     expect(cases.status).toBe("candidates");
     for (const candidate of cases.candidates) {
-      expect(candidate.partId.startsWith("showcase-case-")).toBe(true);
+      // Showcase and Step C parts, both from manufacturer pages.
+      expect(candidate.partId).toMatch(/^(showcase|maker)-case-/);
       expect(candidate.identityEvidence).toBe("appearance_only");
       expect(candidate.catalogSourceUrl).toBe(catalogPartById(candidate.partId)?.productUrl);
     }

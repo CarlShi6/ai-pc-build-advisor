@@ -1,5 +1,5 @@
 import { isSafeExternalUrl } from "@/lib/product-trust";
-import { priceBasisLabel, priceUnknown } from "@/lib/v3/catalog";
+import { colorSourceNote, priceBasisLabel, priceUnknown } from "@/lib/v3/catalog";
 import {
   completeness,
   primarySlots,
@@ -31,6 +31,8 @@ export interface PlanLine {
   /** Known catalog price; null means unknown, never zero. */
   price: number | null;
   priceBasis: string;
+  /** "Color from maker photo" when only the manufacturer's photos give the part's colour. */
+  colorNote?: string;
   links: PlanLink[];
 }
 
@@ -123,6 +125,7 @@ export function buildShoppingPlan(document: BuildDocumentV3): ShoppingPlan {
       name: part.displayName,
       price: known ? part.price : null,
       priceBasis: priceBasisLabel(part),
+      ...(colorSourceNote(part) && { colorNote: colorSourceNote(part)! }),
       links: linksFor(part),
     };
   });

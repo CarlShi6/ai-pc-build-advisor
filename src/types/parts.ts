@@ -40,6 +40,12 @@ export interface Part {
   sku?: string;
   specSummary?: string;
   color?: string;
+  /**
+   * Where the colour comes from: the manufacturer's own words ("maker_text") or only its product
+   * photos ("maker_image", shown as "Color from maker photo"; the page is `colorSourceUrl`).
+   */
+  colorSource?: "maker_text" | "maker_image";
+  colorSourceUrl?: string;
   affiliateLinks?: AffiliateLink[];
   availability?: PartAvailability;
   specs: Record<string, string | number | boolean>;

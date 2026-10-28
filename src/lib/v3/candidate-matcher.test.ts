@@ -62,7 +62,7 @@ describe("R4 visual catalog review", () => {
     expect(html).toContain("Not a Build slot");
     // Tag line of what the photo shows, with the reason on expand.
     expect(html).toContain('<span class="v3-tag-line">Black</span>');
-    expect(html).toContain("4 options equally likely");
+    expect(html).toContain("5 options equally likely");
   });
 
   it("ranks only canonical catalog IDs with separate evidence signals", () => {
@@ -93,10 +93,9 @@ describe("R4 visual catalog review", () => {
     const gpu = matchVisualCandidates(
       analysis([observation("gpu", "model marking", "RTX 5070")]),
     )[0];
-    expect(gpu.candidates.map((candidate) => candidate.partId)).toContain("gpu-rtx-5070-fe");
-    expect(gpu.candidates.map((candidate) => candidate.partId)).toContain(
-      "gpu-rtx-5070-ti-reference",
-    );
+    // Every card the marking names is an alternative (the list is capped at five).
+    expect(gpu.candidates).toHaveLength(5);
+    expect(gpu.candidates.every((candidate) => /5070/.test(candidate.displayName))).toBe(true);
     expect(
       gpu.candidates.every((candidate) => candidate.identityEvidence === "visible_marking"),
     ).toBe(true);

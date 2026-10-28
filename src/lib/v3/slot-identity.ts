@@ -9,6 +9,7 @@ import {
   equallyLikelyCandidates,
   emptyCandidateReview,
   matchVisualCandidates,
+  memoryLook,
   type AppearanceCandidate,
   type CandidateReview,
 } from "@/lib/v3/candidate-matcher";
@@ -42,7 +43,7 @@ export type MatchGap =
   | "tied";
 
 type AnalysisLike = Pick<ImageAnalysisResult, "observations"> &
-  Partial<Pick<ImageAnalysisResult, "absentParts">>;
+  Partial<Pick<ImageAnalysisResult, "absentParts" | "appearance">>;
 
 function candidateSet(analysis: AnalysisLike, category: VisibleCatalogCategory) {
   return matchVisualCandidates({ absentParts: [], ...analysis } as ImageAnalysisResult).find(
@@ -57,9 +58,13 @@ export function matchGap(
   review: CandidateReview = emptyCandidateReview(),
 ): MatchGap | null {
   if (analysis.absentParts?.includes(category as never)) return "judged_absent";
-  const visible = analysis.observations.some(
-    (item) => item.category === category && item.visibleInImage && item.origin !== "unknown",
-  );
+  // Memory is read only in the appearance parameters, never as observations.
+  const visible =
+    category === "memory"
+      ? !!memoryLook(analysis)
+      : analysis.observations.some(
+          (item) => item.category === category && item.visibleInImage && item.origin !== "unknown",
+        );
   if (!visible) return "not_seen";
   const set = candidateSet(analysis, category);
   if (!set || set.status === "no_catalog_coverage") return "no_catalog_category";

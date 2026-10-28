@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Search } from "lucide-react";
 import type { BuildDocumentV3, SlotId } from "@/lib/v3/build-document";
-import { catalogPartById } from "@/lib/v3/catalog";
+import { catalogPartById, colorSourceNote } from "@/lib/v3/catalog";
 import {
   SIMILAR_LOOK_LABEL,
   searchCatalog,
@@ -69,6 +69,9 @@ export function SlotIdentityPanel({
                     {SIMILAR_LOOK_LABEL}
                     {candidate.reviewChoice && " · you chose this in the review"}
                   </small>
+                  {part && colorSourceNote(part) && (
+                    <small className="v3-color-source">{colorSourceNote(part)}</small>
+                  )}
                   {guessed.has(candidate.partId) && (
                     <span className="v3-guess-badge">Matches AI guess</span>
                   )}

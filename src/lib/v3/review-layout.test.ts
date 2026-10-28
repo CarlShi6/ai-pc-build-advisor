@@ -45,7 +45,8 @@ describe("Build it in 3D decisions", () => {
       partName: "Lian Li O11 Dynamic EVO (White)",
     });
     expect(rows.gpu.decision).toBe("tie");
-    expect(rows.motherboard.decision).toBe("none");
+    // Two white catalog boards (Step C) fit the white board equally well.
+    expect(rows.motherboard.decision).toBe("tie");
   });
 
   it("never fills a part the user kept unknown or noted by hand", () => {
@@ -80,7 +81,11 @@ describe("unticking a filled-in row", () => {
     expect(row.appearance).toMatch(/^Not filled in; stays unconfirmed, drawn from the photo/);
     expect(declined.reviews.case).toBeUndefined();
     expect(slotOccupancy(declined.proposal.candidate, "case")).toBe("unresolved");
-    expect(declined.changes.find((item) => item.category === "cooler")?.decision).toBe("suggested");
+    // The other rows are unchanged by the untick (the white AIOs tie either way).
+    for (const category of ["gpu", "cooler", "fan", "motherboard"])
+      expect(declined.changes.find((item) => item.category === category)?.decision).toBe(
+        all.changes.find((item) => item.category === category)?.decision,
+      );
     // Without the untick, the same case is filled in.
     expect(all.changes.find((item) => item.category === "case")?.decision).toBe("suggested");
   });
@@ -96,8 +101,9 @@ describe("review cards", () => {
       html.indexOf('data-category="gpu"'),
     );
     expect(caseCard).toContain('data-state="suggested"');
-    expect(caseCard.match(/>Use this</g)).toHaveLength(2); // top match + one under Other options
-    expect(caseCard).toContain("Other options (1)");
+    // Top match + four under Other options (the list is capped at five).
+    expect(caseCard.match(/>Use this</g)).toHaveLength(5);
+    expect(caseCard).toContain("Other options (4)");
     expect(caseCard).toContain('aria-label="More options for Case"');
     expect(caseCard).toMatch(/Exclude Lian Li O11 Dynamic EVO \(White\)/);
     // Five tied fans fold away instead of reading like a ranking.

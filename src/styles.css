@@ -7203,3 +7203,9 @@
 .v3-candidate-card.guessed {
   border-color: var(--g-pending);
 }
+
+/* Step C: a colour known only from the manufacturer's product photos. */
+.v3-color-source {
+  color: var(--g-text-muted);
+  font-style: italic;
+}

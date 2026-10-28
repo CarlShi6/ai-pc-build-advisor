@@ -13,7 +13,7 @@ import {
   type CandidateSet,
 } from "@/lib/v3/candidate-matcher";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
-import { catalogPartById, priceUnknown } from "@/lib/v3/catalog";
+import { catalogPartById, colorSourceNote, priceUnknown } from "@/lib/v3/catalog";
 import { candidateMatchLabel, type ImageReviews } from "@/lib/v3/image-build";
 import {
   observationGroup,
@@ -29,7 +29,12 @@ const categoryLabels: Record<VisibleCatalogCategory, string> = {
   cooler: "Cooler",
   fan: "Fans",
   motherboard: "Motherboard",
+  memory: "Memory",
 };
+
+/** Memory has no observations (it is read in the appearance parameters), so no tag group. */
+const tagGroup = (category: VisibleCatalogCategory): ObservationGroup | null =>
+  category === "memory" ? null : category;
 
 type CardState = "yours" | "suggested" | "tie" | "kept" | "note" | "absent" | "none";
 
@@ -123,7 +128,7 @@ export function ImageCandidateReview({
           review={reviews[set.category] ?? emptyCandidateReview()}
           onChange={(next) => update(set.category, next)}
           onMessage={setMessage}
-          onActive={(active) => onActiveGroup?.(active ? set.category : null)}
+          onActive={(active) => onActiveGroup?.(active ? tagGroup(set.category) : null)}
         />
       ))}
       {message && (
@@ -204,7 +209,9 @@ function PartCard({
           onMessage={onMessage}
         />
       </div>
-      <ObservationTags observations={observations} group={set.category} />
+      {tagGroup(set.category) && (
+        <ObservationTags observations={observations} group={tagGroup(set.category)!} />
+      )}
       {(state === "absent" || state === "none") && (
         <p className="v3-candidate-explanation">{set.explanation}</p>
       )}
@@ -294,6 +301,9 @@ function CandidateOption({
         <small>
           {candidateMatchLabel(candidate)} · {price}
         </small>
+        {part && colorSourceNote(part) && (
+          <small className="v3-color-source">{colorSourceNote(part)}</small>
+        )}
       </div>
       <button
         type="button"

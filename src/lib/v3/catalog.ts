@@ -1,9 +1,20 @@
 import { seedParts } from "@/data/seedParts";
 import { showcaseParts } from "@/data/showcaseParts";
+import { expansionParts } from "@/data/catalogExpansion";
 import type { Part } from "@/types/parts";
 
-/** The v3 catalog: the existing seed parts plus the manufacturer-sourced white showcase parts. */
-export const v3Catalog: Part[] = [...seedParts, ...showcaseParts];
+/**
+ * The v3 catalog: the existing seed parts, the manufacturer-sourced white showcase parts and the
+ * Step C expansion (src/data/catalogExpansion.ts).
+ */
+export const v3Catalog: Part[] = [...seedParts, ...showcaseParts, ...expansionParts];
+
+export const COLOR_FROM_MAKER_PHOTO = "Color from maker photo";
+
+/** "Color from maker photo" when only the manufacturer's photos give the colour, else null. */
+export function colorSourceNote(part: Part): string | null {
+  return part.color && part.colorSource === "maker_image" ? COLOR_FROM_MAKER_PHOTO : null;
+}
 
 export function catalogPartById(id: string): Part | undefined {
   return v3Catalog.find((part) => part.id === id);

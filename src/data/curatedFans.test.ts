@@ -9,6 +9,7 @@ const manufacturerDomains: Record<string, string> = {
   NZXT: "nzxt.com",
   ARCTIC: "arctic.de",
   "be quiet!": "bequiet.com",
+  Phanteks: "phanteks.com",
 };
 
 function fanAnalysis(observations: Array<[string, string]>) {

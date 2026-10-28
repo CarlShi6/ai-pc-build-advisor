@@ -60,21 +60,24 @@ describe("Use suggested parts", () => {
     const rows = Object.fromEntries(suggested.changes.map((row) => [row.category, row]));
     expect(rows.case.partName).toBe("Lian Li O11 Dynamic EVO (White)");
     expect(rows.gpu.partName).toMatch(/^MSI .*WHITE$/);
-    expect(rows.cooler.partName).toMatch(/White/);
+    // Four white AIOs now fit the photo equally well (Step C), so the cooler waits for the user.
+    expect(rows.cooler.decision).toBe("tie");
+    expect(rows.cooler.partName).toBeNull();
     expect(rows.case.appearance).toBe("White, matches the photo");
     expect(rows.fan.price).toBe("Not counted");
     expect(rows.fan.match).toBe("5 options equally likely");
-    // No white motherboard in the catalog: it stays unresolved and is drawn from the photo.
+    // Two white boards tie: it stays unresolved and is drawn from the photo.
+    expect(rows.motherboard.decision).toBe("tie");
     expect(rows.motherboard.partName).toBeNull();
-    expect(rows.motherboard.appearance).toMatch(/drawn from the photo \(White/);
+    expect(rows.motherboard.appearance).toMatch(/drawn from the photo until then \(White/);
     expect(suggested.total.unknown).toBeGreaterThan(0);
-    expect(suggested.compatibility).toMatch(/^Incomplete · 3 of 8 slots selected/);
+    expect(suggested.compatibility).toMatch(/^Incomplete · 2 of 8 slots selected/);
 
     const draft = confirmImageBuild(suggested.proposal, before);
     expect(slotOccupancy(draft, "case")).toBe("selected");
     expect(slotOccupancy(draft, "gpu")).toBe("selected");
     expect(slotOccupancy(draft, "motherboard")).toBe("unresolved");
-    expect(Object.keys(photoAppearance(draft))).toEqual(["motherboard"]);
+    expect(Object.keys(photoAppearance(draft)).sort()).toEqual(["cooler", "motherboard"]);
     // The confirmed case keeps the photo's fans as an appearance note.
     expect(photoFans(draft)).toMatchObject({ count: 5, color: "white", lightColor: "blue" });
   });
@@ -84,10 +87,10 @@ describe("Use suggested parts", () => {
     const rows = Object.fromEntries(suggested.changes.map((row) => [row.category, row]));
     expect(suggested.reviews.case).toBeUndefined();
     expect(rows.case.partName).toBeNull();
-    expect(rows.case.match).toBe("3 options equally likely");
-    expect(rows.case.equallyLikely).toHaveLength(3);
+    expect(rows.case.match).toBe("5 options equally likely");
+    expect(rows.case.equallyLikely).toHaveLength(5);
     expect(rows.case.appearance).toMatch(/^Choose one in the review; drawn from the photo/);
-    expect(rows.gpu.match).toBe("2 options equally likely");
+    expect(rows.gpu.match).toBe("5 options equally likely");
     // A tied category the user already decided keeps that choice.
     const sets = matchVisualCandidates(createWhiteSketchFixture());
     const cases = sets.find((set) => set.category === "case")!;
@@ -109,8 +112,12 @@ describe("Use suggested parts", () => {
       { case: { status: "unknown", excludedPartIds: [top] } },
       2500,
     );
-    expect(second.reviews.case?.chosenPartId).toBeDefined();
-    expect(second.reviews.case?.chosenPartId).not.toBe(top);
+    // The excluded part is never filled in; the white cases left tie, so none is picked.
+    expect(second.reviews.case?.chosenPartId).toBeUndefined();
+    expect(second.changes.find((row) => row.category === "case")?.decision).toBe("tie");
+    expect(second.changes.find((row) => row.category === "case")?.equallyLikely).not.toContain(
+      first.changes.find((row) => row.category === "case")?.partName,
+    );
   });
 });
 
@@ -119,10 +126,10 @@ describe("case front panel (manufacturer pages, verified 2026-10-26)", () => {
     const cases = matchVisualCandidates(createGlassFrontFixture()).find(
       (set) => set.category === "case",
     )!;
-    expect(cases.candidates.map((item) => item.displayName)).toEqual([
-      "Lian Li O11 Dynamic EVO (White)",
-      "Corsair 4000D Airflow (White)",
-    ]);
+    const names = cases.candidates.map((item) => item.displayName);
+    expect(names[0]).toBe("Lian Li O11 Dynamic EVO (White)");
+    expect(names).toContain("Corsair 4000D Airflow (White)");
+    expect(names).not.toContain("NZXT H5 Flow (White)");
     expect(cases.candidates[0].matchedSignals).toContain(
       "Front panel: glass (manufacturer page, verified 2026-10-26)",
     );
@@ -133,10 +140,10 @@ describe("case front panel (manufacturer pages, verified 2026-10-26)", () => {
     const cases = matchVisualCandidates(createWhiteSketchFixture()).find(
       (set) => set.category === "case",
     )!;
-    expect(equallyLikelyCandidates(cases, emptyCandidateReview())).toHaveLength(3);
-    // Excluding one leaves the other two tied.
+    expect(equallyLikelyCandidates(cases, emptyCandidateReview())).toHaveLength(5);
+    // Excluding one leaves the other four tied.
     const review = { status: "unknown" as const, excludedPartIds: [cases.candidates[0].partId] };
-    expect(equallyLikelyCandidates(cases, review)).toHaveLength(2);
+    expect(equallyLikelyCandidates(cases, review)).toHaveLength(4);
   });
 
   it("records only what each manufacturer page states", () => {

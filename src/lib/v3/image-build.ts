@@ -25,7 +25,7 @@ import type { Part } from "@/types/parts";
 
 export type ImageReviews = Partial<Record<VisibleCatalogCategory, CandidateReview>>;
 
-const visualCategories = new Set(["case", "gpu", "cooler", "fan", "motherboard"]);
+const visualCategories = new Set(["case", "gpu", "cooler", "fan", "motherboard", "memory"]);
 
 function priorityFromObservation(item: VisualObservation): VisualPriority | null {
   if (!item.visibleInImage || item.origin === "unknown") return null;
@@ -204,6 +204,7 @@ const reviewLabels: Record<VisibleCatalogCategory, string> = {
   cooler: "Cooler",
   fan: "Fans",
   motherboard: "Motherboard",
+  memory: "Memory",
 };
 
 /** "Weak visual match · appearance only" and the like, shared by review cards and change lists. */

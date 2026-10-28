@@ -328,6 +328,8 @@ export const showcaseParts: Part[] = sources.map((source) => ({
   searchUrl: searchUrl(source.brand, source.model),
   partNumber: source.partNumber,
   color: "White",
+  // Every showcase part names its colour in the model name or specs.
+  colorSource: "maker_text",
   availability: "unknown",
   lastUpdated: VERIFIED,
   specs: source.specs,

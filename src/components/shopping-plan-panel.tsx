@@ -157,6 +157,7 @@ export function ShoppingPlanPanel({
                     Choose a part
                   </button>
                 ))}
+              {line.colorNote && <small className="v3-color-source">{line.colorNote}</small>}
             </span>
             <span role="cell">
               <strong>{line.price === null ? "Unknown" : `$${line.price.toLocaleString()}`}</strong>

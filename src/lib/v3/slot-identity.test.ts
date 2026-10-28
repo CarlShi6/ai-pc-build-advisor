@@ -5,7 +5,11 @@ import {
   matchVisualCandidates,
   type CandidateReview,
 } from "@/lib/v3/candidate-matcher";
-import { createGlassFrontFixture, createOgImageFixture } from "@/lib/v3/dev-image-fixture";
+import {
+  createBlackTowerFixture,
+  createGlassFrontFixture,
+  createOgImageFixture,
+} from "@/lib/v3/dev-image-fixture";
 import { proposeImageBuild, type ImageReviews } from "@/lib/v3/image-build";
 import { matchGapProperties } from "@/lib/v3/funnel-analytics";
 import {
@@ -22,14 +26,26 @@ const caseSet = matchVisualCandidates(fixture).find((set) => set.category === "c
 const caseOnly: ImageReviews = {
   case: chooseCandidate(caseSet, emptyCandidateReview(), caseSet.candidates[0].partId),
 };
+/** The same sample with a red board, which no catalog board comes in. */
+const redBoard = {
+  ...fixture,
+  observations: fixture.observations.map((item) =>
+    item.category === "motherboard" && /colou?r/.test(item.attribute)
+      ? { ...item, value: "red" }
+      : item,
+  ),
+};
 const draft = (reviews: ImageReviews = caseOnly) =>
   proposeImageBuild(fixture, reviews, null).candidate;
 
 describe("why a visible part finds no catalog match", () => {
   it("names the reason for each category as a code", () => {
-    // The white sample: two white GPUs tie, and no catalog board has a recorded colour.
-    expect(matchGaps(fixture)).toMatchObject({ gpu: "tied", motherboard: "no_close_match" });
-    expect(matchGap(fixture, "cooler")).toBeNull();
+    // The white sample: white GPUs tie, and so do the two white catalog boards.
+    expect(matchGaps(fixture)).toMatchObject({ gpu: "tied", motherboard: "tied" });
+    expect(matchGap(redBoard, "motherboard")).toBe("no_close_match");
+    expect(matchGap(fixture, "cooler")).toBe("tied");
+    // Black sticks without a light bar: every black kit fits equally well.
+    expect(matchGap(createBlackTowerFixture(), "memory")).toBe("tied");
     expect(matchGap({ ...fixture, absentParts: ["gpu"] }, "gpu")).toBe("judged_absent");
     expect(matchGap(createOgImageFixture(), "cooler")).toBe("not_seen");
     const gpus = matchVisualCandidates(fixture).find((set) => set.category === "gpu")!;
@@ -44,7 +60,7 @@ describe("why a visible part finds no catalog match", () => {
     const properties = matchGapProperties(fixture, {});
     expect(properties).toMatchObject({
       gap_gpu: "tied",
-      gap_motherboard: "no_close_match",
+      gap_motherboard: "tied",
       fixture: true,
     });
     for (const item of fixture.observations)
@@ -61,7 +77,10 @@ describe("an unconfirmed photo slot in the Studio", () => {
     );
     expect(help.gap).toBe("tied");
     // A slot with nothing alike still has evidence, an empty list and the reason.
-    const board = slotIdentityHelp(draft(), "motherboard")!;
+    const board = slotIdentityHelp(
+      proposeImageBuild(redBoard, caseOnly, null).candidate,
+      "motherboard",
+    )!;
     expect(board.candidates).toEqual([]);
     expect(board.gap).toBe("no_close_match");
     // Selected and hidden slots get no help.

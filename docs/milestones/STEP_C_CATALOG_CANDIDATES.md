@@ -1,6 +1,83 @@
-# Step C: catalog expansion candidates (proposal, not entered)
+# Step C: catalog expansion
 
-Status: **waiting for approval** (2026-10-28). Nothing below is in the catalog yet.
+Status: **entered** (approved and entered 2026-10-28).
+
+- Data:
+  - `src/data/catalogExpansion.ts`: 18 parts.
+  - `src/data/curatedFans.ts`: 3 fans.
+  - `src/data/seedParts.ts`: colour for the five existing boards.
+- The approved list is kept below. "Entry outcome" records what changed on entry.
+
+## Entry outcome (2026-10-28)
+
+- **Colour rule** (also in CLAUDE.md): `colorSource: "maker_text" | "maker_image"`.
+  - `maker_image` shows "Color from maker photo" on the review card, in the Studio's "Find this part" panel and in the shopping plan.
+- **#8 replaced.**
+  - The MSI RTX 5070 Ti GAMING TRIO OC WHITE was already in the catalog (`showcase-gpu-msi-g507t-16gtcw`), which the list missed.
+  - Entered instead: ASUS TUF Gaming GeForce RTX 5070 Ti **White** OC Edition (`TUF-RTX5070TI-O16G-WHITE-GAMING`, 329 x 140 x 62.5 mm; colour in the model name).
+  - Source: https://www.asus.com/us/motherboards-components/graphics-cards/tuf-gaming/tuf-rtx5070ti-o16g-white-gaming/techspec/
+  - Price null: the ASUS eShop link redirected to an error page.
+- **#21 added (black tower air cooler):** DeepCool AK620 ZERO DARK, `R-AK620-BKNNMT-G-1`.
+  - Dimensions: 129×138×160 mm (L×W×H); heatsink 127×110×157 mm.
+  - Colour in words: "an all-black edition".
+  - Source: https://www.deepcool.com/products/Cooling/cpuaircoolers/AK620-ZERO-DARK-High-Performance-CPU-Cooler-1851-1700-AM5/2024/16124.shtml
+  - Two other picks were dropped:
+    - be quiet! Dark Rock Pro 5: the maker marks it "successor available".
+    - Noctua NH-D15 G2 chromax.black: the spec page returned 404.
+- **Colours from maker photos** (`maker_image`, checked 2026-10-28):
+  - the five existing boards: all black;
+  - GIGABYTE RTX 5070 Ti AERO and RTX 5070 AERO: white;
+  - ASUS TUF RTX 5070 Ti OC: black.
+- **Case appearance not recorded.** No front-panel or layout fields were recorded for the five new cases: I did not read those words on their pages. They stay unknown, so they neither count for nor against a photo.
+- **Memory matching.**
+  - Memory is now a matching category, read from the photo's appearance parameters (`memory.color`, `memory.lightBar`); the observation schema has no memory.
+  - A different colour rules a kit out. A light bar adds weight to an RGB kit. "No light bar" counts neither way.
+  - Like every category, memory is only a candidate, filled into the preview only when one kit leads, and confirmed by the user.
+
+### Matching before → after (replays and fixtures, no AI call)
+
+"lead" means one candidate leads; "tied · n" means n candidates fit equally (the list is capped at 5); "—" means the category did not appear.
+
+| Input                   | Slot        | Before                               | After                                                          |
+| ----------------------- | ----------- | ------------------------------------ | -------------------------------------------------------------- |
+| real-photo-1 v4         | case        | lead · O11 EVO (White), 2 options    | lead · O11 EVO (White), 5 options                              |
+|                         | gpu         | no_close_match                       | no_close_match                                                 |
+|                         | cooler      | no_close_match                       | no_close_match                                                 |
+|                         | fan         | no_close_match                       | no_close_match                                                 |
+|                         | motherboard | no_close_match                       | tied · 2 (B850-A, Z890-A)                                      |
+|                         | memory      | —                                    | tied · 2 (Corsair white RGB CL30 / CL36)                       |
+| real-photo-1 v5         | case        | lead · O11 EVO (White)               | lead · O11 EVO (White)                                         |
+|                         | gpu         | tied · 2                             | tied · 5                                                       |
+|                         | cooler      | lead · Corsair TITAN 360 RX (White)  | tied · 4 (TITAN, Galahad II LCD, HydroShift LCD, Kraken Elite) |
+|                         | fan         | tied · 5                             | tied · 5                                                       |
+|                         | motherboard | no_close_match                       | tied · 2                                                       |
+|                         | memory      | —                                    | tied · 2                                                       |
+| white-build-sketch      | case        | tied · 3                             | tied · 5                                                       |
+|                         | gpu         | tied · 2                             | tied · 5                                                       |
+|                         | cooler      | lead · Corsair TITAN 360 RX (White)  | tied · 4 white AIOs                                            |
+|                         | fan         | tied · 5                             | tied · 5                                                       |
+|                         | motherboard | no_close_match                       | tied · 2                                                       |
+|                         | memory      | —                                    | not_seen                                                       |
+| white-build-glass-front | case        | lead · O11 EVO (White)               | lead · O11 EVO (White)                                         |
+|                         | gpu         | tied · 2                             | tied · 5                                                       |
+|                         | cooler      | lead · Corsair TITAN 360 RX (White)  | tied · 4 white AIOs                                            |
+|                         | fan         | tied · 5                             | tied · 5                                                       |
+|                         | motherboard | no_close_match                       | tied · 2                                                       |
+|                         | memory      | —                                    | not_seen                                                       |
+| black-mesh-tower        | case        | tied · 4                             | tied · 5 (+ LANCOOL 216)                                       |
+|                         | gpu         | tied · 5                             | tied · 5 (+ TUF 5070 Ti)                                       |
+|                         | cooler      | tied · 2 (NH-D15, Peerless Assassin) | **lead · DeepCool AK620 ZERO DARK**                            |
+|                         | fan         | tied · 5                             | tied · 5                                                       |
+|                         | motherboard | no_close_match                       | tied · 5 (the five black boards)                               |
+|                         | memory      | —                                    | tied · 5 black kits                                            |
+
+- **Readings:**
+  - Every "no_close_match" on a motherboard is gone.
+  - Memory now appears whenever the photo look has it.
+  - The black sample's cooler now has a single lead.
+- **The cost:** more same-colour parts mean more ties, and three white "lead" coolers became 4-way ties. The photo cannot tell these parts apart, so none is picked for the user.
+- **Why v4 GPU, cooler and fans stay "no_close_match":** v4 put their colours and the screen pump only into the appearance parameters, not into observations, and the matcher reads observations (memory excepted).
+  - Possible follow-up: also match on the appearance parameters, such as `cooler.pumpStyle` (screen) and `gpu.color`. That could also narrow the white-AIO tie: the Galahad II LCD, HydroShift LCD and Kraken Elite pages name an LCD on the pump, while no pump display is recorded for the TITAN.
 
 ## Rules for entry
 

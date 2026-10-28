@@ -39,15 +39,16 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   );
   await cases.getByText("Why this match").first().click();
   await expect(cases).toContainText("Front panel: glass (manufacturer page, verified 2026-10-26)");
-  await expect(cases.getByText("Other options (1)")).toBeVisible();
+  await expect(cases.getByText("Other options (4)")).toBeVisible();
   // Hovering a part outlines its regions on the photo.
   await cases.hover();
   await expect(page.locator('.v3-evidence-region.active[data-group="case"]').first()).toBeVisible();
   await expect(cases.locator(".v3-equally-likely")).toHaveCount(0);
 
-  // The two white GPUs look the same in the photo: the user picks one.
+  // The white GPUs look the same in the photo: the user picks one.
   const gpus = review.locator('.v3-candidate-set[data-category="gpu"]');
-  await expect(gpus.locator(".v3-equally-likely")).toContainText("2 options equally likely");
+  await expect(gpus.locator(".v3-equally-likely")).toContainText("5 options equally likely");
+  await gpus.getByText("Options (5)").click();
   await gpus
     .locator(".v3-candidate-card", { hasText: "MSI" })
     .getByRole("button", { name: "Use this" })
@@ -64,22 +65,20 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   await expect(caseRow).toContainText("White, matches the photo");
   await expect(changes.locator('tr[data-category="gpu"]')).toContainText("MSI");
   await expect(changes.locator('tr[data-category="gpu"]')).toContainText("Your choice");
+  // The white boards and the white AIOs tie (Step C catalog): nothing is picked by name.
   await expect(changes.locator('tr[data-category="motherboard"]')).toContainText(
-    "Stays unresolved",
+    "2 options equally likely",
   );
-  await expect(changes).toContainText("Incomplete · 3 of 8 slots selected");
+  await expect(changes.locator('tr[data-category="cooler"]')).toContainText(
+    "options equally likely",
+  );
+  await expect(changes).toContainText("Incomplete · 2 of 8 slots selected");
   await expect(changes).toContainText("unknown price, not counted");
   await expect(page).toHaveURL(/\/$/);
 
   // Filled-in rows can be unticked; the user's own choice has no checkbox.
   await expect(changes.locator('tr[data-category="gpu"] input[type=checkbox]')).toHaveCount(0);
-  const coolerRow = changes.locator('tr[data-category="cooler"]');
-  const coolerBox = coolerRow.getByRole("checkbox");
-  await expect(coolerBox).toBeChecked();
-  await coolerBox.uncheck();
-  await expect(coolerRow).toContainText("Top match, not filled in");
-  await expect(coolerRow).toContainText("Not filled in; stays unconfirmed");
-  await expect(changes).toContainText("Incomplete · 2 of 8 slots selected");
+  await expect(changes.locator('tr[data-category="cooler"] input[type=checkbox]')).toHaveCount(0);
   await expect(caseRow.getByRole("checkbox")).toBeChecked();
 
   await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
@@ -98,7 +97,7 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
     "data-color",
     "white",
   );
-  // The unticked cooler stays unconfirmed and is drawn from the photo.
+  // The tied cooler stays unconfirmed and is drawn from the photo.
   await expect(page.locator('.v3-scene-callout[data-scene-slot="cooler"]')).toHaveAttribute(
     "data-look",
     "photo",
@@ -145,7 +144,7 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
 test("a sample that cannot separate the cases shows them as equally likely", async ({ page }) => {
   const review = await loadSample(page, "white-build-sketch.png");
   const cases = review.locator('.v3-candidate-set[data-category="case"]');
-  await expect(cases.locator(".v3-equally-likely")).toContainText("3 options equally likely");
+  await expect(cases.locator(".v3-equally-likely")).toContainText("5 options equally likely");
   await expect(cases.locator(".v3-candidate-card.chosen")).toHaveCount(0);
   await expect(cases.locator(".v3-state-chip")).toHaveText("Choose one");
 
@@ -153,7 +152,23 @@ test("a sample that cannot separate the cases shows them as equally likely", asy
   const caseRow = page
     .getByRole("region", { name: "Suggested parts preview" })
     .locator('tr[data-category="case"]');
-  await expect(caseRow).toContainText("3 options equally likely");
+  await expect(caseRow).toContainText("5 options equally likely");
   await expect(caseRow).toContainText("nothing is picked by name");
   await expect(caseRow).toContainText("Choose one in the review");
+});
+
+test("a filled-in row can be unticked and stays unconfirmed", async ({ page }) => {
+  // Black sample: the all-black DeepCool AK620 ZERO DARK leads the coolers on its own.
+  await loadSample(page, "black-mesh-tower.png");
+  await page.getByRole("button", { name: "Build it in 3D" }).click();
+  const changes = page.getByRole("region", { name: "Suggested parts preview" });
+  const coolerRow = changes.locator('tr[data-category="cooler"]');
+  await expect(coolerRow).toContainText("DeepCool AK620 ZERO DARK");
+  const coolerBox = coolerRow.getByRole("checkbox");
+  await expect(coolerBox).toBeChecked();
+  await expect(changes).toContainText("Incomplete · 1 of 8 slots selected");
+  await coolerBox.uncheck();
+  await expect(coolerRow).toContainText("Top match, not filled in");
+  await expect(coolerRow).toContainText("Not filled in; stays unconfirmed");
+  await expect(changes).toContainText("Incomplete · 0 of 8 slots selected");
 });

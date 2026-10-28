@@ -1,9 +1,16 @@
 import { curatedFans } from "@/data/curatedFans";
 import { caseAppearance, type FrontPanelMaterial } from "@/data/showcaseParts";
 import { v3Catalog } from "@/lib/v3/catalog";
-import type { PartCategory } from "@/types/parts";
+import type { Part, PartCategory } from "@/types/parts";
 
-export const visibleCatalogCategories = ["case", "gpu", "cooler", "fan", "motherboard"] as const;
+export const visibleCatalogCategories = [
+  "case",
+  "gpu",
+  "cooler",
+  "fan",
+  "motherboard",
+  "memory",
+] as const;
 export type VisibleCatalogCategory = (typeof visibleCatalogCategories)[number];
 
 export interface AppearanceProfile {
@@ -27,30 +34,47 @@ export interface AppearanceProfile {
   verifiedAt: string | null;
 }
 
-const allowed = new Set<PartCategory>(visibleCatalogCategories);
+/** The visible category each catalog part category is matched under (memory parts are "ram"). */
+const visibleCategoryOf: Partial<Record<PartCategory, VisibleCatalogCategory>> = {
+  case: "case",
+  gpu: "gpu",
+  cooler: "cooler",
+  motherboard: "motherboard",
+  ram: "memory",
+};
+
+/** Memory lighting: the stated lighting spec, or RGB when the model name says so. */
+function memoryLighting(part: Part) {
+  if (typeof part.specs.lighting === "string") return part.specs.lighting;
+  return /\brgb\b/i.test(part.model) ? "RGB" : null;
+}
 
 const seedProfiles: AppearanceProfile[] = v3Catalog
-  .filter((part) => allowed.has(part.category))
+  .filter((part) => visibleCategoryOf[part.category])
   .map((part) => {
-    // White showcase parts come from manufacturer pages (src/data/showcaseParts.ts).
+    // Showcase and Step C parts come from manufacturer pages (src/data/showcaseParts.ts and
+    // src/data/catalogExpansion.ts).
     const showcase = part.compatibilityTags.includes("white-showcase");
+    const expansion = part.compatibilityTags.includes("maker-sourced");
+    const category = visibleCategoryOf[part.category]!;
     return {
       id: part.id,
       displayName: part.displayName,
-      category: part.category as VisibleCatalogCategory,
+      category,
       color: part.color ?? (typeof part.specs.color === "string" ? part.specs.color : null),
       style: typeof part.specs.style === "string" ? part.specs.style : null,
       coolerType: typeof part.specs.coolerType === "string" ? part.specs.coolerType : null,
-      lighting: null,
+      lighting: category === "memory" ? memoryLighting(part) : null,
       frontPanel: caseAppearance[part.id]?.frontPanel ?? null,
       caseLayout: caseAppearance[part.id]?.layout ?? null,
       appearanceVerifiedAt: caseAppearance[part.id]?.verifiedAt ?? null,
       identityText: `${part.brand} ${part.model}`,
       specFieldCount: Object.keys(part.specs).length,
-      catalogSourceId: `${showcase ? "showcaseParts" : "seedParts"}:${part.id}`,
-      provenance: showcase ? ("manufacturer_page" as const) : ("local_seed_catalog" as const),
-      sourceUrl: showcase ? (part.productUrl ?? null) : null,
-      verifiedAt: showcase ? (part.lastUpdated ?? null) : null,
+      catalogSourceId: `${showcase ? "showcaseParts" : expansion ? "catalogExpansion" : "seedParts"}:${part.id}`,
+      provenance:
+        showcase || expansion ? ("manufacturer_page" as const) : ("local_seed_catalog" as const),
+      sourceUrl: showcase || expansion ? (part.productUrl ?? null) : null,
+      verifiedAt: showcase || expansion ? (part.lastUpdated ?? null) : null,
     };
   });
 

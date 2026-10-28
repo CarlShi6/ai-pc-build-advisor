@@ -268,6 +268,10 @@ export const seedParts: Part[] = [
   createPart({
     id: "mobo-z790-hero",
     category: "motherboard",
+    // Colour from the manufacturer's product photos (checked 2026-10-28); the page text does not say.
+    color: "Black",
+    colorSource: "maker_image",
+    colorSourceUrl: "https://rog.asus.com/motherboards/rog-maximus/rog-maximus-z790-hero-model/",
     brand: "ASUS",
     model: "ROG Maximus Z790 Hero WiFi",
     displayName: "ASUS ROG Maximus Z790 Hero WiFi",
@@ -291,6 +295,10 @@ export const seedParts: Part[] = [
   createPart({
     id: "mobo-b760-aorus",
     category: "motherboard",
+    // Colour from the manufacturer's product photos (checked 2026-10-28); the page text does not say.
+    color: "Black",
+    colorSource: "maker_image",
+    colorSourceUrl: "https://www.gigabyte.com/Motherboard/B760-AORUS-ELITE-AX-rev-1x",
     brand: "Gigabyte",
     model: "B760 AORUS Elite AX",
     displayName: "Gigabyte B760 AORUS Elite AX",
@@ -313,6 +321,11 @@ export const seedParts: Part[] = [
   createPart({
     id: "mobo-x670e-hero",
     category: "motherboard",
+    // Colour from the manufacturer's product photos (checked 2026-10-28); the page text does not say.
+    color: "Black",
+    colorSource: "maker_image",
+    colorSourceUrl:
+      "https://rog.asus.com/motherboards/rog-crosshair/rog-crosshair-x670e-hero-model/",
     brand: "ASUS",
     model: "ROG Crosshair X670E Hero",
     displayName: "ASUS ROG Crosshair X670E Hero",
@@ -335,6 +348,10 @@ export const seedParts: Part[] = [
   createPart({
     id: "mobo-b650-tomahawk",
     category: "motherboard",
+    // Colour from the manufacturer's product photos (checked 2026-10-28); the page text does not say.
+    color: "Black",
+    colorSource: "maker_image",
+    colorSourceUrl: "https://www.msi.com/Motherboard/MAG-B650-TOMAHAWK-WIFI",
     brand: "MSI",
     model: "MAG B650 Tomahawk WiFi",
     displayName: "MSI MAG B650 Tomahawk WiFi",
@@ -358,6 +375,11 @@ export const seedParts: Part[] = [
   createPart({
     id: "mobo-z790-tuf",
     category: "motherboard",
+    // Colour from the manufacturer's product photos (checked 2026-10-28); the page text does not say.
+    color: "Black",
+    colorSource: "maker_image",
+    colorSourceUrl:
+      "https://www.asus.com/motherboards-components/motherboards/tuf-gaming/tuf-gaming-z790-plus-wifi/",
     brand: "ASUS",
     model: "TUF Gaming Z790-Plus WiFi",
     displayName: "ASUS TUF Gaming Z790-Plus WiFi",

@@ -181,6 +181,47 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
   return { score, marking, matchedObservationIds, matchedSignals, observationEvidence };
 }
 
+/**
+ * Memory is read only in the appearance parameters (Step A), never as observations: its colour
+ * and whether the sticks have a light bar. Null when neither is known.
+ */
+export function memoryLook(analysis: Pick<ImageAnalysisResult, "appearance">) {
+  const memory = analysis.appearance?.memory;
+  if (!memory || (memory.color === "unknown" && memory.lightBar === "unknown")) return null;
+  return memory;
+}
+
+type MemoryLook = NonNullable<ReturnType<typeof memoryLook>>;
+
+/**
+ * A memory kit against the photo's memory look: a colour the kit does not come in rules it out;
+ * a matching colour and a light bar on an RGB kit count for it. A missing light bar on an RGB kit
+ * counts neither way (the read has no confidence to rule a kit out on).
+ */
+function scoreMemory(profile: AppearanceProfile, memory: MemoryLook) {
+  const matchedSignals: string[] = [];
+  let score = 0;
+  const seen = colorWords(memory.color);
+  const expected = profile.color ? colorWords(profile.color) : [];
+  if (seen.length && expected.length) {
+    if (!seen.some((color) => expected.includes(color))) return null;
+    score += 1;
+    matchedSignals.push(`Color: ${memory.color} (photo look)`);
+  }
+  if (memory.lightBar === "yes" && profile.lighting) {
+    score += 1;
+    matchedSignals.push(`Light bar: yes (catalog: ${profile.lighting})`);
+  }
+  if (!score) return null;
+  return {
+    score,
+    marking: false,
+    matchedObservationIds: [] as string[],
+    matchedSignals,
+    observationEvidence: [] as string[],
+  };
+}
+
 const absentLabels: Record<string, string> = {
   gpu: "graphics card",
   cooler: "CPU cooler",
@@ -191,10 +232,12 @@ const absentLabels: Record<string, string> = {
 export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateSet[] {
   // Older saved analyses predate `absentParts`.
   const absent = new Set<string>(analysis.absentParts ?? []);
+  const memory = memoryLook(analysis);
   return visibleCatalogCategories
-    .filter(
-      (category) =>
-        absent.has(category) || analysis.observations.some((item) => item.category === category),
+    .filter((category) =>
+      category === "memory"
+        ? !!memory
+        : absent.has(category) || analysis.observations.some((item) => item.category === category),
     )
     .map((category) => {
       const observations = analysis.observations.filter((item) => item.category === category);
@@ -218,7 +261,13 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
           explanation: "The current local catalog has no parts in this visible category.",
         };
       const candidates = profiles
-        .map((profile) => ({ profile, evidence: scoreProfile(profile, observations) }))
+        .map((profile) => ({
+          profile,
+          evidence:
+            category === "memory" && memory
+              ? scoreMemory(profile, memory)
+              : scoreProfile(profile, observations),
+        }))
         .filter(
           (
             item,
@@ -265,9 +314,11 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
         candidates,
         explanation: !candidates.length
           ? "The visible details do not support a match in the current local catalog."
-          : category === "fan"
-            ? "Fans are ranked by visible color and lighting only; a photo cannot tell these models apart. Fans are not one of the eight Build slots, so a chosen fan stays a style note and adds nothing to the Build total."
-            : "Catalog alternatives are ranked by stated visual evidence, not verified identity or purchase value.",
+          : category === "memory"
+            ? "Memory is ranked by the color and light bar read from the photo; a photo cannot tell capacity or speed. Memory is only a candidate until you pick it."
+            : category === "fan"
+              ? "Fans are ranked by visible color and lighting only; a photo cannot tell these models apart. Fans are not one of the eight Build slots, so a chosen fan stays a style note and adds nothing to the Build total."
+              : "Catalog alternatives are ranked by stated visual evidence, not verified identity or purchase value.",
       };
     });
 }

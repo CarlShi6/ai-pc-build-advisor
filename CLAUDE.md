@@ -25,6 +25,10 @@ Read these before starting work. They record where the rebuild stands:
 - 3D geometry is illustrative or reference-reconstructed and never proves physical fit.
 - Manual and 2D flows must keep working without AI or WebGL.
 - Do not invent product identities, specs or prices. For example, catalog fans (`src/data/curatedFans.ts`) come only from manufacturer pages, with a URL and verification date per entry; unclear fields stay `null`.
+- Part colour (decided 2026-10-28): record the source as `colorSource`.
+  - `"maker_text"` when the manufacturer's page or model name states the colour in words.
+  - `"maker_image"` when only the manufacturer's own product photos show it, with `colorSourceUrl` naming the page. The UI then shows "Color from maker photo".
+  - Never take colour from third-party sites or reviews. With neither source, the colour stays unknown.
 - Secrets stay server-only. Never use a `VITE_` prefix for keys.
 - Real image AI was verified live on 2026-10-26 (OpenAI `gpt-4.1-mini`, local dev server only; see demo track slice 9). The user owns the key: it lives in `.env.local` of the main checkout (`C:/Users/carls/projects/ai-pc-build-advisor`), not this worktree. Never read, print, copy or commit it; start the v3 dev server with only `AI_PROVIDER`, `OPENAI_API_KEY`, `AI_PROVIDER_API_KEY` and `AI_PROVIDER_MODEL` exported from that file (plus `IMAGE_AI_MODEL` / `IMAGE_REPLAY_DIR` when needed). Never set or change a provider key yourself. E2E and unit tests keep the keys blank and never call a provider; the dev fixture stays available for keyless runs. `AI_PROVIDER` switches only image recognition; the build advisor chat has its own `ADVISOR_AI_PROVIDER` (default mock). Hosted/production image AI is not verified.
 - Never report a planned or mocked capability as implemented.
