@@ -1,4 +1,5 @@
 import OpenAI from "openai";
+import type { ReasoningEffort } from "openai/resources/shared";
 import { Buffer } from "node:buffer";
 import { getServerConfig } from "@/lib/config.server";
 import {
@@ -82,6 +83,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
     );
   reserveAnalysis();
   const model = config.imageAiModel;
+  const reasoningEffort = config.imageAiReasoningEffort as ReasoningEffort;
   try {
     const cleanBytes = stripImageMetadata(bytes, mime);
     // Reasoning models take longer to answer than the 20 s the default model needs.
@@ -98,7 +100,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
       store: false,
       // A reasoning model spends part of its output budget thinking; give it room, keep it brief.
       max_output_tokens: acceptsTemperature(model) ? 2400 : 8000,
-      ...(!acceptsTemperature(model) && { reasoning: { effort: "low" as const } }),
+      ...(!acceptsTemperature(model) && { reasoning: { effort: reasoningEffort } }),
       input: [
         { role: "system", content: systemPrompt },
         {
@@ -148,6 +150,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
           key: replayKey,
           recordedAt: new Date().toISOString(),
           model,
+          ...(!acceptsTemperature(model) && { reasoningEffort }),
           durationMs: Date.now() - startedAt,
           usage: response.usage
             ? {

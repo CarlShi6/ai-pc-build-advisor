@@ -29,6 +29,8 @@ export function getServerConfig() {
     // Photo analysis model. gpt-5.4 read a real photo far better than gpt-4.1-mini (about 9x the
     // cost per photo); set IMAGE_AI_MODEL=gpt-4.1-mini for the cheaper model.
     imageAiModel: process.env.IMAGE_AI_MODEL || "gpt-5.4",
+    // Reasoning effort for a reasoning image model (gpt-5.x, o-series): none | minimal | low | ...
+    imageAiReasoningEffort: process.env.IMAGE_AI_REASONING_EFFORT || "low",
     priceProvider: process.env.PRICE_PROVIDER,
     bestBuyApiKey: process.env.BEST_BUY_API_KEY,
     persistenceProvider: process.env.PERSISTENCE_PROVIDER,

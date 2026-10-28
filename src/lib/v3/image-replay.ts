@@ -11,6 +11,8 @@ export interface ImageReplay {
   key: string;
   recordedAt: string;
   model: string | null;
+  /** Reasoning effort the model ran at, for reasoning models. */
+  reasoningEffort?: string | null;
   /** How long the provider took to answer, when recorded. */
   durationMs?: number;
   /** Provider token usage for this one analysis, when recorded. */

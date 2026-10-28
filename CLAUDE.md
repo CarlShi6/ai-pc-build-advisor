@@ -113,6 +113,7 @@ Demo track weeks 1–4 are done (see `docs/milestones/DEMO_TRACK_PROGRESS.md`): 
 - Photo analysis defaults to `gpt-5.4` (`IMAGE_AI_MODEL`, server-only). `IMAGE_AI_MODEL=gpt-4.1-mini` is the cheaper option.
 - On the same real photo, gpt-5.4 read the case type, glass, hidden GPU fans and screen pump correctly; mini misread all four.
 - Cost per photo is about $0.04–0.05 for gpt-5.4 (about 4k input and 2.1–2.5k output tokens at $2.50 / $15 per 1M) against about $0.0045 for mini, roughly 9×.
+- Reasoning effort is `IMAGE_AI_REASONING_EFFORT`, default `low`. On the same photo, `none` took 29.8 s against 35.1 s (output 2373 vs 2465 tokens). The appearance fields were unchanged, but the model guesses changed and contradicted the visible text, so the default stays `low` (2026-10-28).
 - gpt-5.4 takes about 35 s, so it gets a 60 s timeout and the analyzing screen shows staged steps with the elapsed time.
 - Reasoning models take no temperature; others use temperature 0.
 - Certain contradictions in the reading are fixed in code (`reconcileAppearance`): only to `unknown`, or a radiator's own fans off the case-fan count. Each fix is shown on the review page as "Adjusted …".
