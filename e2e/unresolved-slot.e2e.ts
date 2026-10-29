@@ -21,6 +21,8 @@ async function photoDraft(page: Page) {
   await exclude.click();
   await page.getByRole("button", { name: "Build it in 3D" }).click();
   const changes = page.getByRole("region", { name: "Suggested parts preview" });
+  // The filled-in cooler is unticked so the Studio starts with nothing selected.
+  await changes.locator('tr[data-category="cooler"]').getByRole("checkbox").uncheck();
   await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
   await expect(page).toHaveURL(/\/studio$/);
   await page.getByRole("button", { name: "2D view" }).click();

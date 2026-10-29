@@ -26,6 +26,15 @@ export interface AppearanceProfile {
   frontPanel: FrontPanelMaterial | null;
   caseLayout: "dual-chamber" | null;
   appearanceVerifiedAt: string | null;
+  /**
+   * Look tags compared with the photo's appearance parameters. Derived only from manufacturer
+   * data already recorded (showcase and Step C parts); null = unknown, including every seed part.
+   */
+  radiatorMm: number | null;
+  /** True when the manufacturer page names a pump display; null when it says nothing. */
+  pumpScreen: true | null;
+  gpuLengthMm: number | null;
+  gpuFanCount: number | null;
   identityText: string;
   specFieldCount: number;
   catalogSourceId: string;
@@ -57,6 +66,9 @@ const seedProfiles: AppearanceProfile[] = v3Catalog
     const showcase = part.compatibilityTags.includes("white-showcase");
     const expansion = part.compatibilityTags.includes("maker-sourced");
     const category = visibleCategoryOf[part.category]!;
+    const maker = showcase || expansion;
+    const makerNumber = (field: string) =>
+      maker && typeof part.specs[field] === "number" ? (part.specs[field] as number) : null;
     return {
       id: part.id,
       displayName: part.displayName,
@@ -68,6 +80,10 @@ const seedProfiles: AppearanceProfile[] = v3Catalog
       frontPanel: caseAppearance[part.id]?.frontPanel ?? null,
       caseLayout: caseAppearance[part.id]?.layout ?? null,
       appearanceVerifiedAt: caseAppearance[part.id]?.verifiedAt ?? null,
+      radiatorMm: category === "cooler" ? makerNumber("radiatorMm") : null,
+      pumpScreen: maker && typeof part.specs.pumpDisplay === "string" ? (true as const) : null,
+      gpuLengthMm: category === "gpu" ? makerNumber("lengthMm") : null,
+      gpuFanCount: category === "gpu" ? makerNumber("fanCount") : null,
       identityText: `${part.brand} ${part.model}`,
       specFieldCount: Object.keys(part.specs).length,
       catalogSourceId: `${showcase ? "showcaseParts" : expansion ? "catalogExpansion" : "seedParts"}:${part.id}`,
@@ -99,6 +115,10 @@ const fanProfiles: AppearanceProfile[] = curatedFans.map((fan) => ({
   frontPanel: null,
   caseLayout: null,
   appearanceVerifiedAt: null,
+  radiatorMm: null,
+  pumpScreen: null,
+  gpuLengthMm: null,
+  gpuFanCount: null,
   identityText: `${fan.brand} ${fan.model} ${fan.partNumber}`,
   specFieldCount: 1 + fanSpecFields.filter((field) => fan[field] !== null).length,
   catalogSourceId: `curatedFans:${fan.id}`,

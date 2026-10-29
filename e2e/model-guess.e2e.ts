@@ -56,9 +56,11 @@ test("real photo: a GPU guess from visible text, not in the catalog, stays a gue
   // The text it read is listed on its own, as a reading that may be wrong.
   await expect(guesses).toContainText("VISIBLE TEXT · AI READ, MAY BE MISREAD");
   await expect(guesses.getByRole("list", { name: "Visible text" })).toContainText("AERO");
-  // Nothing chosen or highlighted from it.
+  // Nothing chosen, and no GPU card highlighted from it.
   await expect(page.locator(".v3-candidate-card.chosen")).toHaveCount(0);
-  await expect(page.locator(".v3-candidate-card.guessed")).toHaveCount(0);
+  await expect(
+    page.locator('.v3-candidate-set[data-category="gpu"] .v3-candidate-card.guessed'),
+  ).toHaveCount(0);
 
   await page.getByRole("button", { name: "Build it in 3D" }).click();
   const changes = page.getByRole("region", { name: "Suggested parts preview" });

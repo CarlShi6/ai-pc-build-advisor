@@ -4,17 +4,17 @@ Stage 2 (deployment prep) started 2026-10-28, after Step C. This file collects w
 
 ## Stage 2 checklist
 
-| #   | Item                                                                                                                                      | Status                         |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------ |
-| 1   | Shorter photo-analysis output (cap observations, drop redundant fields); one run on real-photo-1, compared with v4 on time and key fields | tried, not adopted (see below) |
-| 2   | Global daily analysis cap with a friendly over-cap message (below)                                                                        | open                           |
-| 3   | Abuse limits on Analyze: Cloudflare rate-limiting binding plus Turnstile                                                                  | open                           |
-| 4   | Cloudflare Workers build and `wrangler.jsonc` notes; secrets as Worker secrets only, never `VITE_`                                        | open                           |
-| 5   | Saving: v3 drafts and builds in the browser (localStorage) for the first deployment                                                       | open                           |
-| 6   | Pre-v3 routes return 404 in production; no Stripe                                                                                         | open                           |
-| 7   | Privacy page (photo never stored, metadata stripped, what the provider receives, retention)                                               | open                           |
-| 8   | E2E against a local production preview build                                                                                              | open                           |
-| 9   | Set the OpenAI monthly limit (the user, in the OpenAI dashboard)                                                                          | user                           |
+| #   | Item                                                                                                                                      | Status                      |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
+| 1   | Shorter photo-analysis output (cap observations, drop redundant fields); one run on real-photo-1, compared with v4 on time and key fields | adopted with v7 (see below) |
+| 2   | Global daily analysis cap with a friendly over-cap message (below)                                                                        | open                        |
+| 3   | Abuse limits on Analyze: Cloudflare rate-limiting binding plus Turnstile                                                                  | open                        |
+| 4   | Cloudflare Workers build and `wrangler.jsonc` notes; secrets as Worker secrets only, never `VITE_`                                        | open                        |
+| 5   | Saving: v3 drafts and builds in the browser (localStorage) for the first deployment                                                       | open                        |
+| 6   | Pre-v3 routes return 404 in production; no Stripe                                                                                         | open                        |
+| 7   | Privacy page (photo never stored, metadata stripped, what the provider receives, retention)                                               | open                        |
+| 8   | E2E against a local production preview build                                                                                              | open                        |
+| 9   | Set the OpenAI monthly limit (the user, in the OpenAI dashboard)                                                                          | user                        |
 
 ## Stage 2 must-dos
 
@@ -41,6 +41,22 @@ Stage 2 (deployment prep) started 2026-10-28, after Step C. This file collects w
   - The key fields match and it is 28% faster, but "keep the answer short" also cut the model guesses from four to one. That is the same reason effort `none` was not adopted.
   - The prompt is reverted. The replay is kept as `.v6.json`; the default replay stays v4.
   - **Next try, needing the user's OK for one more run:** the same prompt plus "the limits apply to observations only; give modelGuesses and visibleText as fully as before".
+
+- **Second try, v7 (2026-10-28, effort low, one run, approved by the user).** The v6 limits apply to observations, evidence and the summary only; the prompt adds "Give modelGuesses and visibleText as fully as you would without any length limit."
+
+  |                       | v4                                                         | v6           | v7                                                                            |
+  | --------------------- | ---------------------------------------------------------- | ------------ | ----------------------------------------------------------------------------- |
+  | Time (server)         | 35.1 s                                                     | 25.4 s       | **20.4 s** (−42%)                                                             |
+  | Output tokens         | 2465                                                       | 1493         | **1399** (−43%)                                                               |
+  | Input tokens          | 3999                                                       | 4084         | 4112                                                                          |
+  | Cost                  | about $0.047                                               | about $0.033 | **about $0.031**                                                              |
+  | Observations          | 22                                                         | 12           | 10                                                                            |
+  | Key fields (as above) | dual-chamber / both / unknown / screen / 0,0,3,0,1         | identical    | identical                                                                     |
+  | Model guesses         | 4: MONTECH KING 95, Gigabyte AERO, Galahad II LCD, UNI FAN | 1            | **4**: Phanteks NV5, GIGABYTE AERO, NZXT Kraken Elite 360 RGB, UNI FAN SL-INF |
+  | Visible text          | AERO, GEFORCE RTX, COOLMOON, B612                          | identical    | identical                                                                     |
+
+- **Decision: adopted.** The key fields match, the guess count equals v4's and the time is 42% lower, which meets the agreed test. The prompt keeps the v7 wording and the default replay `<key>.json` is now v7 (v4 stays as `.v4.json`).
+  - The case and cooler guesses name different models than v4 (NV5 for KING 95, Kraken Elite for Galahad II LCD). The agreed test counts guesses only; both are appearance guesses, shown to the user as guesses, and v5 also guessed NV5.
 
 ### Global daily cap on photo analyses (recorded 2026-10-28, not implemented)
 

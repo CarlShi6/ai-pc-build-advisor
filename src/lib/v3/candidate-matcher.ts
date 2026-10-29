@@ -4,6 +4,7 @@ import {
   type AppearanceProfile,
   type VisibleCatalogCategory,
 } from "@/lib/v3/appearance-catalog";
+import type { AppearanceParams, ParamColor } from "@/lib/v3/appearance-params";
 import type { ImageAnalysisResult, VisualObservation } from "@/lib/v3/image-contract";
 
 export interface AppearanceCandidate {
@@ -93,10 +94,148 @@ function frontMaterial(value: string): "glass" | "mesh" | "perforated" | null {
   return null;
 }
 
-function scoreProfile(profile: AppearanceProfile, observations: VisualObservation[]) {
+/** GPU length band as the photo reads it: short is about two fan widths or less, long about three. */
+function lengthBand(mm: number): AppearanceParams["gpu"]["length"] {
+  return mm <= 240 ? "short" : mm < 300 ? "medium" : "long";
+}
+
+/**
+ * The photo's appearance parameters against a profile's recorded look, by the observations'
+ * rule: a known value the manufacturer data contradicts rules the part out, a match counts 1, and
+ * unknown on either side counts neither way. `scored` holds the kinds of fact the observations
+ * already counted, so the same fact is never counted twice.
+ */
+function scoreLook(profile: AppearanceProfile, look: AppearanceParams, scored: Set<string>) {
+  const signals: string[] = [];
+  let ruledOut = false;
+  const add = (kind: string, signal: string) => {
+    if (scored.has(kind)) return;
+    scored.add(kind);
+    signals.push(signal);
+  };
+  const page = profile.appearanceVerifiedAt
+    ? `manufacturer page, verified ${profile.appearanceVerifiedAt}`
+    : "manufacturer page";
+  const color = (value: ParamColor) => {
+    const expected = profile.color ? colorWords(profile.color) : [];
+    if (value === "unknown" || !expected.length) return;
+    if (!colorWords(value).some((item) => expected.includes(item))) ruledOut = true;
+    else add("color", `Color: ${value} (photo look)`);
+  };
+  const mesh = profile.frontPanel === "mesh" || profile.frontPanel === "perforated";
+  switch (profile.category) {
+    case "case": {
+      color(look.case.color);
+      if (look.case.type === "dual-chamber") {
+        if (mesh) ruledOut = true;
+        else if (profile.caseLayout === "dual-chamber")
+          add("layout", `Layout: dual-chamber (photo look; ${page})`);
+      } else if (look.case.type === "mesh-front-mid-tower") {
+        if (profile.frontPanel === "glass" || profile.caseLayout === "dual-chamber")
+          ruledOut = true;
+        else if (mesh) add("front", `Front panel: ${profile.frontPanel} (photo look; ${page})`);
+      }
+      if (look.case.glass === "front" || look.case.glass === "both") {
+        if (mesh) ruledOut = true;
+        else if (profile.frontPanel === "glass")
+          add("front", `Front panel: glass (photo look; ${page})`);
+      } else if (look.case.glass === "none" && profile.frontPanel === "glass") ruledOut = true;
+      break;
+    }
+    case "gpu": {
+      color(look.gpu.color);
+      if (look.gpu.length !== "unknown" && profile.gpuLengthMm !== null) {
+        const band = lengthBand(profile.gpuLengthMm);
+        if (band === look.gpu.length)
+          add("length", `Length: ${band} (photo look; ${page}: ${profile.gpuLengthMm} mm)`);
+        else if (band !== "medium" && look.gpu.length !== "medium") ruledOut = true;
+      }
+      if (look.gpu.fanCount !== "unknown" && profile.gpuFanCount !== null) {
+        if (Number(look.gpu.fanCount) !== profile.gpuFanCount) ruledOut = true;
+        else add("fanCount", `Fans: ${profile.gpuFanCount} (photo look; ${page})`);
+      }
+      break;
+    }
+    case "cooler": {
+      color(look.cooler.color);
+      const air = profile.coolerType === "air";
+      const aio = profile.coolerType === "aio";
+      if (look.cooler.type !== "unknown" && (air || aio)) {
+        if ((look.cooler.type === "aio") !== aio) ruledOut = true;
+        else add("coolerType", `Cooler type: ${profile.coolerType} (photo look)`);
+      }
+      // A radiator or a pump seen in the photo rules out an air cooler.
+      if (look.cooler.radiatorSize !== "unknown") {
+        if (air) ruledOut = true;
+        else if (profile.radiatorMm !== null) {
+          if (Number(look.cooler.radiatorSize) !== profile.radiatorMm) ruledOut = true;
+          else add("radiator", `Radiator: ${profile.radiatorMm} mm (photo look; ${page})`);
+        }
+      }
+      if (look.cooler.pumpStyle !== "unknown") {
+        if (air) ruledOut = true;
+        else if (profile.pumpScreen) {
+          if (look.cooler.pumpStyle !== "screen") ruledOut = true;
+          else add("pump", `Pump screen (photo look; ${page})`);
+        }
+      }
+      break;
+    }
+    case "fan": {
+      const ring = look.fans.ringColor;
+      if (ring !== "unknown" && ring !== "none" && profile.lighting)
+        add("lighting", `Lighting: ${ring} rings (photo look; catalog: ${profile.lighting})`);
+      break;
+    }
+    case "motherboard":
+      color(look.motherboard.color);
+      break;
+  }
+  return ruledOut ? null : signals;
+}
+
+/** True when the appearance parameters show something the matcher compares for this category. */
+export function seenInLook(
+  analysis: Pick<ImageAnalysisResult, "appearance">,
+  category: VisibleCatalogCategory,
+): boolean {
+  const look = analysis.appearance;
+  if (!look) return false;
+  switch (category) {
+    case "case":
+      return [look.case.type, look.case.color, look.case.glass].some((v) => v !== "unknown");
+    case "gpu":
+      return [look.gpu.fanCount, look.gpu.length, look.gpu.color].some((v) => v !== "unknown");
+    case "cooler":
+      return [
+        look.cooler.type,
+        look.cooler.radiatorSize,
+        look.cooler.pumpStyle,
+        look.cooler.color,
+      ].some((v) => v !== "unknown");
+    case "fan":
+      return (
+        (look.fans.ringColor !== "unknown" && look.fans.ringColor !== "none") ||
+        [look.fans.front, look.fans.top, look.fans.side, look.fans.bottom, look.fans.rear].some(
+          (v) => v !== "unknown" && v !== "0",
+        )
+      );
+    case "motherboard":
+      return look.motherboard.color !== "unknown";
+    case "memory":
+      return !!memoryLook(analysis);
+  }
+}
+
+function scoreProfile(
+  profile: AppearanceProfile,
+  observations: VisualObservation[],
+  look?: AppearanceParams,
+) {
   const matchedObservationIds: string[] = [];
   const matchedSignals: string[] = [];
   const observationEvidence: string[] = [];
+  const scored = new Set<string>();
   let marking = false;
   let score = 0;
   for (const item of observations) {
@@ -114,6 +253,7 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
         score += weight;
         matchedObservationIds.push(item.id);
         matchedSignals.push(`Color: ${item.value}`);
+        scored.add("color");
         observationEvidence.push(item.evidence);
       }
     } else if (/front/.test(attribute) && frontMaterial(item.value)) {
@@ -128,6 +268,7 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
       matchedSignals.push(
         `Front panel: ${profile.frontPanel} (manufacturer page, verified ${profile.appearanceVerifiedAt})`,
       );
+      scored.add("front");
       observationEvidence.push(item.evidence);
     } else if (
       /layout|chamber/.test(attribute) &&
@@ -139,6 +280,7 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
       matchedSignals.push(
         `Layout: dual-chamber (manufacturer page, verified ${profile.appearanceVerifiedAt})`,
       );
+      scored.add("layout");
       observationEvidence.push(item.evidence);
     } else if (
       /shape|silhouette|style|panel|layout/.test(attribute) &&
@@ -155,6 +297,7 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
       score += weight;
       matchedObservationIds.push(item.id);
       matchedSignals.push(`Cooler type: ${profile.coolerType}`);
+      scored.add("coolerType");
       observationEvidence.push(item.evidence);
     } else if (
       /lighting|led|rgb|glow/.test(attribute) &&
@@ -164,6 +307,7 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
       score += weight;
       matchedObservationIds.push(item.id);
       matchedSignals.push(`Lighting: ${item.value} (catalog: ${profile.lighting})`);
+      scored.add("lighting");
       observationEvidence.push(item.evidence);
     } else if (
       /brand|logo|model|marking|visible.text|label/.test(attribute) &&
@@ -176,6 +320,12 @@ function scoreProfile(profile: AppearanceProfile, observations: VisualObservatio
       matchedSignals.push(`Visible marking: ${item.value}`);
       observationEvidence.push(item.evidence);
     }
+  }
+  if (look) {
+    const signals = scoreLook(profile, look, scored);
+    if (!signals) return null;
+    score += signals.length;
+    matchedSignals.push(...signals);
   }
   if (!score) return null;
   return { score, marking, matchedObservationIds, matchedSignals, observationEvidence };
@@ -237,7 +387,9 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
     .filter((category) =>
       category === "memory"
         ? !!memory
-        : absent.has(category) || analysis.observations.some((item) => item.category === category),
+        : absent.has(category) ||
+          analysis.observations.some((item) => item.category === category) ||
+          seenInLook(analysis, category),
     )
     .map((category) => {
       const observations = analysis.observations.filter((item) => item.category === category);
@@ -266,7 +418,7 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
           evidence:
             category === "memory" && memory
               ? scoreMemory(profile, memory)
-              : scoreProfile(profile, observations),
+              : scoreProfile(profile, observations, analysis.appearance),
         }))
         .filter(
           (

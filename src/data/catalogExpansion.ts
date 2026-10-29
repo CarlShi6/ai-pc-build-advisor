@@ -9,6 +9,8 @@ import type { Part, PartCategory } from "@/types/parts";
  * Same rules as `showcaseParts.ts`: a field the page did not state is left out; no price means
  * `priceStatus: "unknown"`, never $0; dimensions are quoted exactly as published.
  *
+ * A pump screen (`specs.pumpDisplay`) is recorded only where the page names the display.
+ *
  * Colour: `colorSource` is "maker_text" when the page says it in words (or the model name
  * does), "maker_image" when only the manufacturer's own product photos show it
  * (`colorSourceUrl`). The UI labels the latter "Color from maker photo".
@@ -274,7 +276,13 @@ const sources: ExpansionSource[] = [
     },
     color: "White",
     colorSource: "maker_text",
-    specs: { coolerType: "aio", radiatorMm: 360, tubingLengthMm: 385, color: "White" },
+    specs: {
+      coolerType: "aio",
+      radiatorMm: 360,
+      tubingLengthMm: 385,
+      pumpDisplay: '2.88" IPS LCD',
+      color: "White",
+    },
     notes: ['2.88" IPS LCD on the pump. Fans 123 x 120 x 25mm.'],
   },
   {
@@ -291,7 +299,13 @@ const sources: ExpansionSource[] = [
     },
     color: "Black",
     colorSource: "maker_text",
-    specs: { coolerType: "aio", radiatorMm: 360, tubingLengthMm: 385, color: "Black" },
+    specs: {
+      coolerType: "aio",
+      radiatorMm: 360,
+      tubingLengthMm: 385,
+      pumpDisplay: '2.88" IPS LCD',
+      color: "Black",
+    },
     notes: ['2.88" IPS LCD on the pump. Fans 123 x 120 x 25mm.'],
   },
   {
@@ -306,7 +320,13 @@ const sources: ExpansionSource[] = [
     dimensions: { asPublished: "Radiator 403 x 124.5 x 27mm · Water block 72 x 72 x 59mm" },
     color: "White",
     colorSource: "maker_text",
-    specs: { coolerType: "aio", radiatorMm: 360, tubingLengthMm: 475, color: "White" },
+    specs: {
+      coolerType: "aio",
+      radiatorMm: 360,
+      tubingLengthMm: 475,
+      pumpDisplay: '2.88" IPS LCD',
+      color: "White",
+    },
     notes: ['2.88" IPS LCD (480 × 480). Fans 124 x 120 x 28 mm.'],
   },
   {
@@ -321,7 +341,7 @@ const sources: ExpansionSource[] = [
     dimensions: { asPublished: "Radiator 401 x 120 x 27 mm (L x W x H)" },
     color: "White",
     colorSource: "maker_text",
-    specs: { coolerType: "aio", radiatorMm: 360, color: "White" },
+    specs: { coolerType: "aio", radiatorMm: 360, pumpDisplay: "2.72 in IPS LCD", color: "White" },
     notes: [
       "2.72 in (69 mm) IPS LCD, 640 x 640; pump cap 93.5 mm across.",
       "The store price shown could not be tied to the 360 White option, so the price is unknown.",

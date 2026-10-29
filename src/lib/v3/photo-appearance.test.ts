@@ -60,9 +60,9 @@ describe("Use suggested parts", () => {
     const rows = Object.fromEntries(suggested.changes.map((row) => [row.category, row]));
     expect(rows.case.partName).toBe("Lian Li O11 Dynamic EVO (White)");
     expect(rows.gpu.partName).toMatch(/^MSI .*WHITE$/);
-    // Four white AIOs now fit the photo equally well (Step C), so the cooler waits for the user.
-    expect(rows.cooler.decision).toBe("tie");
-    expect(rows.cooler.partName).toBeNull();
+    // The photo look's round pump cap rules out the white AIOs with a pump screen.
+    expect(rows.cooler.decision).toBe("suggested");
+    expect(rows.cooler.partName).toBe("Corsair iCUE LINK TITAN 360 RX RGB AIO (White)");
     expect(rows.case.appearance).toBe("White, matches the photo");
     expect(rows.fan.price).toBe("Not counted");
     expect(rows.fan.match).toBe("5 options equally likely");
@@ -71,13 +71,14 @@ describe("Use suggested parts", () => {
     expect(rows.motherboard.partName).toBeNull();
     expect(rows.motherboard.appearance).toMatch(/drawn from the photo until then \(White/);
     expect(suggested.total.unknown).toBeGreaterThan(0);
-    expect(suggested.compatibility).toMatch(/^Incomplete · 2 of 8 slots selected/);
+    expect(suggested.compatibility).toMatch(/^Incomplete · 3 of 8 slots selected/);
 
     const draft = confirmImageBuild(suggested.proposal, before);
     expect(slotOccupancy(draft, "case")).toBe("selected");
     expect(slotOccupancy(draft, "gpu")).toBe("selected");
+    expect(slotOccupancy(draft, "cooler")).toBe("selected");
     expect(slotOccupancy(draft, "motherboard")).toBe("unresolved");
-    expect(Object.keys(photoAppearance(draft)).sort()).toEqual(["cooler", "motherboard"]);
+    expect(Object.keys(photoAppearance(draft))).toEqual(["motherboard"]);
     // The confirmed case keeps the photo's fans as an appearance note.
     expect(photoFans(draft)).toMatchObject({ count: 5, color: "white", lightColor: "blue" });
   });

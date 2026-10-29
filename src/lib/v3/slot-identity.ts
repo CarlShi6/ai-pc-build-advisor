@@ -9,7 +9,7 @@ import {
   equallyLikelyCandidates,
   emptyCandidateReview,
   matchVisualCandidates,
-  memoryLook,
+  seenInLook,
   type AppearanceCandidate,
   type CandidateReview,
 } from "@/lib/v3/candidate-matcher";
@@ -58,13 +58,12 @@ export function matchGap(
   review: CandidateReview = emptyCandidateReview(),
 ): MatchGap | null {
   if (analysis.absentParts?.includes(category as never)) return "judged_absent";
-  // Memory is read only in the appearance parameters, never as observations.
+  // Seen as an observation or in the appearance parameters (memory only ever in the latter).
   const visible =
-    category === "memory"
-      ? !!memoryLook(analysis)
-      : analysis.observations.some(
-          (item) => item.category === category && item.visibleInImage && item.origin !== "unknown",
-        );
+    seenInLook(analysis, category) ||
+    analysis.observations.some(
+      (item) => item.category === category && item.visibleInImage && item.origin !== "unknown",
+    );
   if (!visible) return "not_seen";
   const set = candidateSet(analysis, category);
   if (!set || set.status === "no_catalog_coverage") return "no_catalog_category";

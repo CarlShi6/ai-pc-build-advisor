@@ -65,21 +65,23 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   await expect(caseRow).toContainText("White, matches the photo");
   await expect(changes.locator('tr[data-category="gpu"]')).toContainText("MSI");
   await expect(changes.locator('tr[data-category="gpu"]')).toContainText("Your choice");
-  // The white boards and the white AIOs tie (Step C catalog): nothing is picked by name.
+  // The white boards tie (Step C catalog): nothing is picked by name.
   await expect(changes.locator('tr[data-category="motherboard"]')).toContainText(
     "2 options equally likely",
   );
-  await expect(changes.locator('tr[data-category="cooler"]')).toContainText(
-    "options equally likely",
-  );
-  await expect(changes).toContainText("Incomplete · 2 of 8 slots selected");
+  // The photo's round pump cap rules out the white AIOs with a pump screen, so TITAN leads.
+  const coolerRow = changes.locator('tr[data-category="cooler"]');
+  await expect(coolerRow).toContainText("Corsair iCUE LINK TITAN 360 RX RGB AIO (White)");
+  await expect(coolerRow).toContainText("Top match, filled in");
+  await expect(changes).toContainText("Incomplete · 3 of 8 slots selected");
   await expect(changes).toContainText("unknown price, not counted");
   await expect(page).toHaveURL(/\/$/);
 
   // Filled-in rows can be unticked; the user's own choice has no checkbox.
   await expect(changes.locator('tr[data-category="gpu"] input[type=checkbox]')).toHaveCount(0);
-  await expect(changes.locator('tr[data-category="cooler"] input[type=checkbox]')).toHaveCount(0);
   await expect(caseRow.getByRole("checkbox")).toBeChecked();
+  // Untick the cooler: it stays unconfirmed and is drawn from the photo.
+  await coolerRow.getByRole("checkbox").uncheck();
 
   await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
   await expect(page).toHaveURL(/\/studio$/);
@@ -97,7 +99,7 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
     "data-color",
     "white",
   );
-  // The tied cooler stays unconfirmed and is drawn from the photo.
+  // The unticked cooler stays unconfirmed and is drawn from the photo.
   await expect(page.locator('.v3-scene-callout[data-scene-slot="cooler"]')).toHaveAttribute(
     "data-look",
     "photo",

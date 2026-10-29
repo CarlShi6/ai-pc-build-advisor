@@ -43,7 +43,8 @@ describe("why a visible part finds no catalog match", () => {
     // The white sample: white GPUs tie, and so do the two white catalog boards.
     expect(matchGaps(fixture)).toMatchObject({ gpu: "tied", motherboard: "tied" });
     expect(matchGap(redBoard, "motherboard")).toBe("no_close_match");
-    expect(matchGap(fixture, "cooler")).toBe("tied");
+    // Its round pump cap rules out the three AIOs whose maker pages name a pump screen.
+    expect(matchGap(fixture, "cooler")).toBeNull();
     // Black sticks without a light bar: every black kit fits equally well.
     expect(matchGap(createBlackTowerFixture(), "memory")).toBe("tied");
     expect(matchGap({ ...fixture, absentParts: ["gpu"] }, "gpu")).toBe("judged_absent");
