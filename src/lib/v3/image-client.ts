@@ -60,6 +60,8 @@ export async function requestImageAnalysis(
   signal?: AbortSignal,
   /** Dev only: hash of the original photo, so the dev server can save a local replay. */
   replayKey?: string,
+  /** Cloudflare Turnstile token, when the human check is configured. */
+  turnstileToken?: string,
 ): Promise<ImageAnalysisResult> {
   let response: Response;
   try {
@@ -68,6 +70,7 @@ export async function requestImageAnalysis(
       headers: {
         "content-type": image.type,
         ...(replayKey && { "x-aipc-replay-key": replayKey }),
+        ...(turnstileToken && { "x-turnstile-token": turnstileToken }),
       },
       body: image,
       cache: "no-store",

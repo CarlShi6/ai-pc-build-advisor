@@ -25,6 +25,17 @@ import { normalizeRecommendedBuildInput, ValidationError } from "@/lib/validatio
 import { readBoundedImage, ImageInputError } from "@/lib/v3/image-input";
 import { analyzeReferenceImage, ImageAnalysisError } from "@/lib/v3/image-analysis.server";
 import type { ImageAnalyzer } from "@/lib/v3/image-contract";
+import { workerBindings, type WorkerBindings } from "@/lib/v3/cloudflare-env.server";
+import {
+  D1DailyCap,
+  DailyCapError,
+  dailyCapOf,
+  memoryDailyCap,
+  utcDay,
+  type DailyCapStore,
+} from "@/lib/v3/image-daily-cap.server";
+import { verifyTurnstile } from "@/lib/v3/turnstile.server";
+import { getServerConfig } from "@/lib/config.server";
 import {
   imageSessionKey,
   imageSessionLimiter,
@@ -177,6 +188,9 @@ export async function handleInternalApiRequest(
     retailPriceProvider?: RetailPriceProvider;
     imageAnalyzer?: ImageAnalyzer;
     imageLimiter?: ImageSessionLimiter;
+    imageDailyCap?: DailyCapStore | null;
+    workerBindings?: WorkerBindings | null;
+    turnstileFetch?: typeof fetch;
   } = {},
 ): Promise<Response | null> {
   const url = new URL(request.url);
@@ -196,8 +210,33 @@ export async function handleInternalApiRequest(
       const headers: Record<string, string> = { "cache-control": "no-store" };
       if (setCookie) headers["set-cookie"] = setCookie;
       let release: (() => void) | undefined;
+      let releaseDay: (() => Promise<void>) | undefined;
       try {
+        const config = getServerConfig();
+        const bindings =
+          "workerBindings" in dependencies ? dependencies.workerBindings : await workerBindings();
+        await verifyTurnstile(request, config.turnstileSecretKey, dependencies.turnstileFetch);
+        // The platform limit is shared by every isolate; the in-memory one is the fallback.
+        if (
+          bindings?.IMAGE_RATE_LIMITER &&
+          !(await bindings.IMAGE_RATE_LIMITER.limit({ key })).success
+        )
+          throw new ImageSessionLimitError(60);
         release = (dependencies.imageLimiter ?? imageSessionLimiter).reserve(key);
+        // In production the daily cap needs the shared D1 store; without it, analysis stays off.
+        const capStore =
+          "imageDailyCap" in dependencies
+            ? dependencies.imageDailyCap
+            : bindings?.IMAGE_CAP_DB
+              ? new D1DailyCap(bindings.IMAGE_CAP_DB)
+              : import.meta.env.PROD
+                ? null
+                : memoryDailyCap;
+        if (!capStore) throw new DailyCapError("DAILY_CAP_UNAVAILABLE");
+        const day = utcDay();
+        if (!(await capStore.reserve(day, dailyCapOf(config.imageAnalysisDailyCap))))
+          throw new DailyCapError("DAILY_CAP_REACHED");
+        releaseDay = () => capStore.release(day);
         // Dev only: the client names the original photo so the response can be saved as a replay.
         const replayKey = import.meta.env.DEV
           ? (request.headers.get("x-aipc-replay-key") ?? undefined)
@@ -210,7 +249,12 @@ export async function handleInternalApiRequest(
       } catch (error) {
         if (!(error instanceof ImageAnalysisError)) throw error;
         // Requests that never reached the provider don't use up the session's allowance.
-        if (error.code === "IMAGE_AI_NOT_CONFIGURED" || error.code === "RATE_LIMITED") release?.();
+        if (error.code === "IMAGE_AI_NOT_CONFIGURED" || error.code === "RATE_LIMITED") {
+          release?.();
+          await releaseDay?.();
+        }
+        // A request stopped before the provider never counts against the session either.
+        if (error instanceof DailyCapError) release?.();
         if (error instanceof ImageSessionLimitError)
           headers["retry-after"] = String(error.retryAfterSeconds);
         return jsonResponse(

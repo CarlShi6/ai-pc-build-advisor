@@ -4384,6 +4384,48 @@
   font-size: 13px;
   margin: 0;
 }
+/* Photo reading paused (daily cap): a calm notice with the other ways to start. */
+.v3-paused {
+  display: grid;
+  gap: 6px;
+  padding: 12px 14px;
+  border: 1px solid var(--g-line);
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--g-accent) 10%, transparent);
+  font-size: 13px;
+  line-height: 1.55;
+}
+.v3-paused p {
+  margin: 0;
+}
+.v3-paused a {
+  color: var(--g-accent);
+  font-weight: 600;
+}
+.v3-turnstile {
+  min-height: 65px;
+}
+.v3-privacy-page section {
+  max-width: 46rem;
+  margin: 0 auto 22px;
+}
+.v3-privacy-page h2 {
+  font-size: 17px;
+  margin: 0 0 8px;
+}
+.v3-privacy-page ul {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+  color: var(--g-text-muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.v3-privacy-page a,
+.v3-footer a {
+  color: var(--g-accent);
+}
 .v3-blank-message {
   padding: 23px;
   background: color-mix(in srgb, var(--g-accent) 16%, transparent);

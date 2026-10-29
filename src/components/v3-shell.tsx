@@ -39,6 +39,7 @@ export function V3Shell({ children }: { children: ReactNode }) {
       <footer className="v3-footer">
         <span>AIPC v3 preview</span>
         <span>Part fit and prices require source checks before purchase.</span>
+        <Link to="/privacy">Privacy</Link>
       </footer>
     </div>
   );

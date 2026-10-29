@@ -3,6 +3,7 @@ import "./lib/error-capture";
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleInternalApiRequest } from "./lib/api-router";
+import { hiddenInProduction, notFoundResponse } from "./lib/production-surface";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -41,6 +42,10 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
+      // The first deployment serves the v3 app only (src/lib/production-surface.ts).
+      const { pathname } = new URL(request.url);
+      if (import.meta.env.PROD && hiddenInProduction(pathname)) return notFoundResponse(pathname);
+
       const apiResponse = await handleInternalApiRequest(request);
 
       if (apiResponse) {

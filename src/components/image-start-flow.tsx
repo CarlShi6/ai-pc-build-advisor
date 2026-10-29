@@ -1,4 +1,4 @@
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { AlertCircle, ImageUp } from "lucide-react";
 import { ImageCandidateReview } from "@/components/image-candidate-review";
@@ -25,6 +25,13 @@ import {
 } from "@/lib/v3/appearance-params";
 import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import { inspectImage } from "@/lib/v3/image-input";
+import { TurnstileCheck } from "@/components/turnstile-check";
+
+/** Public Turnstile site key; when set, Analyze waits for the human check. */
+const turnstileSiteKey: string | undefined = import.meta.env.VITE_TURNSTILE_SITE_KEY;
+
+/** Error codes for "photo reading is off": the daily cap or no shared cap store. */
+const pausedCodes = ["DAILY_CAP_REACHED", "DAILY_CAP_UNAVAILABLE"];
 
 /** Dev-only sample files with a keyless fixture analysis (`src/lib/v3/dev-image-fixture.ts`). */
 const devFixtureNames = [
@@ -56,6 +63,11 @@ export function ImageStartFlow({
     "idle" | "preparing" | "analyzing" | "ready" | "error"
   >("idle");
   const [analysisError, setAnalysisError] = useState("");
+  const [analysisErrorCode, setAnalysisErrorCode] = useState("");
+  const paused = analysisState === "error" && pausedCodes.includes(analysisErrorCode);
+  // Turnstile: a fresh token per Analyze, when the human check is configured.
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
   const [reviews, setReviews] = useState<ImageReviews>({});
   // Step A: the look as the user corrects it (null until the analysis has one), and which fields.
   const [appearance, setAppearance] = useState<AppearanceParams | null>(null);
@@ -109,6 +121,7 @@ export function ImageStartFlow({
     showAnalysis(null);
     setAnalysisState("idle");
     setAnalysisError("");
+    setAnalysisErrorCode("");
     setReviews({});
     setSuggested(null);
     setImageError("");
@@ -145,6 +158,7 @@ export function ImageStartFlow({
     setReviews({});
     setSuggested(null);
     setAnalysisError("");
+    setAnalysisErrorCode("");
     setAnalysisState("preparing");
     funnel.imageSubmitted({ fixture: false });
     try {
@@ -155,6 +169,7 @@ export function ImageStartFlow({
         prepared,
         controller.signal,
         import.meta.env.DEV ? (replayKey ?? undefined) : undefined,
+        turnstileToken ?? undefined,
       );
       if (requestId !== requestNumber.current) return;
       showAnalysis(result);
@@ -162,16 +177,18 @@ export function ImageStartFlow({
       funnel.imageAnalysisCompleted(result);
     } catch (caught) {
       if (requestId !== requestNumber.current) return;
-      funnel.imageAnalysisFailed(
-        { fixture: false },
+      const code =
         caught && typeof caught === "object" && "code" in caught && typeof caught.code === "string"
           ? caught.code
-          : "UNKNOWN",
-      );
+          : "UNKNOWN";
+      funnel.imageAnalysisFailed({ fixture: false }, code);
+      setAnalysisErrorCode(code);
       setAnalysisError(
         caught instanceof Error ? caught.message : "Image analysis failed. Try again.",
       );
       setAnalysisState("error");
+    } finally {
+      if (turnstileSiteKey) setTurnstileReset((count) => count + 1);
     }
   }
 
@@ -191,6 +208,7 @@ export function ImageStartFlow({
     setAnalysisState("ready");
     funnel.imageAnalysisCompleted(fixture);
     setAnalysisError("");
+    setAnalysisErrorCode("");
     setReviews({});
     setSuggested(null);
   }
@@ -297,7 +315,12 @@ export function ImageStartFlow({
             type="button"
             className={variant === "hero" ? "v3-primary" : "v3-secondary"}
             onClick={() => void analyzeImage()}
-            disabled={analysisState === "preparing" || analysisState === "analyzing"}
+            disabled={
+              analysisState === "preparing" ||
+              analysisState === "analyzing" ||
+              paused ||
+              (!!turnstileSiteKey && !turnstileToken)
+            }
           >
             {analysisState === "error" ? "Retry analysis" : "Analyze image"}
           </button>
@@ -321,10 +344,34 @@ export function ImageStartFlow({
         </p>
       )}
       {analysisState === "analyzing" && <AnalysisWait />}
-      {analysisState === "error" && (
-        <p className="v3-error" role="alert">
-          {analysisError} You can retry or continue manually.
-        </p>
+      {file && turnstileSiteKey && !paused && (
+        <TurnstileCheck
+          siteKey={turnstileSiteKey}
+          resetKey={turnstileReset}
+          onToken={setTurnstileToken}
+        />
+      )}
+      {paused ? (
+        <div className="v3-paused" role="status" aria-label="Photo reading paused">
+          <p>{analysisError}</p>
+          <p>
+            You can still start without a photo:{" "}
+            <Link to="/start/$mode" params={{ mode: "describe" }}>
+              Describe your dream PC
+            </Link>{" "}
+            or{" "}
+            <Link to="/start/$mode" params={{ mode: "blank" }}>
+              Start from scratch (manual)
+            </Link>
+            .
+          </p>
+        </div>
+      ) : (
+        analysisState === "error" && (
+          <p className="v3-error" role="alert">
+            {analysisError} You can retry or continue manually.
+          </p>
+        )
       )}
       {analysis && (
         <div className="v3-review-layout">
@@ -443,7 +490,7 @@ function PrivacyNotes() {
         file name. The copy is sent with OpenAI response storage turned off; OpenAI's own data
         policies still apply. Only the text findings stay in this tab's draft, and they are kept
         with the build if you save it. Each browser session can run 3 analyses per minute and 15 per
-        day.
+        day. <Link to="/privacy">Privacy details</Link>
       </p>
     </>
   );

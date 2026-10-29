@@ -3,6 +3,7 @@ import {
   Outlet,
   Link,
   createRootRouteWithContext,
+  notFound,
   useRouter,
   HeadContent,
   Scripts,
@@ -11,6 +12,7 @@ import { useEffect, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { isLegacyPage } from "../lib/production-surface";
 
 function NotFoundComponent() {
   return (
@@ -73,6 +75,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // Production serves the v3 app only; client-side links to a pre-v3 page show Not found too.
+  beforeLoad: ({ location }) => {
+    if (import.meta.env.PROD && isLegacyPage(location.pathname)) throw notFound();
+  },
   head: () => ({
     meta: [
       { charSet: "utf-8" },

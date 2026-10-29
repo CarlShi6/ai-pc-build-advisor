@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, FolderOpen, Trash2 } from "lucide-react";
 import { V3Shell } from "@/components/v3-shell";
-import { deleteSavedBuild, getSavedBuild, getSavedBuilds } from "@/lib/apiClient";
+import { buildsInBrowser, savedBuilds } from "@/lib/v3/build-store";
 import { fromSavedBuild } from "@/lib/v3/build-document";
 import { readDraft, writeDraft } from "@/lib/v3/draft-session";
 import type { SavedBuildSummary } from "@/types/build";
@@ -20,7 +20,8 @@ function MyBuildsPage() {
   const [notice, setNotice] = useState("");
   useEffect(() => {
     let active = true;
-    void getSavedBuilds()
+    void savedBuilds
+      .list()
       .then((result) => {
         if (active) setBuilds(result.builds);
       })
@@ -39,7 +40,7 @@ function MyBuildsPage() {
     setOpening(id);
     setError("");
     try {
-      const saved = await getSavedBuild(id);
+      const saved = await savedBuilds.get(id);
       const document = fromSavedBuild(saved);
       if (!document) throw new Error("This saved build could not be read.");
       writeDraft(document);
@@ -54,7 +55,7 @@ function MyBuildsPage() {
     setDeleting(id);
     setError("");
     try {
-      const result = await deleteSavedBuild(id);
+      const result = await savedBuilds.remove(id);
       setBuilds(result.builds);
       // A draft open in this tab stops pointing at the deleted save, so saving it creates a new one.
       const draft = readDraft();
@@ -78,6 +79,12 @@ function MyBuildsPage() {
           <span className="v3-kicker">YOUR WORK</span>
           <h1>My Builds</h1>
           <p>Open a saved build in the Build Studio.</p>
+          {buildsInBrowser && (
+            <p className="v3-inline-note" aria-label="Where builds are saved">
+              Saved builds stay in this browser only: another browser or device won't see them, and
+              clearing this site's data deletes them.
+            </p>
+          )}
         </div>
         {loading && <p className="v3-inline-note">Loading saved builds…</p>}
         {notice && (

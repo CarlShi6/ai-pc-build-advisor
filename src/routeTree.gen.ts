@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as StudioRouteImport } from './routes/studio'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as MyBuildsRouteImport } from './routes/my-builds'
 import { Route as LegacyWorkspaceRouteImport } from './routes/legacy-workspace'
 import { Route as DashboardRouteImport } from './routes/dashboard'
@@ -25,6 +26,11 @@ import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
 const StudioRoute = StudioRouteImport.update({
   id: '/studio',
   path: '/studio',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MyBuildsRoute = MyBuildsRouteImport.update({
@@ -92,6 +98,7 @@ export interface FileRoutesByFullPath {
   '/dashboard': typeof DashboardRoute
   '/legacy-workspace': typeof LegacyWorkspaceRoute
   '/my-builds': typeof MyBuildsRoute
+  '/privacy': typeof PrivacyRoute
   '/studio': typeof StudioRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -106,6 +113,7 @@ export interface FileRoutesByTo {
   '/dashboard': typeof DashboardRoute
   '/legacy-workspace': typeof LegacyWorkspaceRoute
   '/my-builds': typeof MyBuildsRoute
+  '/privacy': typeof PrivacyRoute
   '/studio': typeof StudioRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -121,6 +129,7 @@ export interface FileRoutesById {
   '/dashboard': typeof DashboardRoute
   '/legacy-workspace': typeof LegacyWorkspaceRoute
   '/my-builds': typeof MyBuildsRoute
+  '/privacy': typeof PrivacyRoute
   '/studio': typeof StudioRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
@@ -137,6 +146,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/legacy-workspace'
     | '/my-builds'
+    | '/privacy'
     | '/studio'
     | '/checkout/cancel'
     | '/checkout/success'
@@ -151,6 +161,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/legacy-workspace'
     | '/my-builds'
+    | '/privacy'
     | '/studio'
     | '/checkout/cancel'
     | '/checkout/success'
@@ -165,6 +176,7 @@ export interface FileRouteTypes {
     | '/dashboard'
     | '/legacy-workspace'
     | '/my-builds'
+    | '/privacy'
     | '/studio'
     | '/checkout/cancel'
     | '/checkout/success'
@@ -180,6 +192,7 @@ export interface RootRouteChildren {
   DashboardRoute: typeof DashboardRoute
   LegacyWorkspaceRoute: typeof LegacyWorkspaceRoute
   MyBuildsRoute: typeof MyBuildsRoute
+  PrivacyRoute: typeof PrivacyRoute
   StudioRoute: typeof StudioRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
@@ -193,6 +206,13 @@ declare module '@tanstack/react-router' {
       path: '/studio'
       fullPath: '/studio'
       preLoaderRoute: typeof StudioRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/my-builds': {
@@ -284,6 +304,7 @@ const rootRouteChildren: RootRouteChildren = {
   DashboardRoute: DashboardRoute,
   LegacyWorkspaceRoute: LegacyWorkspaceRoute,
   MyBuildsRoute: MyBuildsRoute,
+  PrivacyRoute: PrivacyRoute,
   StudioRoute: StudioRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,

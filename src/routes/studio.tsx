@@ -33,7 +33,8 @@ import {
   type PartRemovalProposal,
 } from "@/lib/v3/build-proposal";
 import { readDraft, writeDraft } from "@/lib/v3/draft-session";
-import { ApiClientError, getSavedBuild, saveCurrentBuild } from "@/lib/apiClient";
+import { ApiClientError } from "@/lib/apiClient";
+import { savedBuilds } from "@/lib/v3/build-store";
 import { SAVE_CONFLICT_CODE } from "@/lib/persistence/save-version";
 import { funnel } from "@/lib/v3/funnel-analytics";
 import type { Part } from "@/types/parts";
@@ -169,7 +170,7 @@ function StudioPage() {
     setSaveError("");
     setSaveConflict(false);
     try {
-      const response = await saveCurrentBuild({
+      const response = await savedBuilds.save({
         id: current.savedBuildId,
         name: current.build.name,
         build: toSavedBuildPayload(current),
@@ -203,7 +204,7 @@ function StudioPage() {
     if (!current.savedBuildId) return;
     setSaving(true);
     try {
-      const latest = await getSavedBuild(current.savedBuildId);
+      const latest = await savedBuilds.get(current.savedBuildId);
       if (keep === "this_tab") {
         setSaving(false);
         await saveDraft({ ...current, savedVersion: latest.updatedAt });

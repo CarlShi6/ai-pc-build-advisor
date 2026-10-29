@@ -31,6 +31,10 @@ export function getServerConfig() {
     imageAiModel: process.env.IMAGE_AI_MODEL || "gpt-5.4",
     // Reasoning effort for a reasoning image model (gpt-5.x, o-series): none | minimal | low | ...
     imageAiReasoningEffort: process.env.IMAGE_AI_REASONING_EFFORT || "low",
+    // Global photo analyses per UTC day (default 100); counted in the IMAGE_CAP_DB D1 binding.
+    imageAnalysisDailyCap: process.env.IMAGE_ANALYSIS_DAILY_CAP,
+    // Cloudflare Turnstile secret; when set, Analyze needs a passed human check.
+    turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY,
     priceProvider: process.env.PRICE_PROVIDER,
     bestBuyApiKey: process.env.BEST_BUY_API_KEY,
     persistenceProvider: process.env.PERSISTENCE_PROVIDER,

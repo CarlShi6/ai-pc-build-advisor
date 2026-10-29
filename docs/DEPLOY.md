@@ -4,17 +4,47 @@ Stage 2 (deployment prep) started 2026-10-28, after Step C. This file collects w
 
 ## Stage 2 checklist
 
-| #   | Item                                                                                                                                      | Status                      |
-| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | --------------------------- |
-| 1   | Shorter photo-analysis output (cap observations, drop redundant fields); one run on real-photo-1, compared with v4 on time and key fields | adopted with v7 (see below) |
-| 2   | Global daily analysis cap with a friendly over-cap message (below)                                                                        | open                        |
-| 3   | Abuse limits on Analyze: Cloudflare rate-limiting binding plus Turnstile                                                                  | open                        |
-| 4   | Cloudflare Workers build and `wrangler.jsonc` notes; secrets as Worker secrets only, never `VITE_`                                        | open                        |
-| 5   | Saving: v3 drafts and builds in the browser (localStorage) for the first deployment                                                       | open                        |
-| 6   | Pre-v3 routes return 404 in production; no Stripe                                                                                         | open                        |
-| 7   | Privacy page (photo never stored, metadata stripped, what the provider receives, retention)                                               | open                        |
-| 8   | E2E against a local production preview build                                                                                              | open                        |
-| 9   | Set the OpenAI monthly limit (the user, in the OpenAI dashboard)                                                                          | user                        |
+| #   | Item                                                                                                                                      | Status                           |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
+| 1   | Shorter photo-analysis output (cap observations, drop redundant fields); one run on real-photo-1, compared with v4 on time and key fields | adopted with v7 (see below)      |
+| 2   | Global daily analysis cap with a friendly over-cap message (below)                                                                        | prepared (code, tests)           |
+| 3   | Abuse limits on Analyze: Cloudflare rate-limiting binding plus Turnstile                                                                  | prepared (code, tests)           |
+| 4   | Cloudflare Workers build and `wrangler.jsonc` notes; secrets as Worker secrets only, never `VITE_`                                        | prepared (config, runbook below) |
+| 5   | Saving: v3 drafts and builds in the browser (localStorage) for the first deployment                                                       | prepared (code, tests)           |
+| 6   | Pre-v3 routes return 404 in production; no Stripe                                                                                         | prepared (code, tests)           |
+| 7   | Privacy page (photo never stored, metadata stripped, what the provider receives, retention)                                               | prepared (/privacy)              |
+| 8   | E2E against a local production preview build                                                                                              | prepared (4 tests pass locally)  |
+| 9   | Set the OpenAI monthly limit (the user, in the OpenAI dashboard)                                                                          | user                             |
+
+## Stage 2 preparation (2026-10-28)
+
+Everything below is prepared and tested locally only. Nothing was deployed and no Cloudflare login was used. The deployment is the user's to run.
+
+| #   | What was built                                                                                                                                                                                                                                                                                                                                                                                                                                | Where                                                                    |
+| --- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| 2   | Global cap per UTC day (`IMAGE_ANALYSIS_DAILY_CAP`, default 100) in a D1 table created on first use. The upsert only increments below the cap, so isolates cannot pass it together. Over the cap: 429 `DAILY_CAP_REACHED` and a calm notice linking to Describe and Start from scratch. In production without the D1 binding, analysis stays off (503 `DAILY_CAP_UNAVAILABLE`). Requests that never reach the provider give their count back. | `image-daily-cap.server.ts`, `api-router.ts`, `image-start-flow.tsx`     |
+| 3   | Rate-limiting binding `IMAGE_RATE_LIMITER` (3 per 60 s per session key) before the in-memory limiter. Turnstile: the widget appears when `VITE_TURNSTILE_SITE_KEY` is set at build time; the server checks the token when `TURNSTILE_SECRET_KEY` is set, and fails closed if Cloudflare's verifier is unreachable.                                                                                                                            | `cloudflare-env.server.ts`, `turnstile.server.ts`, `turnstile-check.tsx` |
+| 4   | `wrangler.jsonc` with vars, the D1 database and the rate limit. `npm run build` writes `.output/server/wrangler.json` (nitro sets main and assets). Bindings reach the code through `cloudflare:workers`.                                                                                                                                                                                                                                     | `wrangler.jsonc`, runbook below                                          |
+| 5   | My Builds in the browser's localStorage in production builds (`VITE_BUILD_STORAGE=local` forces it in dev): same save, open, delete and conflict behaviour, at most 10 builds, and a "this browser only" note. The active draft stays in session storage.                                                                                                                                                                                     | `local-builds.ts`, `build-store.ts`, `studio.tsx`, `my-builds.tsx`       |
+| 6   | Production serves only the v3 pages (/, /start/\*, /studio, /my-builds, /privacy) and three APIs (image analyses, analytics events, Describe's recommendation). Everything else answers 404, including Stripe, sign-in and the legacy workspace; client-side visits to a pre-v3 page show Not found.                                                                                                                                          | `production-surface.ts`, `server.ts`, `__root.tsx`                       |
+| 7   | `/privacy`, linked from the footer and the photo notes. Each statement matches the code (resize to 1600 px, metadata stripped twice, never stored, `store: false`, what analytics hold, localStorage builds, the session cookie, Cloudflare and Google Fonts).                                                                                                                                                                                | `routes/privacy.tsx`                                                     |
+| 8   | `npm run test:e2e:preview`: the production build on `wrangler dev --local` (workerd, local D1 and rate limiting), cap 0 and no provider key. Checks the 404s, the privacy page, the paused notice with D1 behind it, and a build saved, reloaded and deleted in the browser.                                                                                                                                                                  | `playwright.preview.config.ts`, `e2e-preview/`                           |
+
+### Cloudflare Workers runbook (for the user)
+
+1. `npx wrangler login`.
+2. `npx wrangler d1 create aipc-image-cap`; paste the printed `database_id` into `wrangler.jsonc` (it is `REPLACE_WITH_D1_DATABASE_ID` now, so a deploy fails until this is done).
+3. Turnstile (optional but listed for Stage 2): create a widget in the Cloudflare dashboard for the Worker's hostname. Build with `VITE_TURNSTILE_SITE_KEY=<site key>` in the environment; the site key is public.
+4. Secrets, never in `vars` and never `VITE_`: `npx wrangler secret put OPENAI_API_KEY` and, with Turnstile, `npx wrangler secret put TURNSTILE_SECRET_KEY`.
+5. `npm run build`, then `npm run test:e2e:preview` (needs wrangler; `WRANGLER` can name a local copy).
+6. `npx wrangler deploy` from the repository root (it follows `.wrangler/deploy/config.json` to the generated config).
+7. Set the OpenAI monthly budget limit (item 9).
+8. Smoke test on the deployed URL: home, /privacy, one photo analysis, /compare answers 404, and a build saved in My Builds.
+
+Notes:
+
+- The pre-v3 deployment may still hold Worker settings for Supabase, Stripe and Best Buy. Leave `PERSISTENCE_PROVIDER` unset (Analyze otherwise looks up a Supabase session for its rate-limit key), and remove the Stripe and Best Buy secrets if they are no longer needed; no v3 path reads them.
+- `IMAGE_ANALYSIS_DAILY_CAP` can be changed in `wrangler.jsonc` vars; `0` turns photo reading off.
 
 ## Stage 2 must-dos
 
