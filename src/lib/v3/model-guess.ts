@@ -143,7 +143,10 @@ export function catalogMatchesForGuess(
   profiles: AppearanceProfile[] = appearanceProfiles,
 ): AppearanceProfile[] {
   const wanted = modelTokens(guessLabel(guess));
-  if (wanted.size < 2) return [];
+  // After the ignored words, a model word beyond the brand must remain: "be quiet! Pure" names
+  // no model once "Pure" is ignored, so it matches nothing.
+  const brand = modelTokens(guess.brand);
+  if (wanted.size < 2 || ![...wanted].some((token) => !brand.has(token))) return [];
   return profiles.filter((profile) => {
     if (profile.category !== guess.category) return false;
     const have = modelTokens(profile.identityText);

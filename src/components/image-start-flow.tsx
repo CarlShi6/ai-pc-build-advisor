@@ -26,12 +26,23 @@ import {
 import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 import { inspectImage } from "@/lib/v3/image-input";
 import { TurnstileCheck } from "@/components/turnstile-check";
+import { shortFileName } from "@/lib/v3/file-name";
 
 /** Public Turnstile site key; when set, Analyze waits for the human check. */
 const turnstileSiteKey: string | undefined = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
-/** Error codes for "photo reading is off": the daily cap or no shared cap store. */
-const pausedCodes = ["DAILY_CAP_REACHED", "DAILY_CAP_UNAVAILABLE"];
+/**
+ * Errors where photo reading is unavailable, so Describe becomes the main way on. "off": a retry
+ * cannot help (not configured, or the daily cap), so Retry is hidden; "later": rate limited, so
+ * Retry stays as a secondary button.
+ */
+const unavailableCodes: Record<string, "off" | "later"> = {
+  IMAGE_AI_NOT_CONFIGURED: "off",
+  DAILY_CAP_REACHED: "off",
+  DAILY_CAP_UNAVAILABLE: "off",
+  SESSION_RATE_LIMITED: "later",
+  RATE_LIMITED: "later",
+};
 
 /** Dev-only sample files with a keyless fixture analysis (`src/lib/v3/dev-image-fixture.ts`). */
 const devFixtureNames = [
@@ -64,7 +75,8 @@ export function ImageStartFlow({
   >("idle");
   const [analysisError, setAnalysisError] = useState("");
   const [analysisErrorCode, setAnalysisErrorCode] = useState("");
-  const paused = analysisState === "error" && pausedCodes.includes(analysisErrorCode);
+  const unavailable =
+    analysisState === "error" ? (unavailableCodes[analysisErrorCode] ?? null) : null;
   // Turnstile: a fresh token per Analyze, when the human check is configured.
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileReset, setTurnstileReset] = useState(0);
@@ -284,9 +296,13 @@ export function ImageStartFlow({
           }}
         />
         <ImageUp size={variant === "hero" ? 38 : 29} strokeWidth={1.5} />
-        <strong>
-          {file ? file.name : variant === "hero" ? "Upload a PC photo" : "Choose a PC photo"}
-        </strong>
+        {file ? (
+          <span className="v3-upload-file" title={file.name}>
+            {shortFileName(file.name)}
+          </span>
+        ) : (
+          <strong>{variant === "hero" ? "Upload a PC photo" : "Choose a PC photo"}</strong>
+        )}
         <span>
           {variant === "hero"
             ? "Drop a photo here or click to choose · JPEG, PNG or WebP · up to 10 MB"
@@ -311,19 +327,20 @@ export function ImageStartFlow({
       )}
       {file && (
         <div className="v3-image-actions">
-          <button
-            type="button"
-            className={variant === "hero" ? "v3-primary" : "v3-secondary"}
-            onClick={() => void analyzeImage()}
-            disabled={
-              analysisState === "preparing" ||
-              analysisState === "analyzing" ||
-              paused ||
-              (!!turnstileSiteKey && !turnstileToken)
-            }
-          >
-            {analysisState === "error" ? "Retry analysis" : "Analyze image"}
-          </button>
+          {unavailable !== "off" && (
+            <button
+              type="button"
+              className={variant === "hero" && !unavailable ? "v3-primary" : "v3-secondary"}
+              onClick={() => void analyzeImage()}
+              disabled={
+                analysisState === "preparing" ||
+                analysisState === "analyzing" ||
+                (!!turnstileSiteKey && !turnstileToken)
+              }
+            >
+              {analysisState === "error" ? "Retry analysis" : "Analyze image"}
+            </button>
+          )}
           <button type="button" className="v3-text-button" onClick={clearImage}>
             Remove image
           </button>
@@ -344,32 +361,31 @@ export function ImageStartFlow({
         </p>
       )}
       {analysisState === "analyzing" && <AnalysisWait />}
-      {file && turnstileSiteKey && !paused && (
+      {file && turnstileSiteKey && unavailable !== "off" && (
         <TurnstileCheck
           siteKey={turnstileSiteKey}
           resetKey={turnstileReset}
           onToken={setTurnstileToken}
         />
       )}
-      {paused ? (
-        <div className="v3-paused" role="status" aria-label="Photo reading paused">
+      {unavailable ? (
+        <div className="v3-paused" role="status" aria-label="Photo reading unavailable">
           <p>{analysisError}</p>
-          <p>
-            You can still start without a photo:{" "}
-            <Link to="/start/$mode" params={{ mode: "describe" }}>
+          <p>You can still start without a photo:</p>
+          <div className="v3-paused-actions">
+            <Link className="v3-primary" to="/start/$mode" params={{ mode: "describe" }}>
               Describe your dream PC
-            </Link>{" "}
-            or{" "}
+            </Link>
             <Link to="/start/$mode" params={{ mode: "blank" }}>
               Start from scratch (manual)
             </Link>
-            .
-          </p>
+          </div>
         </div>
       ) : (
         analysisState === "error" && (
           <p className="v3-error" role="alert">
-            {analysisError} You can retry or continue manually.
+            {analysisError}
+            {/manually/i.test(analysisError) ? "" : " You can also continue manually."}
           </p>
         )
       )}

@@ -46,14 +46,18 @@ test("over the daily cap, Analyze shows the paused notice and the other starts",
   await openReady(page, "/");
   await page.locator("input[type=file]").setInputFiles("e2e/fixtures/white-build-sketch.png");
   await page.getByRole("button", { name: "Analyze image" }).click();
-  const paused = page.getByRole("status", { name: "Photo reading paused" });
+  const paused = page.getByRole("status", { name: "Photo reading unavailable" });
   await expect(paused).toContainText("Photo reading is paused for today");
   await expect(paused.getByRole("link", { name: "Describe your dream PC" })).toHaveAttribute(
     "href",
     "/start/describe",
   );
   await expect(paused.getByRole("link", { name: "Start from scratch (manual)" })).toBeVisible();
-  await expect(page.getByRole("button", { name: "Retry analysis" })).toBeDisabled();
+  // Retrying cannot help today: Retry is hidden and Describe is the main button.
+  await expect(page.getByRole("button", { name: /analy/i })).toHaveCount(0);
+  await expect(paused.getByRole("link", { name: "Describe your dream PC" })).toHaveClass(
+    /v3-primary/,
+  );
   expect(reachedProvider).toBe(false);
 });
 

@@ -17,6 +17,15 @@ test("image analysis unavailable falls back to a manual draft", async ({ page })
   await clickUntil(page.getByRole("button", { name: "Analyze image" }), async () => {
     await expect(page.getByText(/Image analysis is not configured here/)).toBeVisible();
   });
+  // Said once, Retry hidden (it cannot help), and Describe offered as the main way on.
+  const unavailable = page.getByRole("status", { name: "Photo reading unavailable" });
+  await expect(unavailable.locator("p").first()).toHaveText(
+    "Image analysis is not configured here. You can continue manually.",
+  );
+  await expect(page.getByRole("button", { name: /Retry analysis|Analyze image/ })).toHaveCount(0);
+  await expect(unavailable.getByRole("link", { name: "Describe your dream PC" })).toHaveClass(
+    /v3-primary/,
+  );
   await page.getByRole("button", { name: "Continue manually" }).click();
   await expect(page).toHaveURL(/\/studio$/);
   await expect(selectedCount(page)).toHaveText("0 / 8");

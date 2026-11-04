@@ -10,6 +10,7 @@ import { createGlassFrontFixture } from "@/lib/v3/dev-image-fixture";
 import { confirmImageBuild, proposeImageBuild } from "@/lib/v3/image-build";
 import { fromLegacyBuild, toSavedBuildPayload } from "@/lib/v3/build-document";
 import { slotModel } from "@/lib/v3/slot-models";
+import type { AppearanceProfile } from "@/lib/v3/appearance-catalog";
 
 const guess = (patch: Partial<ModelGuess>): ModelGuess => ({
   category: "gpu",
@@ -21,6 +22,30 @@ const guess = (patch: Partial<ModelGuess>): ModelGuess => ({
 });
 
 describe("model guesses (Step B)", () => {
+  it("still needs a model word after ignoring colour names and sizes", () => {
+    // Made-up profiles: two coolers whose names share an ignored word ("Pure").
+    const profile = (id: string, identityText: string) =>
+      ({ id, category: "cooler", identityText }) as AppearanceProfile;
+    const coolers = [
+      profile("rock", "be quiet! Pure Rock 2"),
+      profile("loop", "be quiet! Pure Loop 2 360"),
+      profile("brand-only", "be quiet! Pure"),
+    ];
+    const ids = (brand: string, model: string) =>
+      catalogMatchesForGuess(guess({ category: "cooler", brand, model }), coolers).map(
+        (item) => item.id,
+      );
+    expect(ids("be quiet!", "Pure Rock 2")).toEqual(["rock"]);
+    expect(ids("be quiet!", "Pure Loop 2")).toEqual(["loop"]);
+    expect(ids("be quiet!", "Pure Loop 2 360")).toEqual(["loop"]);
+    // Ignoring "Pure" never lets one model stand for the other.
+    expect(ids("be quiet!", "Pure Rock")).toEqual([]);
+    expect(ids("be quiet!", "Pure Loop")).toEqual([]);
+    // Nothing but the brand is left: no match, not even the brand-only name.
+    expect(ids("be quiet!", "Pure")).toEqual([]);
+    expect(ids("be quiet!", "Snow 360")).toEqual([]);
+  });
+
   it("names a catalog part only when the model words agree, colour and memory aside", () => {
     const ids = (item: ModelGuess) => catalogMatchesForGuess(item).map((part) => part.id);
     // An AERO card is not the Founders Edition with the same GPU.

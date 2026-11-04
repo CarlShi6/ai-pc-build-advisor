@@ -4359,6 +4359,18 @@
   font-size: 12px;
   color: var(--g-text-muted);
 }
+/* The chosen file: small, one line; long names are shortened in the middle (shortFileName). */
+.v3-upload .v3-upload-file,
+.v3-image-flow-hero .v3-upload .v3-upload-file {
+  display: block;
+  max-width: 100%;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--g-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .v3-preview-image {
   max-width: 100%;
   max-height: 340px;
@@ -4398,7 +4410,13 @@
 .v3-paused p {
   margin: 0;
 }
-.v3-paused a {
+.v3-paused-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 16px;
+}
+.v3-paused-actions a:not(.v3-primary) {
   color: var(--g-accent);
   font-weight: 600;
 }
