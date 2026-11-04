@@ -102,3 +102,9 @@ Case ranking on the real-photo replays, before → after:
 
 - The glass-front sample changes the same way (O11 5, then the three at 3). The white sketch and black mesh tower samples are unchanged.
 - NV5 states neither fact, so it stays at 2 and sixth, and the cap of 5 still leaves it out. v7's NV5 guess is therefore still not among the shown cases.
+
+## AI-guessed parts stay among the options (2026-11-04, user decision)
+
+- A catalog part that an AI model guess names is always listed, even past the cap of 5, as long as the photo does not rule it out. It is highlighted "Matches AI guess" and never chosen for the user.
+- Guess matching now ignores colour names in catalog models ("Matte", "Pure", "Snow") and radiator sizes (240/280/360/420), as it already ignored colours and memory sizes. Before, "Phanteks NV5", "MONTECH KING 95" and "Lian Li Galahad II LCD" matched nothing.
+- Effect on the real-photo replays: v5 and v7 now list Phanteks NV5 as a sixth case option. v4's KING 95 and Galahad II LCD (white) guesses, already among the options, are now highlighted. A guessed part the photo rules out (for example the black Galahad II for a white cooler) stays out.

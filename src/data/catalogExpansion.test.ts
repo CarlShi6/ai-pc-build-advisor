@@ -197,3 +197,28 @@ describe("Step C case layout (manufacturer pages, verified 2026-11-04)", () => {
     expect(caseAppearance["maker-case-phanteks-ph-nv523tg-dmw01"].layout).toBeNull();
   });
 });
+
+describe("a part an AI guess names stays among the options", () => {
+  it("is listed past the cap of 5 when the photo fits it, and never chosen", () => {
+    const base = createGlassFrontFixture();
+    const nv5 = "maker-case-phanteks-ph-nv523tg-dmw01";
+    const without = matchVisualCandidates(base).find((set) => set.category === "case")!;
+    expect(without.candidates.map((item) => item.partId)).not.toContain(nv5);
+    const guessed = {
+      ...base,
+      modelGuesses: [
+        {
+          category: "case" as const,
+          brand: "Phanteks",
+          model: "NV5",
+          basis: "appearance" as const,
+          evidence: "dual-chamber shape",
+        },
+      ],
+    };
+    const cases = matchVisualCandidates(guessed).find((set) => set.category === "case")!;
+    expect(cases.candidates).toHaveLength(6);
+    expect(cases.candidates[5].partId).toBe(nv5);
+    expect(suggestParts(guessed, {}, 2500).reviews.case?.chosenPartId).not.toBe(nv5);
+  });
+});

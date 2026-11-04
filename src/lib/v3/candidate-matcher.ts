@@ -6,6 +6,7 @@ import {
 } from "@/lib/v3/appearance-catalog";
 import type { AppearanceParams, ParamColor } from "@/lib/v3/appearance-params";
 import type { ImageAnalysisResult, VisualObservation } from "@/lib/v3/image-contract";
+import { catalogMatchesForGuess } from "@/lib/v3/model-guess";
 
 export interface AppearanceCandidate {
   partId: string;
@@ -383,6 +384,13 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
   // Older saved analyses predate `absentParts`.
   const absent = new Set<string>(analysis.absentParts ?? []);
   const memory = memoryLook(analysis);
+  // Catalog parts an AI model guess names stay listed even past the cap of 5, as long as the
+  // photo does not rule them out, so the guess can be shown among the options. Never chosen.
+  const guessedIds = new Set(
+    (analysis.modelGuesses ?? []).flatMap((guess) =>
+      catalogMatchesForGuess(guess).map((profile) => profile.id),
+    ),
+  );
   return visibleCatalogCategories
     .filter((category) =>
       category === "memory"
@@ -433,7 +441,7 @@ export function matchVisualCandidates(analysis: ImageAnalysisResult): CandidateS
             b.evidence.score - a.evidence.score ||
             a.profile.displayName.localeCompare(b.profile.displayName),
         )
-        .slice(0, 5)
+        .filter((item, index) => index < 5 || guessedIds.has(item.profile.id))
         .map(
           ({ profile, evidence }, index): AppearanceCandidate => ({
             partId: profile.id,

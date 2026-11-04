@@ -33,6 +33,16 @@ describe("model guesses (Step B)", () => {
     expect(
       ids(guess({ brand: "MSI", model: "GeForce RTX 5070 Ti Gaming Trio OC White" })),
     ).toHaveLength(1);
+    // Colour names and radiator sizes in catalog names do not block a match.
+    expect(ids(guess({ category: "case", brand: "Phanteks", model: "NV5" }))).toEqual([
+      "maker-case-phanteks-ph-nv523tg-dmw01",
+    ]);
+    expect(ids(guess({ category: "case", brand: "MONTECH", model: "KING 95" }))).toEqual([
+      "maker-case-montech-king-95-white",
+    ]);
+    expect(
+      ids(guess({ category: "cooler", brand: "Lian Li", model: "Galahad II LCD" })).sort(),
+    ).toEqual(["maker-cooler-lianli-ga2alcd36b", "maker-cooler-lianli-ga2alcd36w"]);
     // The wrong category, or a vague series, never matches.
     expect(ids(guess({ category: "gpu", brand: "Lian Li", model: "O11 Dynamic EVO" }))).toEqual([]);
     expect(ids(guess({ category: "fan", brand: "Lian Li", model: "UNI FAN series" }))).toEqual([]);

@@ -101,11 +101,15 @@ export function cleanVisibleText(items: VisibleText[]): VisibleText[] {
 export const guessLabel = (guess: ModelGuess) =>
   [guess.brand, guess.model].filter((part) => part.trim()).join(" ");
 
-// Words that say nothing about which model it is: colours, editions, sizes.
+// Words that say nothing about which model it is: colours and colour names, editions, sizes.
 const filler = new Set([
   "white",
   "black",
   "silver",
+  // Colour names in catalog models: "Matte White" (NV5), "Pure White" (KING 95), "Snow White" (Y60).
+  "matte",
+  "pure",
+  "snow",
   "edition",
   "single",
   "pack",
@@ -122,7 +126,9 @@ const filler = new Set([
 function modelTokens(value: string) {
   return new Set(
     (value.toLowerCase().match(/[a-z0-9]+/g) ?? []).filter(
-      (token) => !filler.has(token) && !/^\d+(gb?|mm)$/.test(token),
+      // Memory sizes, and radiator sizes ("Galahad II LCD" names the 360 version too).
+      (token) =>
+        !filler.has(token) && !/^\d+(gb?|mm)$/.test(token) && !/^(240|280|360|420)$/.test(token),
     ),
   );
 }
