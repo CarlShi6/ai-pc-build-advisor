@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { expansionParts } from "@/data/catalogExpansion";
 import { seedParts } from "@/data/seedParts";
+import { caseAppearance } from "@/data/showcaseParts";
 import { unknownAppearance, type AppearanceParams } from "@/lib/v3/appearance-params";
 import {
   chooseCandidate,
@@ -175,5 +176,24 @@ describe("appearance parameters against recorded manufacturer data", () => {
     const signals = set.candidates[0].matchedSignals;
     expect(signals.filter((item) => item.startsWith("Front panel")).length).toBe(1);
     expect(signals.filter((item) => item.startsWith("Color")).length).toBe(1);
+  });
+});
+
+describe("Step C case layout (manufacturer pages, verified 2026-11-04)", () => {
+  it("ranks the dual-chamber cases its pages name right behind the O11", () => {
+    for (const id of Object.keys(caseAppearance))
+      expect(v3Catalog.some((part) => part.id === id)).toBe(true);
+    const cases = matchVisualCandidates(createGlassFrontFixture()).find(
+      (set) => set.category === "case",
+    )!;
+    const names = cases.candidates.map((item) => item.displayName);
+    expect(names.slice(1, 4).sort()).toEqual([
+      "HYTE Y60 (Snow White)",
+      "MONTECH KING 95 (Pure White)",
+      "NZXT H9 Flow (White)",
+    ]);
+    // KING 95 ships with a glass and a mesh front, so the front stays unknown.
+    expect(caseAppearance["maker-case-montech-king-95-white"].frontPanel).toBeNull();
+    expect(caseAppearance["maker-case-phanteks-ph-nv523tg-dmw01"].layout).toBeNull();
   });
 });

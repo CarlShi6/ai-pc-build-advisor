@@ -81,3 +81,24 @@ The candidate matcher now also reads the photo's appearance parameters (Step A),
 - On every real-photo replay the photo's screen pump now narrows the white AIOs to the three with a recorded display (score 4–5). TITAN follows one point behind.
 - The two white samples read a round pump cap, which rules out the three display AIOs, so TITAN leads there.
 - GPUs still tie: every recorded white card is 300 mm or longer, and no card records a fan count.
+
+## Step C case layout (2026-11-04)
+
+Front panel and layout for the four Step C white cases, read from each manufacturer page by the `caseAppearance` rule (a field only when the page names it in words):
+
+| Case            | Front panel                                                                 | Layout                  | Manufacturer wording                                                     |
+| --------------- | --------------------------------------------------------------------------- | ----------------------- | ------------------------------------------------------------------------ |
+| MONTECH KING 95 | unknown (ships with a glass and a mesh panel)                               | dual-chamber            | "Hardware Harmony with Dual Chamber"                                     |
+| Phanteks NV5    | unknown ("Near-seamless glass panels", front not named)                     | unknown (not described) | —                                                                        |
+| NZXT H9 Flow    | unknown (wraparound glass plus mesh and perforated panels, front not named) | dual-chamber            | "Dual-Chamber Design: Separates main components from the PSU and drives" |
+| HYTE Y60        | unknown ("3-piece panoramic tempered glass", front not named)               | dual-chamber            | "Type \| Dual Chamber Mid-Tower ATX Case"                                |
+
+Case ranking on the real-photo replays, before → after:
+
+| Replay | Before                                 | After                                         |
+| ------ | -------------------------------------- | --------------------------------------------- |
+| v4, v7 | O11 5 · 4000D, Y60, KING 95, H9 Flow 2 | O11 5 · **Y60, KING 95, H9 Flow 3** · 4000D 2 |
+| v5, v6 | O11 6 · the same four 2                | O11 6 · **Y60, KING 95, H9 Flow 4** · 4000D 2 |
+
+- The glass-front sample changes the same way (O11 5, then the three at 3). The white sketch and black mesh tower samples are unchanged.
+- NV5 states neither fact, so it stays at 2 and sixth, and the cap of 5 still leaves it out. v7's NV5 guess is therefore still not among the shown cases.

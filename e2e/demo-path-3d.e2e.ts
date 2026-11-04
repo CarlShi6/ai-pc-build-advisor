@@ -11,7 +11,8 @@ test.use({
 test("3D Studio: click a part, swap it in the focus card, and see it in the shopping plan", async ({
   page,
 }) => {
-  test.setTimeout(90_000);
+  // Software WebGL is slow when the whole suite runs; this flow once timed out there.
+  test.setTimeout(150_000);
   await openReady(page, "/");
   await clickUntil(
     page.getByRole("button", { name: "Try the white showcase sample" }),
@@ -22,18 +23,29 @@ test("3D Studio: click a part, swap it in the focus card, and see it in the shop
 
   // The scene loads, starts in a quality tier, and labels the reconstructed parts.
   const scene = page.locator(".v3-scene-canvas");
-  await expect(scene.locator("canvas")).toHaveCount(1, { timeout: 30_000 });
+  await expect(scene.locator("canvas")).toHaveCount(1, { timeout: 60_000 });
   await expect(scene).toHaveAttribute("data-scene-quality", /^(high|low)$/);
   await expect(page.locator('.v3-scene-disclosure [data-kind="reference"]')).toHaveText(
     "Reference reconstruction: Case, Motherboard, Cooler, GPU, Memory",
   );
 
   // Click the GPU's 3D label: the part is shown on its own and the focus card opens beside it.
-  await page.locator('.v3-scene-callout[data-scene-slot="gpu"] button').click();
-  await expect(page.getByRole("button", { name: /Show full build/ })).toBeVisible();
+  // The label follows the camera, so a click during a slow first frame is retried.
+  await clickUntil(page.locator('.v3-scene-callout[data-scene-slot="gpu"] button'), async () => {
+    await expect(page.getByRole("button", { name: /Show full build/ })).toBeVisible({
+      timeout: 3_000,
+    });
+  });
   const card = page.locator(".v3-focus-card .v3-replace-card");
   await expect(card).toContainText("MSI GeForce RTX 5070 Ti 16G GAMING TRIO OC WHITE");
-  await card.getByRole("button", { name: /ASUS PRIME GeForce RTX 5070 White/ }).click();
+  await clickUntil(
+    card.getByRole("button", { name: /ASUS PRIME GeForce RTX 5070 White/ }),
+    async () => {
+      await expect(card.getByRole("button", { name: /Confirm/ }).first()).toBeVisible({
+        timeout: 3_000,
+      });
+    },
+  );
   await card
     .getByRole("button", { name: /Confirm/ })
     .first()

@@ -272,6 +272,7 @@ export interface CaseAppearance {
 }
 
 const APPEARANCE_VERIFIED = "2026-10-26";
+const STEP_C_APPEARANCE_VERIFIED = "2026-11-04";
 
 export const caseAppearance: Record<string, CaseAppearance> = {
   "showcase-case-lianli-o11dew": {
@@ -304,6 +305,47 @@ export const caseAppearance: Record<string, CaseAppearance> = {
     sourceUrl:
       "https://www.corsair.com/us/en/p/pc-cases/cc-9011201-ww/4000d-airflow-tempered-glass-mid-tower-atx-case-white-cc-9011201-ww",
     verifiedAt: APPEARANCE_VERIFIED,
+  },
+  // Step C cases (src/data/catalogExpansion.ts), read on 2026-11-04 by the same rule.
+  "maker-case-montech-king-95-white": {
+    frontPanel: null,
+    layout: "dual-chamber",
+    evidence: [
+      'Front: the case ships with a glass and a mesh panel ("Elegant Glass Mode" and "Turbo Mesh Mode"), so the front can be either and stays unknown.',
+      'Layout: "Hardware Harmony with Dual Chamber".',
+    ],
+    sourceUrl: "https://www.montechpc.com/king-95",
+    verifiedAt: STEP_C_APPEARANCE_VERIFIED,
+  },
+  "maker-case-phanteks-ph-nv523tg-dmw01": {
+    frontPanel: null,
+    layout: null,
+    evidence: [
+      'Front: the page says "Near-seamless glass panels" without naming the front, so it is unknown.',
+      "Layout: the page does not describe a chamber layout, so it is unknown.",
+    ],
+    sourceUrl: "https://phanteks.com/product/nv5-white/",
+    verifiedAt: STEP_C_APPEARANCE_VERIFIED,
+  },
+  "maker-case-nzxt-cm-h92fw-01": {
+    frontPanel: null,
+    layout: "dual-chamber",
+    evidence: [
+      'Front: the page names "wraparound tempered glass paneling" and also mesh and perforated panels, but not which is the front, so it is unknown.',
+      'Layout: "Dual-Chamber Design: Separates main components from the PSU and drives".',
+    ],
+    sourceUrl: "https://nzxt.com/products/h9-flow",
+    verifiedAt: STEP_C_APPEARANCE_VERIFIED,
+  },
+  "maker-case-hyte-cs-hyte-y60-ww": {
+    frontPanel: null,
+    layout: "dual-chamber",
+    evidence: [
+      'Front: the page says "3-piece panoramic tempered glass design" without naming the front, so it is unknown.',
+      'Layout: "Type | Dual Chamber Mid-Tower ATX Case".',
+    ],
+    sourceUrl: "https://hyte.com/store/y60/cs-hyte-y60-ww",
+    verifiedAt: STEP_C_APPEARANCE_VERIFIED,
   },
 };
 
