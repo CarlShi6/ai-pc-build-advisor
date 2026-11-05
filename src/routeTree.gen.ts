@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as StudioRouteImport } from './routes/studio'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as MyBuildsRouteImport } from './routes/my-builds'
@@ -23,6 +24,11 @@ import { Route as StartModeRouteImport } from './routes/start.$mode'
 import { Route as CheckoutSuccessRouteImport } from './routes/checkout.success'
 import { Route as CheckoutCancelRouteImport } from './routes/checkout.cancel'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const StudioRoute = StudioRouteImport.update({
   id: '/studio',
   path: '/studio',
@@ -100,6 +106,7 @@ export interface FileRoutesByFullPath {
   '/my-builds': typeof MyBuildsRoute
   '/privacy': typeof PrivacyRoute
   '/studio': typeof StudioRoute
+  '/terms': typeof TermsRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/start/$mode': typeof StartModeRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/my-builds': typeof MyBuildsRoute
   '/privacy': typeof PrivacyRoute
   '/studio': typeof StudioRoute
+  '/terms': typeof TermsRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/start/$mode': typeof StartModeRoute
@@ -131,6 +139,7 @@ export interface FileRoutesById {
   '/my-builds': typeof MyBuildsRoute
   '/privacy': typeof PrivacyRoute
   '/studio': typeof StudioRoute
+  '/terms': typeof TermsRoute
   '/checkout/cancel': typeof CheckoutCancelRoute
   '/checkout/success': typeof CheckoutSuccessRoute
   '/start/$mode': typeof StartModeRoute
@@ -148,6 +157,7 @@ export interface FileRouteTypes {
     | '/my-builds'
     | '/privacy'
     | '/studio'
+    | '/terms'
     | '/checkout/cancel'
     | '/checkout/success'
     | '/start/$mode'
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/my-builds'
     | '/privacy'
     | '/studio'
+    | '/terms'
     | '/checkout/cancel'
     | '/checkout/success'
     | '/start/$mode'
@@ -178,6 +189,7 @@ export interface FileRouteTypes {
     | '/my-builds'
     | '/privacy'
     | '/studio'
+    | '/terms'
     | '/checkout/cancel'
     | '/checkout/success'
     | '/start/$mode'
@@ -194,6 +206,7 @@ export interface RootRouteChildren {
   MyBuildsRoute: typeof MyBuildsRoute
   PrivacyRoute: typeof PrivacyRoute
   StudioRoute: typeof StudioRoute
+  TermsRoute: typeof TermsRoute
   CheckoutCancelRoute: typeof CheckoutCancelRoute
   CheckoutSuccessRoute: typeof CheckoutSuccessRoute
   StartModeRoute: typeof StartModeRoute
@@ -201,6 +214,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/studio': {
       id: '/studio'
       path: '/studio'
@@ -306,6 +326,7 @@ const rootRouteChildren: RootRouteChildren = {
   MyBuildsRoute: MyBuildsRoute,
   PrivacyRoute: PrivacyRoute,
   StudioRoute: StudioRoute,
+  TermsRoute: TermsRoute,
   CheckoutCancelRoute: CheckoutCancelRoute,
   CheckoutSuccessRoute: CheckoutSuccessRoute,
   StartModeRoute: StartModeRoute,

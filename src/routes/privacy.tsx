@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { ShieldCheck } from "lucide-react";
 import { V3Shell } from "@/components/v3-shell";
+import { externalLinkProps } from "@/lib/v3/external-links";
 
 export const Route = createFileRoute("/privacy")({
   head: () => ({
@@ -39,8 +40,10 @@ function PrivacyPage() {
               server strips any remaining metadata again before the copy goes anywhere.
             </li>
             <li>
-              AIPC never stores the original photo, the resized copy or the file name, on the server
-              or in your browser. The original stays in the open tab only.
+              AIPC never stores the original photo, the resized copy or the file name on the server.
+              The original stays in the open tab only. While the photo is being read, the resized
+              copy is kept in this tab's session storage so the read can run again if the page is
+              reloaded; it is removed as soon as reading ends.
             </li>
           </ul>
         </section>
@@ -49,17 +52,18 @@ function PrivacyPage() {
           <h2 id="privacy-provider">What the analysis provider receives</h2>
           <ul>
             <li>
+              Before the full read, the resized copy goes through two quick checks at OpenAI: its
+              moderation model, which refuses unsafe images, and a small model that answers only
+              whether the photo shows a desktop PC. A photo either check refuses is not read.
+            </li>
+            <li>
               The resized copy and our fixed instructions go to OpenAI's API to read what is
               visible. No name, email, account or file name is sent with it.
             </li>
             <li>
               The request is sent with OpenAI's response storage turned off. OpenAI's own API data
               policies still apply; see{" "}
-              <a
-                href="https://openai.com/policies/privacy-policy/"
-                target="_blank"
-                rel="noreferrer"
-              >
+              <a href="https://openai.com/policies/privacy-policy/" {...externalLinkProps}>
                 OpenAI's privacy policy
               </a>
               .
@@ -90,8 +94,10 @@ function PrivacyPage() {
           <ul>
             <li>
               To limit misuse, Analyze sets a cookie with a random session id (it expires after 24
-              hours) and may show a Cloudflare Turnstile check. The server keeps only a count of
-              analyses per day, with no photo and no identity.
+              hours) and may show a Cloudflare Turnstile check. The server keeps only counts of
+              analyses per day: one in total and one per network, keyed by a one-way hash of the day
+              and your IP address. The address itself is not stored, and counts from earlier days
+              are deleted.
             </li>
             <li>
               The app records product events, such as "analysis completed", with counts and fixed

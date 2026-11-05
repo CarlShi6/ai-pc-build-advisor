@@ -69,7 +69,7 @@ import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
 import { DISCLOSURE_NOTE, sceneDisclosure } from "@/lib/v3/scene-disclosure";
 import { keepSlotUnknown, slotIdentityHelp } from "@/lib/v3/slot-identity";
 import { SlotIdentityPanel } from "@/components/slot-identity-panel";
-import { ReadingStatus } from "@/components/reading-status";
+import { InterruptedReading, ReadingStatus } from "@/components/reading-status";
 import { PhotoMatchDrawer } from "@/components/photo-match-drawer";
 import {
   pendingSlots,
@@ -78,8 +78,16 @@ import {
   stopReading,
   subscribeReading,
 } from "@/lib/v3/live-reading";
-import { analysisOfDraft, matchableCount, matchButtonLabel } from "@/lib/v3/progressive-draft";
+import {
+  analysisOfDraft,
+  endReadingDraft,
+  matchableCount,
+  matchButtonLabel,
+  wasInterrupted,
+} from "@/lib/v3/progressive-draft";
+import { clearReadingRetry } from "@/lib/v3/reading-retry";
 import { renderStyles, type RenderStyle } from "@/lib/v3/scene-diorama";
+import { allowedExternalUrl } from "@/lib/v3/external-links";
 
 const RENDER_STYLE_KEY = "aipc-v3-render-style";
 
@@ -92,12 +100,13 @@ function priceChangeText(delta: number, candidate: Part, current: Part | undefin
 /** A manufacturer page when the catalog has one; otherwise the existing retailer search, labeled as such. */
 function partLinkFor(part: Part | undefined) {
   if (!part) return null;
-  const official = getValidatedOfficialUrl(part);
+  const official = allowedExternalUrl(getValidatedOfficialUrl(part));
   if (official) return { href: official, label: "Manufacturer page" };
-  if (!part.searchUrl) return null;
+  const search = allowedExternalUrl(part.searchUrl);
+  if (!search) return null;
   return {
-    href: part.searchUrl,
-    label: `Search ${new URL(part.searchUrl).hostname.replace(/^www./, "")}`,
+    href: search,
+    label: `Search ${new URL(search).hostname.replace(/^www./, "")}`,
   };
 }
 
@@ -262,6 +271,7 @@ function StudioPage() {
   const live = readingOf(reading, document.imageContext?.analysisId);
   const stillReading = live?.status === "reading";
   const pending = pendingSlots(live);
+  const interrupted = wasInterrupted(document, live);
   const drawerAnalysis = document.imageContext && !stillReading ? analysisOfDraft(document) : null;
   const current = selectedPart(document, selectedSlot);
   const proposal = candidate ? proposePartSelection(document, selectedSlot, candidate) : null;
@@ -368,6 +378,17 @@ function StudioPage() {
           </div>
         </div>
         {live && <ReadingStatus reading={live} onDismissFailure={stopReading} />}
+        {interrupted && (
+          <InterruptedReading
+            document={document}
+            onDismiss={() => {
+              const next = endReadingDraft(document);
+              clearReadingRetry();
+              writeDraft(next);
+              setDocument(next);
+            }}
+          />
+        )}
         {drawerAnalysis && (
           <button
             type="button"

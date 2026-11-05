@@ -5,6 +5,7 @@ import { openReady } from "../e2e/helpers";
 // router), with the local fake provider (fake-provider.mjs, port 8790) behind the worker on 8789.
 // It shows the worker passes events on as they come, not all at the end.
 const STREAM = "http://127.0.0.1:8789";
+const FAKE_PROVIDER = "http://127.0.0.1:8790";
 
 test.beforeAll(async ({ browser }) => {
   test.setTimeout(120_000);
@@ -14,8 +15,9 @@ test.beforeAll(async ({ browser }) => {
   await page.close();
 });
 
-test("the worker streams each part as it is read, then the result", async ({ page }) => {
+test("the worker streams each part as it is read, then the result", async ({ page, request }) => {
   await openReady(page, `${STREAM}/start/image`);
+  await request.get(`${FAKE_PROVIDER}/calls`);
   // Read the stream in the page, noting when each event arrives.
   const arrivals = await page.evaluate(async () => {
     const png = await fetch("/og.png").then((response) => response.blob());
@@ -64,6 +66,10 @@ test("the worker streams each part as it is read, then the result", async ({ pag
   // result later still: nothing was held back until the end.
   expect(at("case") - at("started")).toBeGreaterThan(800);
   expect(at("done") - at("case")).toBeGreaterThan(400);
+  // Moderation and the PC check (run together) both finished before the read began.
+  const calls: string[] = await (await request.get(`${FAKE_PROVIDER}/calls`)).json();
+  expect(calls.slice(0, 2).sort()).toEqual(["moderation", "pc-check"]);
+  expect(calls.slice(2)).toEqual(["read"]);
 });
 
 test("Analyze opens Studio, which fills in part by part", async ({ page }) => {

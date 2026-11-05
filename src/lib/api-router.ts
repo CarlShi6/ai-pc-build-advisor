@@ -28,13 +28,19 @@ import type { ImageAnalyzer } from "@/lib/v3/image-contract";
 import { encodeEvent, NDJSON, type AnalysisStreamEvent } from "@/lib/v3/analysis-stream";
 import { workerBindings, type WorkerBindings } from "@/lib/v3/cloudflare-env.server";
 import {
+  clientIp,
   D1DailyCap,
   DailyCapError,
   dailyCapOf,
+  DEFAULT_IP_DAILY_CAP,
+  IpDailyCapError,
+  ipDayKey,
   memoryDailyCap,
+  memoryIpDailyCap,
   utcDay,
   type DailyCapStore,
 } from "@/lib/v3/image-daily-cap.server";
+import { precheckReferenceImage, type ImagePrecheck } from "@/lib/v3/image-precheck.server";
 import { verifyTurnstile } from "@/lib/v3/turnstile.server";
 import { getServerConfig } from "@/lib/config.server";
 import {
@@ -190,6 +196,9 @@ export async function handleInternalApiRequest(
     imageAnalyzer?: ImageAnalyzer;
     imageLimiter?: ImageSessionLimiter;
     imageDailyCap?: DailyCapStore | null;
+    imageIpDailyCap?: DailyCapStore | null;
+    /** Defaults to the provider prechecks, except with a substituted analyzer (tests, fakes). */
+    imagePrecheck?: ImagePrecheck;
     workerBindings?: WorkerBindings | null;
     turnstileFetch?: typeof fetch;
   } = {},
@@ -205,6 +214,18 @@ export async function handleInternalApiRequest(
   try {
     if (pathname === "/api/image-analyses") {
       if (request.method !== "POST") return methodNotAllowed(["POST"]);
+      // Kill switch: nothing is read, counted or sent while it is on.
+      if (getServerConfig().imageAnalysisPaused)
+        return jsonResponse(
+          {
+            error: {
+              code: "IMAGE_ANALYSIS_PAUSED",
+              message:
+                "Photo reading is paused right now. You can still describe your PC or build it by hand.",
+            },
+          },
+          { status: 503, headers: { "cache-control": "no-store", "retry-after": "3600" } },
+        );
       const image = await readBoundedImage(request);
       const actor = await store.getActor(request);
       const { key, setCookie } = imageSessionKey(request, actor.userId);
@@ -212,6 +233,7 @@ export async function handleInternalApiRequest(
       if (setCookie) headers["set-cookie"] = setCookie;
       let release: (() => void) | undefined;
       let releaseDay: (() => Promise<void>) | undefined;
+      let releaseIp: (() => Promise<void>) | undefined;
       try {
         const config = getServerConfig();
         const bindings =
@@ -235,9 +257,28 @@ export async function handleInternalApiRequest(
                 : memoryDailyCap;
         if (!capStore) throw new DailyCapError("DAILY_CAP_UNAVAILABLE");
         const day = utcDay();
+        // Per client IP, so clearing the session cookie does not reset the count.
+        const ip = clientIp(request);
+        const ipStore =
+          "imageIpDailyCap" in dependencies
+            ? dependencies.imageIpDailyCap
+            : bindings?.IMAGE_CAP_DB
+              ? new D1DailyCap(bindings.IMAGE_CAP_DB)
+              : memoryIpDailyCap;
+        if (ip && ipStore) {
+          const ipKey = await ipDayKey(day, ip);
+          const ipCap = dailyCapOf(config.imageAnalysisIpDailyCap, DEFAULT_IP_DAILY_CAP);
+          if (!(await ipStore.reserve(ipKey, ipCap))) throw new IpDailyCapError();
+          releaseIp = () => ipStore.release(ipKey);
+        }
         if (!(await capStore.reserve(day, dailyCapOf(config.imageAnalysisDailyCap))))
           throw new DailyCapError("DAILY_CAP_REACHED");
         releaseDay = () => capStore.release(day);
+        // Moderation and the "is it a PC?" check, before anything streams (image-precheck.server.ts).
+        const precheck =
+          dependencies.imagePrecheck ??
+          (dependencies.imageAnalyzer ? undefined : precheckReferenceImage);
+        await precheck?.(image);
         // Dev only: the client names the original photo so the response can be saved as a replay.
         const replayKey = import.meta.env.DEV
           ? (request.headers.get("x-aipc-replay-key") ?? undefined)
@@ -288,9 +329,14 @@ export async function handleInternalApiRequest(
         if (error.code === "IMAGE_AI_NOT_CONFIGURED" || error.code === "RATE_LIMITED") {
           release?.();
           await releaseDay?.();
+          await releaseIp?.();
         }
         // A request stopped before the provider never counts against the session either.
-        if (error instanceof DailyCapError) release?.();
+        if (error instanceof DailyCapError) {
+          release?.();
+          await releaseIp?.();
+        }
+        if (error instanceof IpDailyCapError) release?.();
         if (error instanceof ImageSessionLimitError)
           headers["retry-after"] = String(error.retryAfterSeconds);
         return jsonResponse(

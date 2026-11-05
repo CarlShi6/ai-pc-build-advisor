@@ -1,4 +1,4 @@
-import { isSafeExternalUrl } from "@/lib/product-trust";
+import { allowedExternalUrl } from "@/lib/v3/external-links";
 import { colorSourceNote, priceBasisLabel, priceUnknown } from "@/lib/v3/catalog";
 import {
   completeness,
@@ -72,11 +72,12 @@ export const PLAN_DISCLOSURES = [
 
 function linksFor(part: NonNullable<ReturnType<typeof selectedPart>>): PlanLink[] {
   const links: PlanLink[] = [];
-  if (isSafeExternalUrl(part.productUrl))
-    links.push({ url: part.productUrl!, kind: "official", label: "Official page" });
-  if (isSafeExternalUrl(part.searchUrl)) {
-    const host = new URL(part.searchUrl!).hostname.replace(/^www\./, "");
-    links.push({ url: part.searchUrl!, kind: "search", label: `Search ${host}` });
+  const official = allowedExternalUrl(part.productUrl);
+  if (official) links.push({ url: official, kind: "official", label: "Official page" });
+  const search = allowedExternalUrl(part.searchUrl);
+  if (search) {
+    const host = new URL(search).hostname.replace(/^www\./, "");
+    links.push({ url: search, kind: "search", label: `Search ${host}` });
   }
   return links;
 }

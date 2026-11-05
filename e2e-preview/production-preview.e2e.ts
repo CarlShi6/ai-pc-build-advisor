@@ -79,3 +79,45 @@ test("a build is saved in this browser and survives a reload", async ({ page }) 
   await page.getByRole("button", { name: "Delete permanently" }).click();
   await expect(page.getByText("No saved builds yet.")).toBeVisible();
 });
+
+test("pages, APIs and static files carry the security headers", async ({ request }) => {
+  for (const path of ["/", "/studio", "/terms", "/api/image-analyses", "/og.png", "/compare"]) {
+    const headers = (await request.get(path)).headers();
+    expect(headers["content-security-policy"], path).toContain("frame-ancestors 'none'");
+    expect(headers["x-content-type-options"], path).toBe("nosniff");
+    expect(headers["x-frame-options"], path).toBe("DENY");
+    expect(headers["referrer-policy"], path).toBe("strict-origin-when-cross-origin");
+    expect(headers["strict-transport-security"], path).toContain("max-age=");
+    expect(headers["permissions-policy"], path).toContain("camera=()");
+  }
+});
+
+test("the v3 pages load with no content policy violations", async ({ page }) => {
+  const violations: string[] = [];
+  page.on("console", (message) => {
+    if (/content security policy/i.test(message.text())) violations.push(message.text());
+  });
+  await page.addInitScript(() =>
+    document.addEventListener("securitypolicyviolation", (event) =>
+      console.error(`Content Security Policy: ${event.violatedDirective} ${event.blockedURI}`),
+    ),
+  );
+  for (const path of ["/", "/start/image", "/start/describe", "/studio", "/my-builds", "/terms"]) {
+    await openReady(page, path);
+    await page.waitForLoadState("networkidle");
+  }
+  // Studio with a build in it, in 3D where the browser has WebGL.
+  await openReady(page, "/start/blank");
+  await clickUntil(page.getByRole("button", { name: /Create draft/ }), async () => {
+    await expect(page).toHaveURL(/\/studio$/);
+  });
+  await page.waitForLoadState("networkidle");
+  expect(violations).toEqual([]);
+});
+
+test("the terms page is linked from the footer", async ({ page }) => {
+  await openReady(page, "/");
+  await page.locator(".v3-footer").getByRole("link", { name: "Terms" }).click();
+  await expect(page).toHaveURL(/\/terms$/);
+  await expect(page.getByRole("heading", { name: "What the results mean" })).toBeVisible();
+});

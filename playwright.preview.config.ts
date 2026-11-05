@@ -48,7 +48,8 @@ export default defineConfig({
       command: [
         `${wrangler} dev --local --ip 127.0.0.1 --port ${STREAM_PORT} --inspector-port 9231`,
         "--persist-to .wrangler/stream-state",
-        "--var IMAGE_ANALYSIS_DAILY_CAP:100000 --var OPENAI_API_KEY:fake-provider-placeholder",
+        "--var IMAGE_ANALYSIS_DAILY_CAP:100000 --var IMAGE_ANALYSIS_IP_DAILY_CAP:100000",
+        "--var OPENAI_API_KEY:fake-provider-placeholder",
         `--var IMAGE_AI_BASE_URL:http://127.0.0.1:${FAKE_PROVIDER_PORT}/v1`,
       ].join(" "),
       url: `http://127.0.0.1:${STREAM_PORT}/`,

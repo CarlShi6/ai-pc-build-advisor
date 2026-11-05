@@ -2,34 +2,20 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type DragEvent } from "react";
 import { AlertCircle, ImageUp } from "lucide-react";
 import { funnel } from "@/lib/v3/funnel-analytics";
-import { openImageAnalysisStream, prepareImageForAnalysis } from "@/lib/v3/image-client";
 import {
-  hasReplay,
-  loadReplayRecord,
-  replayKeyOf,
-  replaySource,
-  resultSource,
-} from "@/lib/v3/image-replay";
+  openImageAnalysisStream,
+  prepareImageForAnalysis,
+  unavailableCodes,
+} from "@/lib/v3/image-client";
+import { hasReplay, replayKeyOf } from "@/lib/v3/image-replay";
 import { beginReading, type ReadingSource } from "@/lib/v3/live-reading";
+import { blobToDataUrl, localFixtureSource, type ReadingRetry } from "@/lib/v3/reading-retry";
 import { inspectImage } from "@/lib/v3/image-input";
 import { TurnstileCheck } from "@/components/turnstile-check";
 import { shortFileName } from "@/lib/v3/file-name";
 
 /** Public Turnstile site key; when set, Analyze waits for the human check. */
 const turnstileSiteKey: string | undefined = import.meta.env.VITE_TURNSTILE_SITE_KEY;
-
-/**
- * Errors where photo reading is unavailable, so Describe becomes the main way on. "off": a retry
- * cannot help (not configured, or the daily cap), so Retry is hidden; "later": rate limited, so
- * Retry stays as a secondary button.
- */
-const unavailableCodes: Record<string, "off" | "later"> = {
-  IMAGE_AI_NOT_CONFIGURED: "off",
-  DAILY_CAP_REACHED: "off",
-  DAILY_CAP_UNAVAILABLE: "off",
-  SESSION_RATE_LIMITED: "later",
-  RATE_LIMITED: "later",
-};
 
 /** Dev-only sample files with a keyless fixture analysis (`src/lib/v3/dev-image-fixture.ts`). */
 const devFixtureNames = [
@@ -121,9 +107,10 @@ export function ImageStartFlow({
   }
 
   /** Opens Studio and reads into it; Studio shows the parts, failures and the match drawer. */
-  function readIntoStudio(source: ReadingSource, fixture: boolean) {
+  function readIntoStudio(source: ReadingSource, fixture: boolean, retry?: ReadingRetry) {
     void beginReading(source, {
       fixture,
+      retry,
       onResult: (result) => funnel.imageAnalysisCompleted(result),
       onFailure: (code) => funnel.imageAnalysisFailed({ fixture }, code),
     });
@@ -152,7 +139,12 @@ export function ImageStartFlow({
       if (requestId !== requestNumber.current) return;
       // The stream now belongs to Studio; leaving this page must not cancel it.
       analysisController.current = null;
-      readIntoStudio(source, false);
+      const dataUrl = await blobToDataUrl(prepared).catch(() => null);
+      readIntoStudio(
+        source,
+        false,
+        dataUrl ? { kind: "photo", dataUrl, replayKey: replayKey ?? undefined } : undefined,
+      );
     } catch (caught) {
       if (requestId !== requestNumber.current) return;
       const code =
@@ -177,16 +169,11 @@ export function ImageStartFlow({
     analysisController.current?.abort();
     const speed = fastReplay ? 2 : 1;
     // A recorded real analysis of this photo wins over a name-based fixture.
-    const replay = replayable && replayKey ? await loadReplayRecord(replayKey) : null;
-    let source: ReadingSource | null = replay ? replaySource(replay, speed) : null;
-    if (!source) {
-      const { devImageFixtures } = await import("@/lib/v3/dev-image-fixture");
-      const fixture = devImageFixtures[file.name]?.();
-      if (fixture) source = resultSource(fixture, speed);
-    }
+    const key = replayable ? (replayKey ?? undefined) : undefined;
+    const source = await localFixtureSource(file.name, key, speed);
     if (requestId !== requestNumber.current || !source) return;
     funnel.imageSubmitted({ fixture: true });
-    readIntoStudio(source, true);
+    readIntoStudio(source, true, { kind: "fixture", fileName: file.name, replayKey: key, speed });
   }
 
   return (
@@ -322,11 +309,13 @@ function PrivacyNotes() {
         identified from the photo.
       </p>
       <p className="v3-inline-note" aria-label="Image retention">
-        <AlertCircle size={17} /> Retention: AIPC never stores the photo, the resized copy or its
-        file name. The copy is sent with OpenAI response storage turned off; OpenAI's own data
-        policies still apply. Only the text findings stay in this tab's draft, and they are kept
-        with the build if you save it. Each browser session can run 3 analyses per minute and 15 per
-        day. <Link to="/privacy">Privacy details</Link>
+        <AlertCircle size={17} /> Retention: the AIPC server never stores the photo, the resized
+        copy or its file name. The copy is sent with OpenAI response storage turned off; OpenAI's
+        own data policies still apply. While the photo is read, the resized copy is kept in this tab
+        so an interrupted read can run again; it is removed once reading ends. Only the text
+        findings stay in this tab's draft, and they are kept with the build if you save it. Each
+        browser session can run 3 analyses per minute and 15 per day, and each network 10 per day.{" "}
+        <Link to="/privacy">Privacy details</Link>
       </p>
     </>
   );

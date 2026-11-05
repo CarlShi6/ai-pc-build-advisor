@@ -1,14 +1,17 @@
 import { readDraft, writeDraft } from "@/lib/v3/draft-session";
-import type { SlotId } from "@/lib/v3/build-document";
+import type { BuildDocumentV3, SlotId } from "@/lib/v3/build-document";
 import type { AnalysisStreamEvent, StreamedCategory } from "@/lib/v3/analysis-stream";
 import {
   applyFullResult,
   applyStreamedPart,
+  endReadingDraft,
   foundLabel,
   readingSlots,
+  resumeReadingDraft,
   slotOfCategory,
   startReadingDraft,
 } from "@/lib/v3/progressive-draft";
+import { clearReadingRetry, saveReadingRetry, type ReadingRetry } from "@/lib/v3/reading-retry";
 import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
 
 /**
@@ -94,13 +97,16 @@ export type ReadingSource = (
 ) => Promise<void>;
 
 /**
- * Starts reading into a new Studio draft. `onResult` reports the full result (analytics).
- * Resolves when the read has ended.
+ * Starts reading into a new Studio draft, or again into an interrupted one (`resume`).
+ * `retry` is kept while reading so a reload can offer to read again. `onResult` reports the
+ * full result (analytics). Resolves when the read has ended.
  */
 export async function beginReading(
   source: ReadingSource,
   options: {
     fixture?: boolean;
+    resume?: BuildDocumentV3;
+    retry?: ReadingRetry;
     onResult?: (result: ImageAnalysisResult) => void;
     onFailure?: (code: string) => void;
   } = {},
@@ -109,7 +115,9 @@ export async function beginReading(
   const own = new AbortController();
   controller = own;
   const id = `reading-${crypto.randomUUID()}`;
-  writeDraft(startReadingDraft(id));
+  writeDraft(options.resume ? resumeReadingDraft(options.resume, id) : startReadingDraft(id));
+  if (options.retry) saveReadingRetry(id, options.retry);
+  else clearReadingRetry();
   state = { id, status: "reading", found: [], notices: [], fixture: !!options.fixture };
   emit();
   const timer = setTimeout(() => own.abort("timeout"), READING_TIMEOUT_MS);
@@ -117,6 +125,9 @@ export async function beginReading(
   const fail = (code: string, message: string) => {
     if (ended || state?.id !== id) return;
     ended = true;
+    clearReadingRetry();
+    const draft = ownDraft(id);
+    if (draft) writeDraft(endReadingDraft(draft));
     update({ status: "failed", error: { code, message } });
     options.onFailure?.(code);
   };
@@ -139,6 +150,7 @@ export async function beginReading(
       }
     } else if (event.type === "done") {
       ended = true;
+      clearReadingRetry();
       const { document, adjusted } = applyFullResult(draft, event.result);
       writeDraft(document);
       update({ status: "done", resultId: event.result.analysisId });

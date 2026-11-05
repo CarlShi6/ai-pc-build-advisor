@@ -64,6 +64,8 @@ export interface ImageBuildContext {
   quality?: ImageAnalysisResult["quality"];
   absentParts?: ImageAnalysisResult["absentParts"];
   appearanceCorrections?: AppearanceCorrection[];
+  /** Set while the photo is being read; a draft that still has it after a reload was interrupted. */
+  reading?: true;
   reviews: Partial<Record<VisibleCatalogCategory, CandidateReview>>;
   visualPriorities: VisualPriority[];
   plannedSelections: Partial<

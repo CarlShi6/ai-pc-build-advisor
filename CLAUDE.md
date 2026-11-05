@@ -95,6 +95,7 @@ Done: R0–R5 (image path verified with the local fixture only); R6 slice 1 (v3 
 Demo track weeks 1–4 are done (see `docs/milestones/DEMO_TRACK_PROGRESS.md`): photo-first home, studio-look 3D with Focus/Isolate and replace card, white showcase parts with reference-reconstructed models (`reference-models/`, `tools/reference-models/`), one-click white sample, live image recognition verified locally, adaptive scene quality, full 2D fallback without WebGL, and 11 E2E flows. Next: the visual redesign round below (slices A–D, in order), then R7.
 
 **Order (decided 2026-10-27): Stage 1 → appearance layer → model layer → catalog expansion → Stage 2 (deployment prep).** The idea: separate what the photo-to-3D scene draws (appearance) from naming the exact model (identity), so the 3D still looks like the photo when the catalog has no match. Send screenshots after each step.
+
 1. **Stage 1:** diagnostics, plus candidates shown on unconfirmed Studio slots.
 2. **Step A, appearance layer (parametric 3D):**
    - Strict (Zod) per-category appearance parameters from the image analysis; anything not visible is `unknown`, never guessed.
@@ -114,12 +115,14 @@ Demo track weeks 1–4 are done (see `docs/milestones/DEMO_TRACK_PROGRESS.md`): 
 5. **Stage 2:** deployment prep.
 
 **Image model and cost (decided 2026-10-28).**
+
 - Photo analysis defaults to `gpt-5.4` (`IMAGE_AI_MODEL`, server-only). `IMAGE_AI_MODEL=gpt-4.1-mini` is the cheaper option.
 - On the same real photo, gpt-5.4 read the case type, glass, hidden GPU fans and screen pump correctly; mini misread all four.
 - Cost per photo is about $0.04–0.05 for gpt-5.4 (about 4k input and 2.1–2.5k output tokens at $2.50 / $15 per 1M) against about $0.0045 for mini, roughly 9×.
 - Reasoning effort is `IMAGE_AI_REASONING_EFFORT`, default `low`. On the same photo, `none` took 29.8 s against 35.1 s (output 2373 vs 2465 tokens). The appearance fields were unchanged, but the model guesses changed and contradicted the visible text, so the default stays `low` (2026-10-28).
 - The prompt caps observations at 12 with short evidence; model guesses and visible text are exempt from the limits. On the same photo this took 20.4 s and 1399 output tokens (about $0.031) against 35.1 s and 2465 (v4), with the same appearance fields and guess count (adopted 2026-10-28, `docs/DEPLOY.md`).
-- Reading is streamed (2026-11-04, `docs/milestones/STREAMED_READING.md`). Analyze opens Studio at once; the appearance arrives first (about 11 s into a 21 s read with gpt-5.4) and each part is drawn as it lands. The read stops at 75 s on the server and 90 s in the browser. Every limit and check answers before the stream starts.
+- Reading is streamed (2026-11-04, `docs/milestones/STREAMED_READING.md`). Analyze opens Studio at once; the appearance arrives first (about 11 s into a 21 s read with gpt-5.4) and each part is drawn as it lands. The read stops at 75 s on the server and 90 s in the browser. Every limit and check answers before the stream starts. A reload mid-read shows "Reading was interrupted" with Describe and "Read the photo again" (through the same limits).
+- Launch safety (2026-11-05, `docs/DEPLOY.md` "Launch safety"): kill switch `IMAGE_ANALYSIS_PAUSED`, per-IP daily cap (10), global daily cap (default 30), moderation and the "is it a PC?" precheck before streaming (`image-precheck.server.ts`), security headers (`security-headers.ts`, `public/_headers`), outbound link allowlist (`external-links.ts`), `/terms`, `npm run smoke` and `npm run measure:cpu`.
 - Reasoning models take no temperature; others use temperature 0.
 - Certain contradictions in the reading are fixed in code (`reconcileAppearance`): only to `unknown`, or a radiator's own fans off the case-fan count. Each fix is shown in the Studio match drawer as "Adjusted …", and a drawn part the full read changes shows "Adjusted after full read".
 - Real photos replay from the gitignored `local-replays/` in dev and E2E. Never commit the photos or the responses. Streamed recordings keep each chunk's time (`stream.chunks`), so "Load local fixture" plays at the recorded pace (2× optional).
@@ -129,6 +132,7 @@ Demo track weeks 1–4 are done (see `docs/milestones/DEMO_TRACK_PROGRESS.md`): 
 **Deferred (2026-10-27): budget-based optimization of photo builds.** Photo drafts carry no target budget, so nothing optimizes a photo build against one. Revisit after R7 if users ask for it, starting from `budgetOf` and the visual-optimization intents.
 
 R7, after the demo track (in order):
+
 1. R7 E2E: the remaining §19.3 flows (#2 lookalike correction, #4 replace from the 3D scene, #9 old-format restore, #10 unauthorized access/deletion, an explicit no-WebGL launch).
 2. R7: Focus/Isolate mode, reduced motion, keyboard and mobile support.
 3. R7: the PRD §19.3 curated image fixture set, performance profile and visual regression.
@@ -139,6 +143,7 @@ R7, after the demo track (in order):
 Problem: the photo is read as "white case, tempered glass side panel, 5 blue-lit fans, white AIO", but the Studio shows green wireframes and orange boxes, so photo and 3D don't match. The review page reads like a form, and the site's colours are inconsistent.
 
 Order: each slice gets the full gate plus E2E, before/after browser screenshots, a local commit (no push) and a note in `docs/milestones/DEMO_TRACK_PROGRESS.md`. **Stop after slice A for the user's review.**
+
 - **Slice A: the photo's appearance reaches 3D (first).**
   - **Placeholders.** Unresolved slots that have photo observations draw an appearance placeholder (PRD §9.3 level 2, appearance-informed). It uses the observed colour, the glass side panel, the fan count and light colour, and AIO vs air cooler type. The label reads "Appearance from photo · model not confirmed" and never names a model. Slots without observations keep the empty-slot style.
   - **"Use suggested parts".** On the review page, it takes the top-ranked candidate in every category at once. It first shows a change list: what each slot becomes, the total price, compatibility, and the effect on appearance. It applies only after the user confirms, through the existing preview/confirm flow. Weak matches still say "Weak visual match · appearance only".
@@ -160,24 +165,25 @@ Order: each slice gets the full gate plus E2E, before/after browser screenshots,
   - Text contrast at least WCAG AA. Status is never shown by colour alone; always add text or an icon.
   - **Palette (done 2026-10-26; tokens in `src/styles.css` at the top of the v3 section).** Use these tokens for any new v3 colour; never add a raw hex.
 
-    | Token | Value | Use |
-    | --- | --- | --- |
-    | `--g-bg` | `#121417` | Page background |
-    | `--g-surface-1` | `#1a1d21` | Cards and panels |
-    | `--g-surface-2` | `#22262b` | Raised surfaces and inputs |
-    | `--g-surface-3` | `#2b3036` | Hover |
-    | `--g-line` | `#363c43` | Lines |
-    | `--g-line-strong` | `#4c545d` | Strong lines |
-    | `--g-text` | `#e8ebee` | Text |
-    | `--g-text-muted` | `#b0b8c1` | Muted text |
-    | `--g-text-faint` | `#939ca6` | Faint text, kickers |
-    | `--g-accent` | `#6aa6ff` | Clickable or selected: links, outlines, selected chips, 3D selection |
-    | `--g-accent-strong` | `#2f6fd6` | Primary button fill (white text 4.8:1) |
-    | `--g-pending` | `#f2b65f` | Amber: needs confirmation only |
-    | `--g-danger` | `#ff8178` | Red: compatibility failure only |
-    | `--g-unselected` | `#7d8690` | Grey dashed: not selected only |
+    | Token               | Value     | Use                                                                  |
+    | ------------------- | --------- | -------------------------------------------------------------------- |
+    | `--g-bg`            | `#121417` | Page background                                                      |
+    | `--g-surface-1`     | `#1a1d21` | Cards and panels                                                     |
+    | `--g-surface-2`     | `#22262b` | Raised surfaces and inputs                                           |
+    | `--g-surface-3`     | `#2b3036` | Hover                                                                |
+    | `--g-line`          | `#363c43` | Lines                                                                |
+    | `--g-line-strong`   | `#4c545d` | Strong lines                                                         |
+    | `--g-text`          | `#e8ebee` | Text                                                                 |
+    | `--g-text-muted`    | `#b0b8c1` | Muted text                                                           |
+    | `--g-text-faint`    | `#939ca6` | Faint text, kickers                                                  |
+    | `--g-accent`        | `#6aa6ff` | Clickable or selected: links, outlines, selected chips, 3D selection |
+    | `--g-accent-strong` | `#2f6fd6` | Primary button fill (white text 4.8:1)                               |
+    | `--g-pending`       | `#f2b65f` | Amber: needs confirmation only                                       |
+    | `--g-danger`        | `#ff8178` | Red: compatibility failure only                                      |
+    | `--g-unselected`    | `#7d8690` | Grey dashed: not selected only                                       |
 
     Every text token passes AA on every surface. The 3D scene uses the same hexes for its selection, pending and unselected edges.
+
 - **Slice D: recognisable demo part models.**
   - Build the models in code from manufacturer millimetre specs; no full img2threejs run.
   - Parts to model, for the white showcase build: white GPU (three-fan shroud, backplate), white 360 AIO (pump head, radiator fins), case fans (blades, light ring), memory (light bar), motherboard (slots, heatsinks). CPU, PSU and SSD may stay simple.
@@ -190,12 +196,14 @@ Order: each slice gets the full gate plus E2E, before/after browser screenshots,
 Goal: one demonstrable path: home page photo upload → recognition → Studio 3D (real dimensions, single-part explode, click a part to replace it) → shopping plan. All PRD and CLAUDE.md rules above still apply.
 
 Weekly plan:
+
 - **Week 1:** Merge the home page with the photo entry: the photo drop zone takes the hero position, and Describe / Import / Blank shrink to secondary links (PRD §4.2). Restyle the Studio 3D as a deep "Blender studio" look: drei `Environment` (HDRI or studio lightformers), `ContactShadows`/`AccumulativeShadows`, `@react-three/postprocessing` (SSAO, slight depth of field, bloom on RGB lighting), PBR materials (glass, metal, plastic), a dark grey background with floor reflection. Keep UI chrome minimal and put information on 3D labels. **Stop after week 1 for the user to review before week 2.**
 - **Week 2:** Single-part explode and isolate (click a part → it pulls out alone, the rest dims; PRD Focus/Isolate). A replace card next to the part (candidates, price difference, compatibility change → preview → confirm through the existing proposal/confirm flow). The part name on the 3D label links to the manufacturer product page. No information-heavy side panel.
 - **Week 3:** A "white showcase build" demo configuration of 8–12 parts. Add white catalog variants (white part numbers of the existing O11 Dynamic EVO, H5 Flow and 4000D Airflow, plus 1–2 white GPUs, ideally a white cooler and memory). Specs and prices only from manufacturer sites; prices are manufacturer MSRP labeled "Manufacturer MSRP, verified <date>", and are left out when the site has none. One 3D model per part, scaled 1:1 from the manufacturer's millimetre specs. Connect real image recognition, asking the user first when `OPENAI_API_KEY` is needed.
 - **Week 4:** Polish the demo path, check performance, confirm the 2D fallback works without WebGL, and add matching Playwright E2E.
 
 Demo-track rules:
+
 - Part 3D models may be generated during development with img2threejs (Apache-2.0; a Claude Code agent skill that generates procedural three.js models from reference images). Never generate models from user photos at runtime. Before installing it, review its GitHub repository and license, tell the user where it would be installed, wait for approval, and record it in `docs/engineering/REUSE_DECISIONS.md`.
 - Reference images come only from manufacturers' own product images. Models never reproduce brand logos.
 - Dimensions always come from the manufacturer's spec sheet in millimetres, never estimated from images. Such models have `geometryAccuracy: "reference_reconstructed"`, and the UI says "Reference reconstruction · dimensions from manufacturer specs", never "real model". They never claim to prove fit.

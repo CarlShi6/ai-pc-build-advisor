@@ -13,6 +13,21 @@ export class ImageClientError extends Error {
   }
 }
 
+/**
+ * Errors where photo reading is unavailable, so Describe becomes the main way on. "off": a retry
+ * cannot help (not configured, or the daily cap), so Retry is hidden; "later": rate limited, so
+ * Retry stays as a secondary button.
+ */
+export const unavailableCodes: Record<string, "off" | "later"> = {
+  IMAGE_AI_NOT_CONFIGURED: "off",
+  IMAGE_ANALYSIS_PAUSED: "off",
+  DAILY_CAP_REACHED: "off",
+  DAILY_CAP_UNAVAILABLE: "off",
+  IP_DAILY_CAP_REACHED: "off",
+  SESSION_RATE_LIMITED: "later",
+  RATE_LIMITED: "later",
+};
+
 export async function prepareImageForAnalysis(file: File): Promise<Blob> {
   if (file.size > MAX_IMAGE_BYTES)
     throw new ImageInputError("Choose an image under 10 MB.", 413, "IMAGE_TOO_LARGE");

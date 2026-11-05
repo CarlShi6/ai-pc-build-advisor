@@ -27,6 +27,13 @@ const look = {
   motherboard: { color: "white" },
 };
 
+/** Installs the page clock and stops it, so timers only move with runFor. */
+async function holdClock(page: Page) {
+  const now = Date.now();
+  await page.clock.install({ time: now });
+  await page.clock.pauseAt(now + 1);
+}
+
 /** A finished result as the server sends it in the "done" event. */
 const result = {
   analysisId: "e2e-analysis",
@@ -76,7 +83,7 @@ test("Studio opens at once; visible slots read in, and a part the user picks sta
   await openReady(page, "/start/image");
   await page.locator("input[type=file]").setInputFiles("e2e/fixtures/white-build-glass-front.png");
   // The page's clock is held, so the read waits at its start until the test moves it on.
-  await page.clock.install();
+  await holdClock(page);
   await page.getByRole("button", { name: "Load local fixture (no AI call)" }).click();
   await expect(page).toHaveURL(/\/studio$/);
 
@@ -157,4 +164,90 @@ test("a part the full read changes is updated, with a notice", async ({ page }) 
   );
   expect(draft.imageContext.appearance.gpu.color).toBe("white");
   expect(draft.imageContext.summary).toBe("A white dual-chamber build.");
+});
+
+/** Plays the glass-front sample's fixture with the page clock held, and reads the case only. */
+async function readCaseThenReload(page: Page) {
+  await openReady(page, "/start/image");
+  await page.locator("input[type=file]").setInputFiles("e2e/fixtures/white-build-glass-front.png");
+  await holdClock(page);
+  await page.getByRole("button", { name: "Load local fixture (no AI call)" }).click();
+  await expect(page).toHaveURL(/\/studio$/);
+  // The case arrives at 700 ms, the graphics card at 860 ms.
+  await page.clock.runFor(750);
+  await expect(card(page, "case")).not.toHaveAttribute("data-reading", /.*/);
+  await page.reload();
+}
+
+test("a reload mid-read says reading was interrupted, and the photo can be read again", async ({
+  page,
+}) => {
+  await readCaseThenReload(page);
+  const interrupted = page.getByRole("alert", { name: "Reading was interrupted" });
+  await expect(interrupted).toBeVisible();
+  await expect(interrupted.getByRole("link", { name: "Describe your dream PC" })).toHaveClass(
+    /v3-primary/,
+  );
+  // The case read before the reload stays; the slots not yet read are ordinary manual slots.
+  await expect(card(page, "case")).toContainText("Identity unresolved");
+  for (const slot of ["gpu", "cooler", "memory", "motherboard"]) {
+    await expect(card(page, slot)).not.toHaveAttribute("data-reading", /.*/);
+    await expect(card(page, slot)).toContainText("Add part");
+  }
+  await expect(page.getByRole("button", { name: "Save build" })).toBeEnabled();
+
+  // Reading again fills the same draft in.
+  const buildId = await page.evaluate(
+    () => JSON.parse(sessionStorage.getItem("aipc-v3-active-draft")!).build.id,
+  );
+  await interrupted.getByRole("button", { name: "Read the photo again" }).click();
+  await expect(page.getByRole("status", { name: "Reading the photo" })).toBeVisible();
+  await expect(interrupted).toHaveCount(0);
+  await page.clock.runFor(5_000);
+  await expect(page.getByRole("button", { name: /can be matched to a model/ })).toBeVisible();
+  const draft = await page.evaluate(() =>
+    JSON.parse(sessionStorage.getItem("aipc-v3-active-draft")!),
+  );
+  expect(draft.build.id).toBe(buildId);
+  expect(draft.imageContext.reading).toBeUndefined();
+  expect(await page.evaluate(() => sessionStorage.getItem("aipc-v3-reading-retry"))).toBeNull();
+  // Reloading a finished read shows nothing more.
+  await page.reload();
+  await expect(page.getByRole("alert", { name: "Reading was interrupted" })).toHaveCount(0);
+});
+
+test("reading a photo again goes through the same limits as Analyze", async ({ page }) => {
+  await readCaseThenReload(page);
+  // Stand in the resized copy a live read would have kept.
+  await page.evaluate(() => {
+    const id = JSON.parse(sessionStorage.getItem("aipc-v3-active-draft")!).imageContext.analysisId;
+    const dataUrl =
+      "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==";
+    sessionStorage.setItem(
+      "aipc-v3-reading-retry",
+      JSON.stringify({ readingId: id, retry: { kind: "photo", dataUrl } }),
+    );
+  });
+  await page.reload();
+  const requests: string[] = [];
+  await page.route("**/api/image-analyses", (route) => {
+    requests.push(route.request().headers()["accept"] ?? "");
+    return route.fulfill({
+      status: 429,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: { code: "DAILY_CAP_REACHED", message: "Photo reading has reached today's limit." },
+      }),
+    });
+  });
+  const interrupted = page.getByRole("alert", { name: "Reading was interrupted" });
+  await interrupted.getByRole("button", { name: "Read the photo again" }).click();
+  await expect(interrupted).toContainText("Photo reading has reached today's limit.");
+  expect(requests).toEqual(["application/x-ndjson"]);
+  // A retry cannot help today, so the button goes; Describe stays first.
+  await expect(interrupted.getByRole("button", { name: "Read the photo again" })).toHaveCount(0);
+  await interrupted.getByRole("button", { name: "Dismiss" }).click();
+  await expect(interrupted).toHaveCount(0);
+  await page.reload();
+  await expect(page.getByRole("alert", { name: "Reading was interrupted" })).toHaveCount(0);
 });

@@ -56,6 +56,34 @@ export const systemPrompt = [
   "The length limits apply to observations, evidence and the summary only. Give modelGuesses and visibleText as fully as you would without any length limit.",
 ].join(" ");
 
+/** A provider call that failed, as the error the client is shown (timedOut: our deadline hit). */
+export function providerFailure(error: unknown, timedOut: boolean): ImageAnalysisError {
+  const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
+  if (status === 429)
+    return new ImageAnalysisError(
+      "Image analysis is rate limited. Please retry later.",
+      429,
+      "RATE_LIMITED",
+    );
+  if (status === 401 || status === 403)
+    return new ImageAnalysisError(
+      "Image analysis credentials are unavailable.",
+      503,
+      "IMAGE_AI_NOT_CONFIGURED",
+    );
+  if (error instanceof OpenAI.APIConnectionTimeoutError || timedOut)
+    return new ImageAnalysisError(
+      "Image analysis timed out. Please retry.",
+      504,
+      "ANALYSIS_TIMEOUT",
+    );
+  return new ImageAnalysisError(
+    "Image analysis is unavailable. You can continue manually.",
+    502,
+    "ANALYSIS_FAILED",
+  );
+}
+
 /** Reasoning models (o-series, gpt-5) reject a temperature setting. */
 const acceptsTemperature = (model: string) => !/^(o[0-9]|gpt-5)/.test(model);
 
@@ -209,31 +237,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
     }
   } catch (error) {
     if (error instanceof ImageAnalysisError) throw error;
-    const status =
-      typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
-    if (status === 429)
-      throw new ImageAnalysisError(
-        "Image analysis is rate limited. Please retry later.",
-        429,
-        "RATE_LIMITED",
-      );
-    if (status === 401 || status === 403)
-      throw new ImageAnalysisError(
-        "Image analysis credentials are unavailable.",
-        503,
-        "IMAGE_AI_NOT_CONFIGURED",
-      );
-    if (error instanceof OpenAI.APIConnectionTimeoutError || deadline.signal.aborted)
-      throw new ImageAnalysisError(
-        "Image analysis timed out. Please retry.",
-        504,
-        "ANALYSIS_TIMEOUT",
-      );
-    throw new ImageAnalysisError(
-      "Image analysis is unavailable. You can continue manually.",
-      502,
-      "ANALYSIS_FAILED",
-    );
+    throw providerFailure(error, deadline.signal.aborted);
   } finally {
     clearTimeout(timer);
   }

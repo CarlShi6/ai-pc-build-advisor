@@ -1,6 +1,19 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { dismissNotice, type ReadingState } from "@/lib/v3/live-reading";
+import { beginReading, dismissNotice, type ReadingState } from "@/lib/v3/live-reading";
+import type { BuildDocumentV3 } from "@/lib/v3/build-document";
+import { openImageAnalysisStream, unavailableCodes } from "@/lib/v3/image-client";
+import {
+  dataUrlToBlob,
+  loadReadingRetry,
+  localFixtureSource,
+  type ReadingRetry,
+} from "@/lib/v3/reading-retry";
+import { funnel } from "@/lib/v3/funnel-analytics";
+import { TurnstileCheck } from "@/components/turnstile-check";
+
+/** Public Turnstile site key; when set, reading again waits for the human check. */
+const turnstileSiteKey: string | undefined = import.meta.env.VITE_TURNSTILE_SITE_KEY;
 
 const NOTICE_MS = 3_500;
 
@@ -67,5 +80,113 @@ export function ReadingStatus({
         ))}
       </ul>
     </>
+  );
+}
+
+/**
+ * A draft whose read stopped with the page (a reload, or the tab was closed and restored). Drawn
+ * parts stay, the other slots are ordinary manual slots, and the photo can be read again: that
+ * request goes through the same limits, daily cap and human check as Analyze.
+ */
+export function InterruptedReading({
+  document,
+  onDismiss,
+}: {
+  document: BuildDocumentV3;
+  onDismiss: () => void;
+}) {
+  const analysisId = document.imageContext?.analysisId ?? "";
+  const [retry] = useState<ReadingRetry | null>(() => loadReadingRetry(analysisId));
+  const [starting, setStarting] = useState(false);
+  const [error, setError] = useState<{ code: string; message: string } | null>(null);
+  const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
+  const [turnstileReset, setTurnstileReset] = useState(0);
+  const needsCheck = !!turnstileSiteKey && retry?.kind === "photo";
+  const off = error ? unavailableCodes[error.code] === "off" : false;
+
+  async function readAgain() {
+    if (!retry) return;
+    setStarting(true);
+    setError(null);
+    const fixture = retry.kind === "fixture";
+    funnel.imageSubmitted({ fixture });
+    try {
+      const source =
+        retry.kind === "fixture"
+          ? await localFixtureSource(retry.fileName, retry.replayKey, retry.speed)
+          : await openImageAnalysisStream(
+              dataUrlToBlob(retry.dataUrl),
+              undefined,
+              import.meta.env.DEV ? retry.replayKey : undefined,
+              turnstileToken ?? undefined,
+            );
+      if (!source)
+        throw Object.assign(new Error("This sample has no local fixture."), { code: "" });
+      void beginReading(source, {
+        fixture,
+        resume: document,
+        retry,
+        onResult: (result) => funnel.imageAnalysisCompleted(result),
+        onFailure: (code) => funnel.imageAnalysisFailed({ fixture }, code),
+      });
+    } catch (caught) {
+      const code =
+        caught && typeof caught === "object" && "code" in caught && typeof caught.code === "string"
+          ? caught.code
+          : "UNKNOWN";
+      funnel.imageAnalysisFailed({ fixture }, code);
+      setError({
+        code,
+        message: caught instanceof Error ? caught.message : "The photo could not be read again.",
+      });
+      setStarting(false);
+      if (needsCheck) setTurnstileReset((count) => count + 1);
+    }
+  }
+
+  return (
+    <div className="v3-paused v3-reading-failed" role="alert" aria-label="Reading was interrupted">
+      <p>
+        <strong>Reading was interrupted.</strong> The page was reloaded before the photo was fully
+        read.
+      </p>
+      <p>
+        {document.build.parts.length || Object.keys(document.unresolved).length
+          ? "What was drawn stays. Choose the rest yourself, read the photo again, or start from a description."
+          : "Choose the parts yourself, read the photo again, or start from a description."}
+      </p>
+      {error && <p className="v3-error">{error.message}</p>}
+      <div className="v3-paused-actions">
+        <Link className="v3-primary" to="/start/$mode" params={{ mode: "describe" }}>
+          Describe your dream PC
+        </Link>
+        {retry && !off ? (
+          <button
+            type="button"
+            className="v3-secondary"
+            disabled={starting || (needsCheck && !turnstileToken)}
+            onClick={() => void readAgain()}
+          >
+            {starting ? "Starting the read…" : "Read the photo again"}
+          </button>
+        ) : (
+          !retry && (
+            <Link className="v3-secondary" to="/start/$mode" params={{ mode: "image" }}>
+              Choose the photo again
+            </Link>
+          )
+        )}
+        <button type="button" className="v3-text-button" onClick={onDismiss}>
+          Dismiss
+        </button>
+      </div>
+      {needsCheck && !off && (
+        <TurnstileCheck
+          siteKey={turnstileSiteKey!}
+          resetKey={turnstileReset}
+          onToken={setTurnstileToken}
+        />
+      )}
+    </div>
   );
 }

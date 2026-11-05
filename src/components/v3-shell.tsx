@@ -40,6 +40,7 @@ export function V3Shell({ children }: { children: ReactNode }) {
         <span>AIPC v3 preview</span>
         <span>Part fit and prices require source checks before purchase.</span>
         <Link to="/privacy">Privacy</Link>
+        <Link to="/terms">Terms</Link>
       </footer>
     </div>
   );

@@ -129,6 +129,7 @@ import {
   type ReferenceModelPart,
   type ReferenceModel,
 } from "@/lib/v3/reference-models";
+import { externalLinkProps } from "@/lib/v3/external-links";
 
 export type { SceneMode } from "@/lib/v3/scene-focus";
 export interface BuildSceneProps {
@@ -2417,7 +2418,7 @@ export default function BuildScene({
                 </span>
               )}
               {link && (
-                <a href={link.href} target="_blank" rel="noopener noreferrer">
+                <a href={link.href} {...externalLinkProps}>
                   {link.label} ↗
                 </a>
               )}

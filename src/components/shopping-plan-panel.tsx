@@ -8,6 +8,7 @@ import {
   type PlanLineStatus,
 } from "@/lib/v3/shopping-plan";
 import { funnel } from "@/lib/v3/funnel-analytics";
+import { externalLinkProps } from "@/lib/v3/external-links";
 
 const statusLabel: Record<PlanLineStatus, string> = {
   planned: "Planned",
@@ -169,8 +170,7 @@ export function ShoppingPlanPanel({
                     <a
                       key={link.url}
                       href={link.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                      {...externalLinkProps}
                       onClick={() => funnel.shoppingLinkOpened(document, line.slot, link.kind)}
                     >
                       {link.label} <ExternalLink size={12} />

@@ -4,6 +4,7 @@ import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
 import { handleInternalApiRequest } from "./lib/api-router";
 import { hiddenInProduction, notFoundResponse } from "./lib/production-surface";
+import { withSecurityHeaders } from "./lib/security-headers";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -41,26 +42,30 @@ async function normalizeCatastrophicSsrResponse(response: Response): Promise<Res
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
-    try {
-      // The first deployment serves the v3 app only (src/lib/production-surface.ts).
-      const { pathname } = new URL(request.url);
-      if (import.meta.env.PROD && hiddenInProduction(pathname)) return notFoundResponse(pathname);
-
-      const apiResponse = await handleInternalApiRequest(request);
-
-      if (apiResponse) {
-        return apiResponse;
-      }
-
-      const handler = await getServerEntry();
-      const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
-    } catch (error) {
-      console.error(error);
-      return new Response(renderErrorPage(), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
-    }
+    return withSecurityHeaders(await respond(request, env, ctx), import.meta.env.PROD);
   },
 };
+
+async function respond(request: Request, env: unknown, ctx: unknown): Promise<Response> {
+  try {
+    // The first deployment serves the v3 app only (src/lib/production-surface.ts).
+    const { pathname } = new URL(request.url);
+    if (import.meta.env.PROD && hiddenInProduction(pathname)) return notFoundResponse(pathname);
+
+    const apiResponse = await handleInternalApiRequest(request);
+
+    if (apiResponse) {
+      return apiResponse;
+    }
+
+    const handler = await getServerEntry();
+    const response = await handler.fetch(request, env, ctx);
+    return await normalizeCatastrophicSsrResponse(response);
+  } catch (error) {
+    console.error(error);
+    return new Response(renderErrorPage(), {
+      status: 500,
+      headers: { "content-type": "text/html; charset=utf-8" },
+    });
+  }
+}

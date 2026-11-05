@@ -34,8 +34,14 @@ export function getServerConfig() {
     // Optional OpenAI-compatible base URL for photo analysis (an AI gateway, or the local fake
     // provider the preview E2E uses). Unset: api.openai.com.
     imageAiBaseUrl: process.env.IMAGE_AI_BASE_URL || undefined,
-    // Global photo analyses per UTC day (default 100); counted in the IMAGE_CAP_DB D1 binding.
+    // Global photo analyses per UTC day (default 30); counted in the IMAGE_CAP_DB D1 binding.
     imageAnalysisDailyCap: process.env.IMAGE_ANALYSIS_DAILY_CAP,
+    // Photo analyses per client IP per UTC day (default 10), in the same D1 database.
+    imageAnalysisIpDailyCap: process.env.IMAGE_ANALYSIS_IP_DAILY_CAP,
+    // Kill switch: "true" (or 1/on/yes) stops photo analysis before anything is read or sent.
+    imageAnalysisPaused: /^(1|true|on|yes)$/i.test(process.env.IMAGE_ANALYSIS_PAUSED?.trim() ?? ""),
+    // The cheap model that checks a photo shows a PC before the full read (low image detail).
+    imagePrecheckModel: process.env.IMAGE_PRECHECK_MODEL || "gpt-4.1-mini",
     // Cloudflare Turnstile secret; when set, Analyze needs a passed human check.
     turnstileSecretKey: process.env.TURNSTILE_SECRET_KEY,
     priceProvider: process.env.PRICE_PROVIDER,

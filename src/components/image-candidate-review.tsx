@@ -22,6 +22,7 @@ import {
 } from "@/lib/v3/observation-tags";
 import { catalogMatchesForGuess } from "@/lib/v3/model-guess";
 import { ModelGuesses } from "@/components/model-guesses";
+import { allowedExternalUrl, externalLinkProps } from "@/lib/v3/external-links";
 
 const categoryLabels: Record<VisibleCatalogCategory, string> = {
   case: "Case",
@@ -330,9 +331,13 @@ function CandidateOption({
             <>
               {" "}
               ·{" "}
-              <a href={candidate.catalogSourceUrl} target="_blank" rel="noopener noreferrer">
-                Specs from manufacturer page
-              </a>
+              {allowedExternalUrl(candidate.catalogSourceUrl) ? (
+                <a href={allowedExternalUrl(candidate.catalogSourceUrl)!} {...externalLinkProps}>
+                  Specs from manufacturer page
+                </a>
+              ) : (
+                "Specs from manufacturer page"
+              )}
               , verified {candidate.catalogVerifiedAt}
             </>
           )}

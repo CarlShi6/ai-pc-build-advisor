@@ -65,8 +65,30 @@ export function startReadingDraft(readingId: string): BuildDocumentV3 {
       reviews: {},
       visualPriorities: [],
       plannedSelections: {},
+      reading: true,
     },
   });
+}
+
+/** Reads the photo again into an interrupted draft: what is drawn and what the user chose stay. */
+export function resumeReadingDraft(document: BuildDocumentV3, readingId: string): BuildDocumentV3 {
+  if (!document.imageContext) return document;
+  return {
+    ...document,
+    imageContext: { ...document.imageContext, analysisId: readingId, reading: true },
+  };
+}
+
+/** The read ended without a full result (failed, or the user set the interruption aside). */
+export function endReadingDraft(document: BuildDocumentV3): BuildDocumentV3 {
+  if (!document.imageContext?.reading) return document;
+  const { reading: _reading, ...context } = document.imageContext;
+  return { ...document, imageContext: context };
+}
+
+/** A draft whose read stopped with the page (a reload or a closed tab), not by an error. */
+export function wasInterrupted(document: BuildDocumentV3, live: unknown) {
+  return !!document.imageContext?.reading && !live;
 }
 
 /** Slots the user decided while the photo was read: a chosen part or "keep unknown". */

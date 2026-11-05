@@ -20,6 +20,7 @@ import { REFERENCE_MODEL_LABEL, referenceModelFor } from "@/lib/v3/reference-mod
 import { keepSlotUnknown, slotIdentityHelp } from "@/lib/v3/slot-identity";
 import { SlotIdentityPanel } from "@/components/slot-identity-panel";
 import { catalogPartById } from "@/lib/v3/catalog";
+import { externalLinkProps } from "@/lib/v3/external-links";
 
 function totalText(total: { known: number; unknown: number }) {
   return `${total.known.toLocaleString()}${total.unknown ? ` + ${total.unknown} unknown` : ""}`;
@@ -98,7 +99,7 @@ export function PartReplaceCard({
                 : "Empty slot")}
           </strong>
           {current && link && (
-            <a href={link.href} target="_blank" rel="noopener noreferrer">
+            <a href={link.href} {...externalLinkProps}>
               {link.label} ↗
             </a>
           )}

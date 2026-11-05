@@ -6,6 +6,7 @@ import {
   type ModelGuess,
   type VisibleText,
 } from "@/lib/v3/model-guess";
+import { allowedExternalUrl, externalLinkProps } from "@/lib/v3/external-links";
 
 const categoryLabels: Record<string, string> = {
   case: "Case",
@@ -66,9 +67,11 @@ export function ModelGuesses({
                       : `Catalog has ${matches.map((match) => match.displayName).join(", ")}; search for it to use it.`}
                   </small>
                 ) : (
-                  <a href={search.url} target="_blank" rel="noopener noreferrer">
-                    {search.label} <ExternalLink size={12} aria-hidden="true" />
-                  </a>
+                  allowedExternalUrl(search.url) && (
+                    <a href={allowedExternalUrl(search.url)!} {...externalLinkProps}>
+                      {search.label} <ExternalLink size={12} aria-hidden="true" />
+                    </a>
+                  )
                 )}
               </li>
             );

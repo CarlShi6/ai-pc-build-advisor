@@ -9,7 +9,8 @@
   "compatibility_flags": ["nodejs_compat"],
   "vars": {
     "AI_PROVIDER": "openai",
-    "IMAGE_ANALYSIS_DAILY_CAP": "100",
+    "IMAGE_ANALYSIS_DAILY_CAP": "30",
+    "IMAGE_ANALYSIS_IP_DAILY_CAP": "10",
   },
   // Global daily cap on photo analyses. Create it with `wrangler d1 create aipc-image-cap` and
   // paste the printed database_id here; the table is created on first use.

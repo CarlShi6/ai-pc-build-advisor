@@ -8,8 +8,11 @@ import {
   analysisOfDraft,
   applyFullResult,
   applyStreamedPart,
+  endReadingDraft,
+  resumeReadingDraft,
   setDraftAppearance,
   startReadingDraft,
+  wasInterrupted,
 } from "@/lib/v3/progressive-draft";
 import { pendingSlots, type ReadingState } from "@/lib/v3/live-reading";
 import { fromLegacyBuild, toSavedBuildPayload } from "@/lib/v3/build-document";
@@ -103,5 +106,21 @@ describe("the Studio draft while a photo is read", () => {
     expect(analysis.quality).toBe(fixture.quality);
     expect(analysis.appearance).toEqual(fixture.appearance);
     expect(restored.imageContext!.appearanceRead).toEqual(fixture.appearance);
+  });
+
+  it("marks a draft while it is read, so a reload can tell the read was interrupted", () => {
+    const draft = applyStreamedPart(startReadingDraft("reading-1"), part("case"));
+    expect(draft.imageContext!.reading).toBe(true);
+    expect(wasInterrupted(draft, null)).toBe(true);
+    expect(wasInterrupted(draft, { id: "reading-1" })).toBe(false);
+    // Reading again keeps the draft and what was drawn, under the new read.
+    const again = resumeReadingDraft(draft, "reading-2");
+    expect(again.build.id).toBe(draft.build.id);
+    expect(again.imageContext!.analysisId).toBe("reading-2");
+    expect(again.imageContext!.appearance!.case).toEqual(look.case);
+    // A finished or stopped read clears the mark.
+    expect(applyFullResult(again, fixture).document.imageContext!.reading).toBeUndefined();
+    expect(endReadingDraft(again).imageContext!.reading).toBeUndefined();
+    expect(wasInterrupted(endReadingDraft(again), null)).toBe(false);
   });
 });
