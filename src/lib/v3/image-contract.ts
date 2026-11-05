@@ -18,6 +18,7 @@ import {
   type ModelGuess,
   type VisibleText,
 } from "@/lib/v3/model-guess";
+import type { StreamedPart } from "@/lib/v3/analysis-stream";
 
 /** Visible parts a photo can show are *not installed* (an empty case). Hidden parts never qualify. */
 export const absentPartCategories = ["gpu", "cooler", "fan", "motherboard"] as const;
@@ -105,32 +106,39 @@ export type ImageAnalyzer = (input: {
   height: number;
   /** Dev only: hash of the original photo, to save the response as a local replay. */
   replayKey?: string;
+  /**
+   * Called once the provider has accepted the request. Errors before it (not configured, rate
+   * limited, refused credentials) still answer with their own status; later ones are stream events.
+   */
+  onStarted?: () => void;
+  /** Each appearance category as soon as it has been read in full (see analysis-stream.ts). */
+  onPart?: (part: StreamedPart) => void;
 }) => Promise<ImageAnalysisResult>;
 
 export const observationJsonSchema = {
   type: "object",
   additionalProperties: false,
   required: [
-    "summary",
+    "appearance",
+    "absentParts",
     "quality",
     "qualityIssues",
+    "summary",
     "observations",
-    "absentParts",
-    "appearance",
     "modelGuesses",
     "visibleText",
   ],
+  // The provider writes properties in this order. Appearance comes first so a streamed read can
+  // draw each part early (analysis-stream.ts); observations and guesses come last.
   properties: {
     appearance: appearanceParamsJsonSchema,
-    modelGuesses: modelGuessJsonSchema,
-    visibleText: visibleTextJsonSchema,
-    summary: { type: "string" },
-    quality: { type: "string", enum: ["clear", "limited", "poor"] },
-    qualityIssues: { type: "array", items: { type: "string" } },
     absentParts: {
       type: "array",
       items: { type: "string", enum: [...absentPartCategories] },
     },
+    quality: { type: "string", enum: ["clear", "limited", "poor"] },
+    qualityIssues: { type: "array", items: { type: "string" } },
+    summary: { type: "string" },
     observations: {
       type: "array",
       items: {
@@ -176,6 +184,8 @@ export const observationJsonSchema = {
         },
       },
     },
+    modelGuesses: modelGuessJsonSchema,
+    visibleText: visibleTextJsonSchema,
   },
 } as const;
 

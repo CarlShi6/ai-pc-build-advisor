@@ -152,9 +152,12 @@ export interface BuildSceneProps {
   renderStyle?: RenderStyle;
   /** Diorama only: put the cut-away glass side and front back on. */
   casePanelsShown?: boolean;
+  /** Slots still being read from the photo: a dashed box marked "Reading…". */
+  reading?: SlotId[];
 }
 
 const FLOOR_Y = -1.7;
+const APPEAR_MS = 450;
 /** First visit hint ("Click a part to inspect it"), remembered once closed. */
 const HINT_KEY = "aipc-v3-scene-hint";
 
@@ -1126,6 +1129,7 @@ function SlotMesh({
   presentation,
   look,
   fans,
+  reading = false,
 }: {
   slot: SlotId;
   document: BuildDocumentV3;
@@ -1149,6 +1153,8 @@ function SlotMesh({
   look?: SlotAppearance;
   /** Confirmed case only: fans seen in the photo (a style note; fans are not Build slots). */
   fans?: PhotoFans | null;
+  /** Still being read from the photo: a dashed box; the part grows in when it arrives. */
+  reading?: boolean;
 }) {
   const group = useRef<Group>(null);
   const occupancy = slotOccupancy(document, slot);
@@ -1163,6 +1169,21 @@ function SlotMesh({
       ? [2.55, 3.05, 1.75]
       : layout[slot].size;
   const placed = useRef(false);
+  // A part read from the photo grows in over APPEAR_MS (not with reduced motion).
+  const wasReading = useRef(reading);
+  const appearAt = useRef<number | null>(null);
+  useEffect(() => {
+    if (wasReading.current && !reading && !prefersReducedMotion())
+      appearAt.current = performance.now();
+    wasReading.current = reading;
+  }, [reading]);
+  useFrame(() => {
+    const node = group.current;
+    if (!node || appearAt.current === null) return;
+    const t = Math.min(1, (performance.now() - appearAt.current) / APPEAR_MS);
+    node.scale.setScalar(0.82 + 0.18 * (1 - (1 - t) ** 3));
+    if (t === 1) appearAt.current = null;
+  });
   // Ease towards the resting pose; snap on the first frame and when the user prefers reduced motion.
   useFrame((_, delta) => {
     const node = group.current;
@@ -1196,7 +1217,7 @@ function SlotMesh({
     ? { color: "#8cc4ff", lineWidth: 3, opacity: 1 }
     : hovered
       ? { color: "#6aa6ff", lineWidth: 1.6, opacity: 0.95 }
-      : edgeColor && !dimmed && !(slot === "case" && (occupancy === "selected" || look))
+      : edgeColor && !dimmed && !reading && !(slot === "case" && (occupancy === "selected" || look))
         ? { color: edgeColor, lineWidth: 0.8, opacity: 0.45 }
         : null;
   const pickable = !(dimmed && slot === "case");
@@ -1271,6 +1292,25 @@ function SlotMesh({
               }
             />
           )
+        ) : reading ? (
+          // Still being read: the slot's volume, faint, inside a dashed box.
+          <mesh raycast={slot === "case" ? () => null : undefined}>
+            <boxGeometry args={size} />
+            <Mat
+              color="#23272b"
+              transparent
+              opacity={slot === "case" ? 0.04 : 0.12}
+              depthWrite={false}
+            />
+            <Edges
+              color="#9fb3c8"
+              dashed
+              dashSize={0.08}
+              gapSize={0.06}
+              transparent
+              opacity={0.85}
+            />
+          </mesh>
         ) : drawn?.kind === "ghost" ? (
           // Open motherboard slot: a faint generic board, so the parts around it have a base.
           <GhostContext.Provider value>
@@ -1878,6 +1918,7 @@ export default function BuildScene({
   sidePanelRemoved = false,
   renderStyle = "studio",
   casePanelsShown = false,
+  reading = [],
 }: BuildSceneProps) {
   const diorama = renderStyle === "diorama";
   const labelRefs = useRef<Partial<Record<SlotId, HTMLElement | null>>>({});
@@ -2172,6 +2213,7 @@ export default function BuildScene({
                         presentation={presentation}
                         look={looks[slot]}
                         fans={slot === "case" ? fans : null}
+                        reading={reading.includes(slot)}
                       />
                     ))}
                   </PanelOffsetContext.Provider>
@@ -2331,6 +2373,7 @@ export default function BuildScene({
           const look = looks[slot];
           // Drawn from the photo (parameters or an older text look): the label says so.
           const fromPhoto = !part && (!!look || slotModel(document, slot)?.kind === "appearance");
+          const isReading = !part && reading.includes(slot);
           return (
             <div
               key={slot}
@@ -2344,7 +2387,8 @@ export default function BuildScene({
               onPointerLeave={() => setLabelSlot((current) => (current === slot ? null : current))}
               data-color={look?.color ?? colorName(part?.color) ?? undefined}
               data-look={look ? "photo" : undefined}
-              className={`v3-scene-callout ${picked && selectedSlot === slot ? "active" : ""} ${occupancy} ${look ? "photo-look" : ""} ${isDimmed(slot, focusSlot) ? "dimmed" : ""}`}
+              data-reading={isReading || undefined}
+              className={`v3-scene-callout ${picked && selectedSlot === slot ? "active" : ""} ${occupancy} ${look ? "photo-look" : ""} ${isReading ? "reading" : ""} ${isDimmed(slot, focusSlot) ? "dimmed" : ""}`}
             >
               <button
                 type="button"
@@ -2352,17 +2396,19 @@ export default function BuildScene({
                 // Tab through the labels: the part they name gets the same blue box as a hover.
                 onFocus={() => setKeyboardSlot(slot)}
                 onBlur={() => setKeyboardSlot((current) => (current === slot ? null : current))}
-                aria-label={`${slotLabel[slot]}: ${part?.displayName ?? (fromPhoto ? PHOTO_APPEARANCE_LABEL : occupancy)}`}
+                aria-label={`${slotLabel[slot]}: ${part?.displayName ?? (isReading ? "Reading…" : fromPhoto ? PHOTO_APPEARANCE_LABEL : occupancy)}`}
                 title={look ? appearanceSummary(look) : undefined}
               >
                 <strong>{slotLabel[slot]}</strong>
                 <small>
                   {part?.model ??
-                    (fromPhoto
-                      ? PHOTO_APPEARANCE_LABEL
-                      : occupancy === "unresolved"
-                        ? "Review match"
-                        : "Add part")}
+                    (isReading
+                      ? "Reading…"
+                      : fromPhoto
+                        ? PHOTO_APPEARANCE_LABEL
+                        : occupancy === "unresolved"
+                          ? "Review match"
+                          : "Add part")}
                 </small>
               </button>
               {slot === "case" && fans && (

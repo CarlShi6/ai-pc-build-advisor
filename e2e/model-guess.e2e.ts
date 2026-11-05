@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
-import { clickUntil, openReady, selectedCount } from "./helpers";
+import { openMatchDrawer, readIntoStudio, selectedCount } from "./helpers";
 
 // Step B: the AI's model guesses and the text it read, shown as guesses. They never choose a
 // part, add a price or change the 3D. The real photo replays its gpt-5.4 reading (gitignored
@@ -22,15 +22,10 @@ const gpuGuess = replay?.raw?.modelGuesses?.find(
   (guess: { category: string }) => guess.category === "gpu",
 );
 
+/** Reads the photo into Studio and opens the match drawer. */
 async function loadFixture(page: Page, file: string) {
-  await openReady(page, "/");
-  await page.locator("input[type=file]").setInputFiles(file);
-  await clickUntil(
-    page.getByRole("button", { name: "Load local fixture (no AI call)" }),
-    async () => {
-      await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
-    },
-  );
+  await readIntoStudio(page, file, "/");
+  return openMatchDrawer(page);
 }
 
 test("real photo: a GPU guess from visible text, not in the catalog, stays a guess", async ({
@@ -42,9 +37,9 @@ test("real photo: a GPU guess from visible text, not in the catalog, stays a gue
   page.on("request", (request) => {
     if (request.url().includes("/api/image-analyses")) aiCalls += 1;
   });
-  await loadFixture(page, photo);
+  const drawer = await loadFixture(page, photo);
   const label = `${gpuGuess.brand} ${gpuGuess.model}`;
-  const guesses = page.getByRole("region", { name: "AI model guesses" });
+  const guesses = drawer.getByRole("region", { name: "AI model guesses" });
   const gpu = guesses.locator('li[data-guess-category="gpu"]');
   await expect(gpu.locator("strong")).toHaveText(`AI guess: ${label} · not in catalog`);
   await expect(gpu).toContainText("from visible text");
@@ -62,11 +57,7 @@ test("real photo: a GPU guess from visible text, not in the catalog, stays a gue
     page.locator('.v3-candidate-set[data-category="gpu"] .v3-candidate-card.guessed'),
   ).toHaveCount(0);
 
-  await page.getByRole("button", { name: "Build it in 3D" }).click();
-  const changes = page.getByRole("region", { name: "Suggested parts preview" });
-  for (const box of await changes.getByRole("checkbox").all()) await box.uncheck();
-  await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
-  await expect(page).toHaveURL(/\/studio$/);
+  await drawer.getByRole("button", { name: "Close" }).click();
   const scene = page.locator(".v3-scene-canvas");
   await expect(scene.locator("canvas")).toHaveCount(1, { timeout: 30_000 });
   // The 3D is still drawn from the photo's look, and nothing was selected or priced.
@@ -90,8 +81,8 @@ test("real photo: a GPU guess from visible text, not in the catalog, stays a gue
 });
 
 test("a guess the catalog holds is highlighted, never chosen", async ({ page }) => {
-  await loadFixture(page, "e2e/fixtures/white-build-glass-front.png");
-  const guess = page
+  const drawer = await loadFixture(page, "e2e/fixtures/white-build-glass-front.png");
+  const guess = drawer
     .getByRole("region", { name: "AI model guesses" })
     .locator('li[data-guess-category="case"]');
   await expect(guess.locator("strong")).toHaveText(

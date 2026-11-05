@@ -90,22 +90,31 @@ test("a stale tab gets a save conflict instead of overwriting", async ({ page, c
   await expect(page.getByRole("status").filter({ hasText: "Saved to My Builds" })).toBeVisible();
 });
 
-// A careful read takes about 35 s: the wait names the step being read and the elapsed time.
-test("the analysis wait shows what is being read, not a blank spinner", async ({ page }) => {
-  test.setTimeout(45_000);
+// Before reading starts, the upload page says what is happening; it never waits there for the
+// whole read (that happens in Studio).
+test("Analyze says it is starting the read, then answers errors on the upload page", async ({
+  page,
+}) => {
   await page.route("**/api/image-analyses", async (route) => {
-    await new Promise((resolve) => setTimeout(resolve, 8_000));
-    await route.abort();
+    await new Promise((resolve) => setTimeout(resolve, 1_500));
+    await route.fulfill({
+      status: 429,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "SESSION_RATE_LIMITED",
+          message: "Too many photo reads. Try again shortly.",
+        },
+      }),
+    });
   });
   await openReady(page, "/start/image");
   await page.locator("input[type=file]").setInputFiles(fixtureImage);
   await page.getByRole("button", { name: "Analyze image" }).click();
-  const wait = page.locator(".v3-analysis-wait");
-  await expect(wait.locator(".v3-analysis-status")).toContainText("Reading the case…");
-  await expect(wait.getByRole("listitem")).toHaveCount(6);
-  await expect(wait).toContainText("not live progress");
-  await expect(wait.locator(".v3-analysis-status")).toContainText("Reading the graphics card…", {
-    timeout: 8_000,
-  });
-  await expect(wait.locator('li[aria-current="step"]')).toHaveText("Reading the graphics card");
+  await expect(page.getByRole("status").filter({ hasText: "starting the read" })).toBeVisible();
+  const unavailable = page.getByRole("status", { name: "Photo reading unavailable" });
+  await expect(unavailable).toContainText("Too many photo reads.");
+  await expect(page).toHaveURL(/\/start\/image$/);
+  // Rate limited: Retry stays, as a secondary button.
+  await expect(page.getByRole("button", { name: "Retry analysis" })).toHaveClass(/v3-secondary/);
 });

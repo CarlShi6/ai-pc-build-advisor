@@ -1,10 +1,10 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { clickUntil, openReady } from "./helpers";
+import { openMatchDrawer, readIntoStudio } from "./helpers";
 
-// The review page's "Appearance from photo" block: the user corrects what the AI read, and the
-// Studio draws the corrected look. Uses the real-photo-1 replay (gitignored), so it skips
+// The match drawer's "Appearance from photo" block: the user corrects what the AI read, and the
+// Studio draws the corrected look at once. Uses the real-photo-1 replay (gitignored), so it skips
 // on machines without it.
 test.use({
   launchOptions: {
@@ -30,15 +30,9 @@ test("correcting the case to a dual-chamber showcase redraws it in the Studio", 
   page.on("request", (request) => {
     if (request.url().includes("/api/image-analyses")) aiCalls += 1;
   });
-  await openReady(page, "/");
-  await page.locator("input[type=file]").setInputFiles(photo);
-  await clickUntil(
-    page.getByRole("button", { name: "Load local fixture (no AI call)" }),
-    async () => {
-      await expect(page.getByRole("region", { name: "Appearance from photo" })).toBeVisible();
-    },
-  );
-  const look = page.getByRole("region", { name: "Appearance from photo" });
+  await readIntoStudio(page, photo, "/");
+  const drawer = await openMatchDrawer(page);
+  const look = drawer.getByRole("region", { name: "Appearance from photo" });
   const caseType = look.locator('label[data-path="case.type"]');
   const glass = look.locator('label[data-path="case.glass"]');
   await expect(caseType.locator("small")).toHaveText(/^AI read/);
@@ -50,11 +44,7 @@ test("correcting the case to a dual-chamber showcase redraws it in the Studio", 
   // Fields left alone keep the AI's value.
   await expect(look.locator('label[data-path="gpu.color"] small')).toHaveText(/^AI read/);
 
-  await page.getByRole("button", { name: "Build it in 3D" }).click();
-  const changes = page.getByRole("region", { name: "Suggested parts preview" });
-  for (const box of await changes.getByRole("checkbox").all()) await box.uncheck();
-  await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
-  await expect(page).toHaveURL(/\/studio$/);
+  await drawer.getByRole("button", { name: "Close" }).click();
   const scene = page.locator(".v3-scene-canvas");
   await expect(scene.locator("canvas")).toHaveCount(1, { timeout: 30_000 });
   await expect(scene).toHaveAttribute("data-slot-models", /case:appearance/);

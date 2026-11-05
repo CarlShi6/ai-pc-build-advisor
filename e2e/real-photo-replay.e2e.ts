@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { expect, test } from "@playwright/test";
-import { clickUntil, openReady } from "./helpers";
+import { readIntoStudio } from "./helpers";
 
 // Real photos, replayed: each photo in local-replays/ with a recorded analysis
 // (<sha256>.json, saved by the dev server with IMAGE_REPLAY_DIR) runs the photo flow without
@@ -33,19 +33,7 @@ test("real photos replay through the Studio without an AI call", async ({ page }
     if (request.url().includes("/api/image-analyses")) aiCalls += 1;
   });
   for (const photo of photos) {
-    await openReady(page, "/");
-    await page.locator("input[type=file]").setInputFiles(join(dir, photo));
-    await clickUntil(
-      page.getByRole("button", { name: "Load local fixture (no AI call)" }),
-      async () => {
-        await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
-      },
-    );
-    await page.getByRole("button", { name: "Build it in 3D" }).click();
-    const changes = page.getByRole("region", { name: "Suggested parts preview" });
-    for (const box of await changes.getByRole("checkbox").all()) await box.uncheck();
-    await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
-    await expect(page).toHaveURL(/\/studio$/);
+    await readIntoStudio(page, join(dir, photo), "/");
     await expect(page.locator(".v3-scene-canvas canvas")).toHaveCount(1, { timeout: 30_000 });
   }
   expect(aiCalls).toBe(0);

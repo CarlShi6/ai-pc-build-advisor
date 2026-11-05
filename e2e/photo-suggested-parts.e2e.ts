@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
-import { clickUntil, openReady, selectedCount } from "./helpers";
+import { openMatchDrawer, readIntoStudio, selectedCount } from "./helpers";
 
-// Visual redesign slices A and A2: a white photo sample → "Use suggested parts" → confirm → a
+// Visual redesign slices A and A2: a white photo sample → Studio → match drawer → confirm → a
 // white Studio. The samples are drawings with keyless dev fixtures (no AI call). Software WebGL.
 test.use({
   launchOptions: {
@@ -9,16 +9,11 @@ test.use({
   },
 });
 
+/** Reads a sample into Studio and opens the match drawer; returns its candidate review. */
 async function loadSample(page: Page, file: string) {
-  await openReady(page, "/");
-  await page.locator("input[type=file]").setInputFiles(`e2e/fixtures/${file}`);
-  await clickUntil(
-    page.getByRole("button", { name: "Load local fixture (no AI call)" }),
-    async () => {
-      await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
-    },
-  );
-  return page.getByRole("region", { name: "Catalog candidate review" });
+  await readIntoStudio(page, `e2e/fixtures/${file}`, "/");
+  const drawer = await openMatchDrawer(page);
+  return drawer.getByRole("region", { name: "Catalog candidate review" });
 }
 
 test("glass-front sample ranks the O11 first; suggested parts keep the photo fans", async ({
@@ -26,8 +21,7 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
 }) => {
   test.setTimeout(90_000);
   const review = await loadSample(page, "white-build-glass-front.png");
-  // Slice B layout: photo with outlined regions on the left, one disclaimer, tag lines.
-  await expect(page.locator(".v3-review-photo .v3-evidence-region").first()).toBeVisible();
+  // One disclaimer and tag lines.
   await expect(review.getByRole("note").filter({ hasText: "Visual similarity only" })).toHaveCount(
     1,
   );
@@ -40,9 +34,6 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   await cases.getByText("Why this match").first().click();
   await expect(cases).toContainText("Front panel: glass (manufacturer page, verified 2026-10-26)");
   await expect(cases.getByText("Other options (4)")).toBeVisible();
-  // Hovering a part outlines its regions on the photo.
-  await cases.hover();
-  await expect(page.locator('.v3-evidence-region.active[data-group="case"]').first()).toBeVisible();
   await expect(cases.locator(".v3-equally-likely")).toHaveCount(0);
 
   // The white GPUs look the same in the photo: the user picks one.
@@ -56,7 +47,7 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   await expect(gpus.locator(".v3-equally-likely")).toHaveCount(0);
 
   // The change list comes first; nothing is applied yet.
-  await page.getByRole("button", { name: "Build it in 3D" }).click();
+  await page.getByRole("button", { name: "Preview matches" }).click();
   const changes = page.getByRole("region", { name: "Suggested parts preview" });
   await expect(changes).toContainText("Your Build · preview, not applied");
   const caseRow = changes.locator('tr[data-category="case"]');
@@ -75,7 +66,6 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   await expect(coolerRow).toContainText("Top match, filled in");
   await expect(changes).toContainText("Incomplete · 3 of 8 slots selected");
   await expect(changes).toContainText("unknown price, not counted");
-  await expect(page).toHaveURL(/\/$/);
 
   // Filled-in rows can be unticked; the user's own choice has no checkbox.
   await expect(changes.locator('tr[data-category="gpu"] input[type=checkbox]')).toHaveCount(0);
@@ -83,8 +73,8 @@ test("glass-front sample ranks the O11 first; suggested parts keep the photo fan
   // Untick the cooler: it stays unconfirmed and is drawn from the photo.
   await coolerRow.getByRole("checkbox").uncheck();
 
-  await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
-  await expect(page).toHaveURL(/\/studio$/);
+  await changes.getByRole("button", { name: "Apply to this build" }).click();
+  await expect(page.getByRole("dialog", { name: "Match parts to a model" })).toHaveCount(0);
   await expect(selectedCount(page)).toHaveText("2 / 8");
 
   // 3D: white catalog case and GPU; the confirmed case still shows the photo's five fans.
@@ -150,7 +140,7 @@ test("a sample that cannot separate the cases shows them as equally likely", asy
   await expect(cases.locator(".v3-candidate-card.chosen")).toHaveCount(0);
   await expect(cases.locator(".v3-state-chip")).toHaveText("Choose one");
 
-  await page.getByRole("button", { name: "Build it in 3D" }).click();
+  await page.getByRole("button", { name: "Preview matches" }).click();
   const caseRow = page
     .getByRole("region", { name: "Suggested parts preview" })
     .locator('tr[data-category="case"]');
@@ -162,7 +152,7 @@ test("a sample that cannot separate the cases shows them as equally likely", asy
 test("a filled-in row can be unticked and stays unconfirmed", async ({ page }) => {
   // Black sample: the all-black DeepCool AK620 ZERO DARK leads the coolers on its own.
   await loadSample(page, "black-mesh-tower.png");
-  await page.getByRole("button", { name: "Build it in 3D" }).click();
+  await page.getByRole("button", { name: "Preview matches" }).click();
   const changes = page.getByRole("region", { name: "Suggested parts preview" });
   const coolerRow = changes.locator('tr[data-category="cooler"]');
   await expect(coolerRow).toContainText("DeepCool AK620 ZERO DARK");

@@ -31,6 +31,9 @@ export function getServerConfig() {
     imageAiModel: process.env.IMAGE_AI_MODEL || "gpt-5.4",
     // Reasoning effort for a reasoning image model (gpt-5.x, o-series): none | minimal | low | ...
     imageAiReasoningEffort: process.env.IMAGE_AI_REASONING_EFFORT || "low",
+    // Optional OpenAI-compatible base URL for photo analysis (an AI gateway, or the local fake
+    // provider the preview E2E uses). Unset: api.openai.com.
+    imageAiBaseUrl: process.env.IMAGE_AI_BASE_URL || undefined,
     // Global photo analyses per UTC day (default 100); counted in the IMAGE_CAP_DB D1 binding.
     imageAnalysisDailyCap: process.env.IMAGE_ANALYSIS_DAILY_CAP,
     // Cloudflare Turnstile secret; when set, Analyze needs a passed human check.

@@ -25,6 +25,7 @@ import { normalizeRecommendedBuildInput, ValidationError } from "@/lib/validatio
 import { readBoundedImage, ImageInputError } from "@/lib/v3/image-input";
 import { analyzeReferenceImage, ImageAnalysisError } from "@/lib/v3/image-analysis.server";
 import type { ImageAnalyzer } from "@/lib/v3/image-contract";
+import { encodeEvent, NDJSON, type AnalysisStreamEvent } from "@/lib/v3/analysis-stream";
 import { workerBindings, type WorkerBindings } from "@/lib/v3/cloudflare-env.server";
 import {
   D1DailyCap,
@@ -241,11 +242,46 @@ export async function handleInternalApiRequest(
         const replayKey = import.meta.env.DEV
           ? (request.headers.get("x-aipc-replay-key") ?? undefined)
           : undefined;
-        const result = await (dependencies.imageAnalyzer ?? analyzeReferenceImage)({
-          ...image,
-          ...(isReplayKey(replayKey) && { replayKey }),
+        const analyzer = dependencies.imageAnalyzer ?? analyzeReferenceImage;
+        const input = { ...image, ...(isReplayKey(replayKey) && { replayKey }) };
+        if (!request.headers.get("accept")?.includes(NDJSON))
+          return jsonResponse(await analyzer(input), { headers });
+        // Streamed: every check above, and any error before the provider accepts the request,
+        // answers with its own status; after that, parts, the result and errors are events.
+        const { readable, writable } = new TransformStream<string, string>();
+        const writer = writable.getWriter();
+        // A closed tab ends the stream; its failed writes are not errors.
+        const send = (event: AnalysisStreamEvent) =>
+          void writer.write(encodeEvent(event)).catch(() => undefined);
+        let isStarted = false;
+        let markStarted = () => {};
+        const started = new Promise<void>((resolve) => (markStarted = resolve));
+        const start = () => {
+          if (!isStarted) send({ type: "started" });
+          isStarted = true;
+          markStarted();
+        };
+        const work = analyzer({ ...input, onStarted: start, onPart: send });
+        // A fake analyzer may finish without calling onStarted; its errors still come first.
+        await Promise.race([started, work]);
+        start();
+        void work
+          .then((result) => send({ type: "done", result }))
+          .catch((error: unknown) =>
+            send({
+              type: "error",
+              code: error instanceof ImageAnalysisError ? error.code : "ANALYSIS_FAILED",
+              message:
+                error instanceof ImageAnalysisError
+                  ? error.message
+                  : "Image analysis is unavailable. You can continue manually.",
+            }),
+          )
+          .finally(() => void writer.close().catch(() => undefined));
+        return new Response(readable.pipeThrough(new TextEncoderStream()), {
+          status: 200,
+          headers: { ...headers, "content-type": `${NDJSON}; charset=utf-8` },
         });
-        return jsonResponse(result, { headers });
       } catch (error) {
         if (!(error instanceof ImageAnalysisError)) throw error;
         // Requests that never reached the provider don't use up the session's allowance.

@@ -1,4 +1,5 @@
-import type { ImageAnalysisResult } from "@/lib/v3/image-contract";
+import { NDJSON, readEvents } from "@/lib/v3/analysis-stream";
+import type { ReadingSource } from "@/lib/v3/live-reading";
 import { ImageInputError, inspectImage, MAX_IMAGE_BYTES } from "@/lib/v3/image-input";
 
 export class ImageClientError extends Error {
@@ -55,20 +56,26 @@ export async function prepareImageForAnalysis(file: File): Promise<Blob> {
   }
 }
 
-export async function requestImageAnalysis(
+/**
+ * Starts a streamed analysis. Every check before the provider accepts the photo (limits, daily
+ * cap, human check, configuration) answers here as an ImageClientError, so the upload page can
+ * show it; once this resolves, reading goes on in Studio (see live-reading.ts).
+ */
+export async function openImageAnalysisStream(
   image: Blob,
   signal?: AbortSignal,
   /** Dev only: hash of the original photo, so the dev server can save a local replay. */
   replayKey?: string,
   /** Cloudflare Turnstile token, when the human check is configured. */
   turnstileToken?: string,
-): Promise<ImageAnalysisResult> {
+): Promise<ReadingSource> {
   let response: Response;
   try {
     response = await fetch("/api/image-analyses", {
       method: "POST",
       headers: {
         "content-type": image.type,
+        accept: NDJSON,
         ...(replayKey && { "x-aipc-replay-key": replayKey }),
         ...(turnstileToken && { "x-turnstile-token": turnstileToken }),
       },
@@ -83,8 +90,8 @@ export async function requestImageAnalysis(
       "NETWORK_ERROR",
     );
   }
-  const body = await response.json().catch(() => null);
-  if (!response.ok) {
+  if (!response.ok || !response.body) {
+    const body = await response.json().catch(() => null);
     const code = typeof body?.error?.code === "string" ? body.error.code : "ANALYSIS_FAILED";
     const message =
       typeof body?.error?.message === "string"
@@ -92,7 +99,15 @@ export async function requestImageAnalysis(
         : "Image analysis is unavailable. Continue manually or retry.";
     throw new ImageClientError(message, code, response.status);
   }
-  if (body?.status !== "ready" || !Array.isArray(body.observations))
-    throw new ImageClientError("Image analysis returned an invalid result.", "INVALID_ANALYSIS");
-  return body as ImageAnalysisResult;
+  const stream = response.body;
+  return async (onEvent, readSignal) => {
+    const stop = () => void stream.cancel().catch(() => undefined);
+    readSignal.addEventListener("abort", stop, { once: true });
+    try {
+      await readEvents(stream, onEvent);
+    } finally {
+      readSignal.removeEventListener("abort", stop);
+    }
+    if (readSignal.aborted) throw new Error("aborted");
+  };
 }

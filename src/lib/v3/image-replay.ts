@@ -1,5 +1,8 @@
 import { createImageAnalysisResult, type ImageAnalysisResult } from "@/lib/v3/image-contract";
 import type { ImageMime } from "@/lib/v3/image-input";
+import { anyKnown } from "@/lib/v3/appearance-params";
+import { createPartScanner, streamedCategories, type StreamedPart } from "@/lib/v3/analysis-stream";
+import type { ReadingSource } from "@/lib/v3/live-reading";
 
 /**
  * Development replays of real image analyses. With IMAGE_REPLAY_DIR=local-replays, the dev server
@@ -19,6 +22,8 @@ export interface ImageReplay {
   usage?: { inputTokens: number; outputTokens: number } | null;
   image: { mime: ImageMime; width: number; height: number };
   raw: unknown;
+  /** Streamed reads: each text chunk with its time since the request (ms), to replay the pace. */
+  stream?: { chunks: { ms: number; text: string }[] };
 }
 
 /** Lowercase hex SHA-256 of a file's original bytes: the replay key. */
@@ -52,4 +57,68 @@ export async function loadReplay(key: string): Promise<ImageAnalysisResult | nul
     `replay-${key.slice(0, 12)}`,
     "fixture",
   );
+}
+
+/** The recorded file itself (dev only), for playback at its recorded pace. */
+export async function loadReplayRecord(key: string): Promise<ImageReplay | null> {
+  const load = replayFiles[pathFor(key)];
+  return load ? load() : null;
+}
+
+function wait(ms: number, signal: AbortSignal) {
+  return new Promise<void>((resolve, reject) => {
+    if (signal.aborted) return reject(new Error("aborted"));
+    const timer = setTimeout(resolve, ms);
+    signal.addEventListener(
+      "abort",
+      () => {
+        clearTimeout(timer);
+        reject(new Error("aborted"));
+      },
+      { once: true },
+    );
+  });
+}
+
+/**
+ * Plays a finished result as a stream with a short fixed rhythm: a pause for "reading", each
+ * category the photo shows, then the result. For fixtures and replays recorded before streaming.
+ */
+export function resultSource(result: ImageAnalysisResult, speed = 1): ReadingSource {
+  return async (onEvent, signal) => {
+    onEvent({ type: "started" });
+    await wait(700 / speed, signal);
+    for (const category of streamedCategories) {
+      const value = result.appearance?.[category];
+      if (!value || !anyKnown(value as Record<string, string>)) continue;
+      onEvent({ type: "part", category, value } as StreamedPart);
+      await wait(160 / speed, signal);
+    }
+    await wait(500 / speed, signal);
+    onEvent({ type: "done", result });
+  };
+}
+
+/** Plays a recorded stream at its recorded pace (or faster), through the same part scanner. */
+export function replaySource(replay: ImageReplay, speed = 1): ReadingSource {
+  const result = () =>
+    createImageAnalysisResult(
+      replay.raw,
+      replay.image,
+      `replay-${replay.key.slice(0, 12)}`,
+      "fixture",
+    );
+  const chunks = replay.stream?.chunks;
+  if (!chunks?.length) return (onEvent, signal) => resultSource(result(), speed)(onEvent, signal);
+  return async (onEvent, signal) => {
+    onEvent({ type: "started" });
+    const feed = createPartScanner(onEvent);
+    const start = performance.now();
+    for (const chunk of chunks) {
+      const due = chunk.ms / speed - (performance.now() - start);
+      if (due > 0) await wait(due, signal);
+      feed(chunk.text);
+    }
+    onEvent({ type: "done", result: result() });
+  };
 }

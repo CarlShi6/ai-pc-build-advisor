@@ -1,5 +1,5 @@
 import { expect, test, type Locator } from "@playwright/test";
-import { clickUntil, openReady } from "./helpers";
+import { openMatchDrawer, openReady, readIntoStudio } from "./helpers";
 
 // Visual redesign slice C: one graphite palette; blue only for clickable or selected, amber only
 // for pending, grey dashed only for unselected. 2D view only (no WebGL needed).
@@ -17,23 +17,17 @@ test("home, review and Studio share the graphite palette and colour meanings", a
   await openReady(page, "/");
   expect(await css(page.locator(".v3-app"), "background-color")).toBe("rgb(18, 20, 23)");
 
-  await page.locator("input[type=file]").setInputFiles("e2e/fixtures/white-build-glass-front.png");
-  await clickUntil(
-    page.getByRole("button", { name: "Load local fixture (no AI call)" }),
-    async () => {
-      await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
-    },
-  );
+  await readIntoStudio(page, "e2e/fixtures/white-build-glass-front.png", "/");
+  const drawer = await openMatchDrawer(page);
   // The primary action is the strong blue; a tie (pending) chip is amber and says so in text.
-  const use = page.locator('.v3-candidate-set[data-category="case"] .v3-primary').first();
+  const use = drawer.locator('.v3-candidate-set[data-category="case"] .v3-primary').first();
   expect(await css(use, "background-color")).toBe(accentStrong);
-  const tieChip = page.locator('.v3-candidate-set[data-category="gpu"] .v3-state-chip');
+  const tieChip = drawer.locator('.v3-candidate-set[data-category="gpu"] .v3-state-chip');
   await expect(tieChip).toHaveText("Choose one");
   expect(await css(tieChip, "color")).toBe(pending);
 
-  await page.getByRole("button", { name: "Build it in 3D" }).click();
-  await page.getByRole("button", { name: "Confirm and open Build Studio" }).click();
-  await expect(page).toHaveURL(/\/studio$/);
+  await drawer.getByRole("button", { name: "Preview matches" }).click();
+  await drawer.getByRole("button", { name: "Apply to this build" }).click();
 
   // 2D grid: the selected slot is outlined in blue, a photo-only slot is amber (pending) and an
   // empty slot is grey dashed, each with its own text.

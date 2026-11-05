@@ -4,8 +4,17 @@ import type { Build, SavedBuild } from "@/types/build";
 import type { Part, PartCategory } from "@/types/parts";
 import type { CandidateReview } from "@/lib/v3/candidate-matcher";
 import type { VisibleCatalogCategory } from "@/lib/v3/appearance-catalog";
-import type { VisualObservation } from "@/lib/v3/image-contract";
-import { readAppearanceParams, type AppearanceParams } from "@/lib/v3/appearance-params";
+import {
+  absentPartCategories,
+  type AbsentPartCategory,
+  type ImageAnalysisResult,
+  type VisualObservation,
+} from "@/lib/v3/image-contract";
+import {
+  readAppearanceParams,
+  type AppearanceCorrection,
+  type AppearanceParams,
+} from "@/lib/v3/appearance-params";
 import {
   modelGuessSchema,
   visibleTextSchema,
@@ -48,6 +57,13 @@ export interface ImageBuildContext {
   /** Step B: the AI model guesses and legible text, shown as guesses; they never select a part. */
   modelGuesses?: ModelGuess[];
   visibleText?: VisibleText[];
+  /** From the full read, for the match drawer; absent on drafts from before streamed reading. */
+  summary?: string;
+  /** The look as the AI read it, before the user's changes (the drawer shows both). */
+  appearanceRead?: AppearanceParams;
+  quality?: ImageAnalysisResult["quality"];
+  absentParts?: ImageAnalysisResult["absentParts"];
+  appearanceCorrections?: AppearanceCorrection[];
   reviews: Partial<Record<VisibleCatalogCategory, CandidateReview>>;
   visualPriorities: VisualPriority[];
   plannedSelections: Partial<
@@ -238,6 +254,19 @@ function readImageContext(value: unknown, build: Build): ImageBuildContext | und
     appearanceUserSet: appearance ? userSet : undefined,
     modelGuesses: guesses.success ? guesses.data : undefined,
     visibleText: text.success ? text.data : undefined,
+    summary: typeof value.summary === "string" ? value.summary.slice(0, 500) : undefined,
+    appearanceRead: readAppearanceParams(value.appearanceRead),
+    quality: ["clear", "limited", "poor"].includes(value.quality as string)
+      ? (value.quality as ImageBuildContext["quality"])
+      : undefined,
+    absentParts: Array.isArray(value.absentParts)
+      ? value.absentParts.filter((item): item is AbsentPartCategory =>
+          (absentPartCategories as readonly unknown[]).includes(item),
+        )
+      : undefined,
+    appearanceCorrections: Array.isArray(value.appearanceCorrections)
+      ? (value.appearanceCorrections as AppearanceCorrection[]).slice(0, 12)
+      : undefined,
   };
 }
 

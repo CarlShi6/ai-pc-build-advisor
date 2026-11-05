@@ -1,30 +1,23 @@
 import { expect, test, type Page } from "@playwright/test";
-import { clickUntil, openReady, selectedCount } from "./helpers";
+import { openMatchDrawer, readIntoStudio, selectedCount } from "./helpers";
 
 // Stage 1: a part the photo shows but nobody confirmed. The Studio shows the photo evidence, the
 // closest-looking catalog parts (never "this part"), a search by name and "keep unknown", and it
 // keeps the review's decisions. Local sample, no AI call; the 2D view so it needs no WebGL.
 async function photoDraft(page: Page) {
-  await openReady(page, "/");
-  await page.locator("input[type=file]").setInputFiles("e2e/fixtures/white-build-glass-front.png");
-  await clickUntil(
-    page.getByRole("button", { name: "Load local fixture (no AI call)" }),
-    async () => {
-      await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
-    },
-  );
+  await readIntoStudio(page, "e2e/fixtures/white-build-glass-front.png", "/");
+  const drawer = await openMatchDrawer(page);
   // Exclude the case's top match in the review; the other white cases tie, so it stays open.
-  const cases = page.locator('.v3-candidate-set[data-category="case"]');
+  const cases = drawer.locator('.v3-candidate-set[data-category="case"]');
   await cases.getByLabel(/More options for/).click();
   const exclude = cases.getByRole("button", { name: /^Exclude / });
   const excludedName = (await exclude.innerText()).replace(/^Exclude /, "");
   await exclude.click();
-  await page.getByRole("button", { name: "Build it in 3D" }).click();
-  const changes = page.getByRole("region", { name: "Suggested parts preview" });
+  await drawer.getByRole("button", { name: "Preview matches" }).click();
+  const changes = drawer.getByRole("region", { name: "Suggested parts preview" });
   // The filled-in cooler is unticked so the Studio starts with nothing selected.
   await changes.locator('tr[data-category="cooler"]').getByRole("checkbox").uncheck();
-  await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
-  await expect(page).toHaveURL(/\/studio$/);
+  await changes.getByRole("button", { name: "Apply to this build" }).click();
   await page.getByRole("button", { name: "2D view" }).click();
   return excludedName;
 }

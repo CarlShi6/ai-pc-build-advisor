@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { clickUntil, openReady } from "./helpers";
+import { readIntoStudio } from "./helpers";
 
 // Step A: with no catalog model confirmed, the 3D still looks like the photo. Each part is drawn
 // from the photo's appearance parameters, labelled as estimated proportions, never as a model.
@@ -10,21 +10,9 @@ test.use({
   },
 });
 
-/** Loads a sample and opens the Studio with every suggested part left unconfirmed. */
+/** Reads a sample into Studio; nothing is confirmed until the user picks it. */
 async function openUnconfirmed(page: Page, file: string) {
-  await openReady(page, "/");
-  await page.locator("input[type=file]").setInputFiles(`e2e/fixtures/${file}`);
-  await clickUntil(
-    page.getByRole("button", { name: "Load local fixture (no AI call)" }),
-    async () => {
-      await expect(page.getByRole("region", { name: "Catalog candidate review" })).toBeVisible();
-    },
-  );
-  await page.getByRole("button", { name: "Build it in 3D" }).click();
-  const changes = page.getByRole("region", { name: "Suggested parts preview" });
-  for (const box of await changes.getByRole("checkbox").all()) await box.uncheck();
-  await changes.getByRole("button", { name: "Confirm and open Build Studio" }).click();
-  await expect(page).toHaveURL(/\/studio$/);
+  await readIntoStudio(page, `e2e/fixtures/${file}`, "/");
   const scene = page.locator(".v3-scene-canvas");
   await expect(scene.locator("canvas")).toHaveCount(1, { timeout: 30_000 });
   return scene;

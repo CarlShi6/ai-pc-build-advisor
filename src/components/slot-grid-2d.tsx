@@ -26,12 +26,15 @@ export function SlotGrid2D({
   focusSlot,
   onPick,
   focusCard,
+  reading = [],
 }: {
   document: BuildDocumentV3;
   selectedSlot: SlotId;
   focusSlot: SlotId | null;
   onPick: (slot: SlotId) => void;
   focusCard: ReactNode;
+  /** Slots still being read from the photo. */
+  reading?: SlotId[];
 }) {
   const looks = photoAppearance(document);
   return (
@@ -41,6 +44,7 @@ export function SlotGrid2D({
           const part = selectedPart(document, slot);
           const occupancy = slotOccupancy(document, slot);
           const look = looks[slot];
+          const isReading = !part && reading.includes(slot);
           return (
             <button
               type="button"
@@ -48,26 +52,31 @@ export function SlotGrid2D({
               data-slot={slot}
               data-color={look?.color ?? colorName(part?.color) ?? undefined}
               data-look={look ? "photo" : undefined}
-              className={`${occupancy} ${selectedSlot === slot ? "active" : ""}`}
+              data-reading={isReading || undefined}
+              className={`${occupancy} ${selectedSlot === slot ? "active" : ""} ${isReading ? "reading" : ""}`}
               aria-pressed={focusSlot === slot}
               onClick={() => onPick(slot)}
             >
               <span className="v3-slot-grid-label">{slotLabel[slot]}</span>
               <strong>
                 {part?.displayName ??
-                  (look
-                    ? appearanceSummary(look)
-                    : occupancy === "unresolved"
-                      ? "Identity unresolved"
-                      : "No part yet")}
+                  (isReading
+                    ? "Reading…"
+                    : look
+                      ? appearanceSummary(look)
+                      : occupancy === "unresolved"
+                        ? "Identity unresolved"
+                        : "No part yet")}
               </strong>
               <small>
                 {!part
-                  ? look
-                    ? PHOTO_APPEARANCE_LABEL
-                    : occupancy === "unresolved"
-                      ? "Review the match"
-                      : "Add part"
+                  ? isReading
+                    ? "From your photo"
+                    : look
+                      ? PHOTO_APPEARANCE_LABEL
+                      : occupancy === "unresolved"
+                        ? "Review the match"
+                        : "Add part"
                   : part.owned
                     ? "Already owned"
                     : priceUnknown(part)

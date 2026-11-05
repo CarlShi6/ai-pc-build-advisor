@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useCallback, useEffect, useState, type ComponentType } from "react";
+import { useCallback, useEffect, useState, useSyncExternalStore, type ComponentType } from "react";
 import {
   ArrowRight,
   Check,
@@ -69,6 +69,16 @@ import { priceCoverage, priceUnknown } from "@/lib/v3/catalog";
 import { DISCLOSURE_NOTE, sceneDisclosure } from "@/lib/v3/scene-disclosure";
 import { keepSlotUnknown, slotIdentityHelp } from "@/lib/v3/slot-identity";
 import { SlotIdentityPanel } from "@/components/slot-identity-panel";
+import { ReadingStatus } from "@/components/reading-status";
+import { PhotoMatchDrawer } from "@/components/photo-match-drawer";
+import {
+  pendingSlots,
+  readingOf,
+  readingState,
+  stopReading,
+  subscribeReading,
+} from "@/lib/v3/live-reading";
+import { analysisOfDraft, matchableCount, matchButtonLabel } from "@/lib/v3/progressive-draft";
 import { renderStyles, type RenderStyle } from "@/lib/v3/scene-diorama";
 
 const RENDER_STYLE_KEY = "aipc-v3-render-style";
@@ -141,6 +151,10 @@ function StudioPage() {
     setDocument(draft);
     if (draft?.savedBuildId) setSavedRevision(draft.revision);
   }, []);
+  // A photo being read writes each part into the session draft; show it as it lands.
+  const reading = useSyncExternalStore(subscribeReading, readingState, () => null);
+  useEffect(() => subscribeReading(() => setDocument(readDraft())), []);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => {
     if (view !== "3d") return;
     let active = true;
@@ -245,6 +259,10 @@ function StudioPage() {
       </V3Shell>
     );
   const status = completeness(document);
+  const live = readingOf(reading, document.imageContext?.analysisId);
+  const stillReading = live?.status === "reading";
+  const pending = pendingSlots(live);
+  const drawerAnalysis = document.imageContext && !stillReading ? analysisOfDraft(document) : null;
   const current = selectedPart(document, selectedSlot);
   const proposal = candidate ? proposePartSelection(document, selectedSlot, candidate) : null;
   const preview = proposal?.candidate ?? null;
@@ -308,16 +326,18 @@ function StudioPage() {
                 ? saveError
                 : saving
                   ? "Saving…"
-                  : savedRevision === document.revision
-                    ? "Saved to My Builds"
-                    : document.savedBuildId
-                      ? "Unsaved changes"
-                      : "Not saved yet"}
+                  : stillReading
+                    ? "Save once the photo is read"
+                    : savedRevision === document.revision
+                      ? "Saved to My Builds"
+                      : document.savedBuildId
+                        ? "Unsaved changes"
+                        : "Not saved yet"}
             </span>
             <button
               type="button"
               className="v3-primary"
-              disabled={saving || savedRevision === document.revision}
+              disabled={saving || stillReading || savedRevision === document.revision}
               onClick={() => void saveDraft(document)}
             >
               <Save size={16} /> {document.savedBuildId ? "Save changes" : "Save build"}
@@ -347,6 +367,17 @@ function StudioPage() {
             </Link>
           </div>
         </div>
+        {live && <ReadingStatus reading={live} onDismissFailure={stopReading} />}
+        {drawerAnalysis && (
+          <button
+            type="button"
+            className="v3-secondary v3-match-open"
+            aria-expanded={drawerOpen}
+            onClick={() => setDrawerOpen((open) => !open)}
+          >
+            {matchButtonLabel(matchableCount(document, drawerAnalysis))}
+          </button>
+        )}
         <section className="v3-scene-panel" aria-label="Build visualization">
           <div className="v3-scene-toolbar">
             <div>
@@ -411,6 +442,7 @@ function StudioPage() {
                     sidePanelRemoved={sidePanelRemoved}
                     renderStyle={renderStyle}
                     casePanelsShown={casePanelsShown}
+                    reading={pending}
                   />
                 </SceneBoundary>
               ) : (
@@ -484,6 +516,7 @@ function StudioPage() {
                 selectedSlot={selectedSlot}
                 focusSlot={focusSlot}
                 focusCard={replaceCard}
+                reading={pending}
                 onPick={(slot) => {
                   setSelectedSlot(slot);
                   setCandidate(null);
@@ -931,6 +964,14 @@ function StudioPage() {
             </summary>
             <pre>{document.sourceInput}</pre>
           </details>
+        )}
+        {drawerOpen && drawerAnalysis && (
+          <PhotoMatchDrawer
+            key={document.imageContext?.analysisId}
+            document={document}
+            onCommit={commit}
+            onClose={() => setDrawerOpen(false)}
+          />
         )}
       </main>
     </V3Shell>
