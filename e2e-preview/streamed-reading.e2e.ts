@@ -62,14 +62,14 @@ test("the worker streams each part as it is read, then the result", async ({ pag
   ]);
   const at = (name: string) =>
     arrivals.events.find((event) => (event.category ?? event.type) === name)!.ms;
-  // "started" comes before the provider's reasoning pause, the case right after it, and the
-  // result later still: nothing was held back until the end.
-  expect(at("case") - at("started")).toBeGreaterThan(800);
-  expect(at("done") - at("case")).toBeGreaterThan(400);
-  // Moderation and the PC check (run together) both finished before the read began.
+  // The fast read draws the parts while the full read is still in its reasoning pause (1.2 s),
+  // and the result comes later still: nothing was held back until the end.
+  expect(at("motherboard") - at("started")).toBeLessThan(1_000);
+  expect(at("done") - at("motherboard")).toBeGreaterThan(800);
+  // Moderation and the kind check (run together) both finished before the two reads began.
   const calls: string[] = await (await request.get(`${FAKE_PROVIDER}/calls`)).json();
   expect(calls.slice(0, 2).sort()).toEqual(["moderation", "pc-check"]);
-  expect(calls.slice(2)).toEqual(["read"]);
+  expect(calls.slice(2).sort()).toEqual(["fast", "read"]);
 });
 
 test("Analyze opens Studio, which fills in part by part", async ({ page }) => {
@@ -78,7 +78,10 @@ test("Analyze opens Studio, which fills in part by part", async ({ page }) => {
   await page.getByRole("button", { name: "Analyze image" }).click();
   await expect(page).toHaveURL(/\/studio$/);
   await expect(page.getByRole("status", { name: "Reading the photo" })).toBeVisible();
-  await expect(page.getByText("Graphics card found")).toBeVisible();
+  // The fast read brings all six parts within a moment; the last four notices show.
+  await expect(page.getByText("Motherboard found")).toBeVisible();
+  // The fast read saw a white GPU light, the full read blue: the full read wins, with a notice.
+  await expect(page.getByText("Adjusted after full read")).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole("button", { name: /can be matched to a model/ })).toBeVisible({
     timeout: 20_000,
   });

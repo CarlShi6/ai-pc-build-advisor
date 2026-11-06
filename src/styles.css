@@ -7237,6 +7237,15 @@
 }
 
 /* Streamed photo reading in Studio: the reading line, found notices, Reading… slots, match drawer. */
+.v3-photo-unclear {
+  margin: 0 0 10px;
+  padding: 10px 14px;
+  border: 1px solid color-mix(in srgb, var(--g-pending) 45%, var(--g-line));
+  border-radius: 11px;
+  background: color-mix(in srgb, var(--g-pending) 10%, transparent);
+  color: var(--g-text);
+  font-size: 13px;
+}
 .v3-reading-line {
   display: flex;
   align-items: center;

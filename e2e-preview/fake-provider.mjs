@@ -1,7 +1,8 @@
 // A stand-in for the OpenAI API, for the preview E2E only. The prechecks get answers at once
-// (moderation: not flagged; the "is it a PC?" check: yes); the streamed read gets a structured
-// read of a white showcase build, a few characters at a time, after a pause like the model's
-// reasoning. GET /calls lists the calls in the order they arrived, so a test can check the
+// (moderation: not flagged; the photo kind: pc_build). The fast read (schema "pc_appearance")
+// streams the look after a short pause, with the GPU light read as white; the full read streams
+// the whole structured read of a white showcase build after a pause like the model's reasoning,
+// with the light as blue, so Studio shows "Adjusted after full read". GET /calls lists the calls in the order they arrived, so a test can check the
 // prechecks ran before the read. Nothing here talks to OpenAI; the key the worker sends is a
 // placeholder that this server ignores.
 //
@@ -12,6 +13,7 @@ import { readFileSync } from "node:fs";
 
 const PORT = Number(process.env.FAKE_PROVIDER_PORT ?? 8790);
 const THINK_MS = 1_200;
+const FAST_THINK_MS = 200;
 const CHUNK_MS = 40;
 const replayChunks = process.env.FAKE_REPLAY
   ? JSON.parse(readFileSync(process.env.FAKE_REPLAY, "utf8")).stream.chunks.map(
@@ -84,18 +86,23 @@ http
             id: "msg_check",
             role: "assistant",
             status: "completed",
-            content: [{ type: "output_text", annotations: [], text: '{"shows_desktop_pc":true}' }],
+            content: [{ type: "output_text", annotations: [], text: '{"kind":"pc_build"}' }],
           },
         ],
       });
     }
-    calls.push("read");
+    const fast = JSON.parse(body).text?.format?.name === "pc_appearance";
+    calls.push(fast ? "fast" : "read");
     res.writeHead(200, { "content-type": "text/event-stream" });
     const response = { id: "resp_fake", object: "response", status: "in_progress", output: [] };
     sse(res, { type: "response.created", sequence_number: 0, response });
-    await sleep(THINK_MS);
-    const text = JSON.stringify(read);
-    const deltas = replayChunks ?? text.match(/[sS]{1,24}/g);
+    await sleep(fast ? FAST_THINK_MS : THINK_MS);
+    const text = fast
+      ? JSON.stringify({
+          appearance: { ...read.appearance, gpu: { ...read.appearance.gpu, light: "white" } },
+        })
+      : JSON.stringify(read);
+    const deltas = (!fast && replayChunks) || text.match(/[\s\S]{1,24}/g);
     let sequence = 1;
     for (const delta of deltas) {
       sse(res, {
@@ -107,7 +114,7 @@ http
         delta,
         logprobs: [],
       });
-      await sleep(replayChunks ? 1 : CHUNK_MS);
+      await sleep(fast ? 10 : replayChunks ? 1 : CHUNK_MS);
     }
     sse(res, {
       type: "response.completed",

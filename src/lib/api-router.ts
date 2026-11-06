@@ -278,13 +278,17 @@ export async function handleInternalApiRequest(
         const precheck =
           dependencies.imagePrecheck ??
           (dependencies.imageAnalyzer ? undefined : precheckReferenceImage);
-        await precheck?.(image);
+        const checked = (await precheck?.(image)) ?? null;
         // Dev only: the client names the original photo so the response can be saved as a replay.
         const replayKey = import.meta.env.DEV
           ? (request.headers.get("x-aipc-replay-key") ?? undefined)
           : undefined;
         const analyzer = dependencies.imageAnalyzer ?? analyzeReferenceImage;
-        const input = { ...image, ...(isReplayKey(replayKey) && { replayKey }) };
+        const input = {
+          ...image,
+          ...(isReplayKey(replayKey) && { replayKey }),
+          ...(checked && { precheck: checked }),
+        };
         if (!request.headers.get("accept")?.includes(NDJSON))
           return jsonResponse(await analyzer(input), { headers });
         // Streamed: every check above, and any error before the provider accepts the request,
@@ -298,7 +302,8 @@ export async function handleInternalApiRequest(
         let markStarted = () => {};
         const started = new Promise<void>((resolve) => (markStarted = resolve));
         const start = () => {
-          if (!isStarted) send({ type: "started" });
+          if (!isStarted)
+            send({ type: "started", ...(checked?.kind === "unclear" && { photo: "unclear" }) });
           isStarted = true;
           markStarted();
         };

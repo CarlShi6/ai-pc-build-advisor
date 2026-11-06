@@ -75,7 +75,13 @@ export function resumeReadingDraft(document: BuildDocumentV3, readingId: string)
   if (!document.imageContext) return document;
   return {
     ...document,
-    imageContext: { ...document.imageContext, analysisId: readingId, reading: true },
+    // The new read is checked again, so an earlier "unclear" goes until it says so.
+    imageContext: {
+      ...document.imageContext,
+      analysisId: readingId,
+      reading: true,
+      photoUnclear: undefined,
+    },
   };
 }
 
@@ -182,6 +188,7 @@ export function applyFullResult(
     ...context?.plannedSelections,
   };
   const extras: Partial<ImageBuildContext> = {
+    ...(context?.photoUnclear && { photoUnclear: true as const }),
     summary: result.summary,
     ...(read && { appearanceRead: read }),
     quality: result.quality,

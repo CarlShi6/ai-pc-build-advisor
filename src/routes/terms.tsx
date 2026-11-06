@@ -12,8 +12,10 @@ export const Route = createFileRoute("/terms")({
   component: TermsPage,
 });
 
-// Like /privacy, every statement describes what the app does; change it with the code. The
-// operator's name, contact and governing law are for the operator to add before launch.
+// Like /privacy, every statement describes what the app does; change it with the code.
+// CONTACT_EMAIL is a placeholder the operator replaces before launch.
+const OPERATOR = "AIPC (AI PC Build Advisor), operated by Jiahao Shi";
+const CONTACT_EMAIL = "CONTACT_EMAIL";
 function TermsPage() {
   return (
     <V3Shell>
@@ -25,8 +27,8 @@ function TermsPage() {
           <span className="v3-kicker">TERMS</span>
           <h1>Terms of use</h1>
           <p>
-            AIPC is a free preview that helps you plan a PC build. By using it you agree to these
-            terms.
+            AIPC is a free preview that helps you plan a PC build. These terms are between you and{" "}
+            {OPERATOR}. By using it you agree to them.
           </p>
         </div>
 
@@ -39,7 +41,7 @@ function TermsPage() {
             </li>
             <li>
               Photos must show a desktop PC or PC hardware. Photos that are not of a PC, or that the
-              moderation check refuses, are not read.
+              moderation check refuses, are not read; an unclear photo is read with a warning.
             </li>
             <li>
               How a photo is handled is described in the <Link to="/privacy">privacy notes</Link>.
@@ -95,6 +97,17 @@ function TermsPage() {
               The service is provided as is, without warranties, and may change or stop. Your saved
               builds are kept only in your browser, so keep a copy of anything you need.
             </li>
+          </ul>
+        </section>
+
+        <section aria-labelledby="terms-contact">
+          <h2 id="terms-contact">Operator, contact and law</h2>
+          <ul>
+            <li>{OPERATOR}.</li>
+            <li>
+              Questions about these terms: <span data-contact>{CONTACT_EMAIL}</span>.
+            </li>
+            <li>These terms are governed by the laws of the State of California, USA.</li>
           </ul>
         </section>
       </main>

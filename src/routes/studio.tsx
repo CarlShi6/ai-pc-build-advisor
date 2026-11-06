@@ -377,6 +377,12 @@ function StudioPage() {
             </Link>
           </div>
         </div>
+        {document.imageContext?.photoUnclear && (
+          <p className="v3-photo-unclear" role="note" aria-label="Photo quality">
+            This photo isn't very clear, so the results may not be accurate. Check each part before
+            you rely on it.
+          </p>
+        )}
         {live && <ReadingStatus reading={live} onDismissFailure={stopReading} />}
         {interrupted && (
           <InterruptedReading

@@ -95,3 +95,52 @@ Ways to bring the first part forward (not done; each needs an authorized check o
 - **Preview E2E:**
   - `e2e-preview/streamed-reading.e2e.ts` runs a second worker (port 8789) whose provider is `e2e-preview/fake-provider.mjs` (port 8790), set through the new optional `IMAGE_AI_BASE_URL`. Its key is a placeholder; nothing calls OpenAI.
   - It checks that events reach the browser through nitro → h3 → the router one by one, and that Analyze fills Studio in.
+
+## Two reads at once (2026-11-05)
+
+Studio's parts used to wait for the full read's 8 s of reasoning. Now two requests start together, after the precheck:
+
+- **Fast read:** gpt-5.4 at effort `none`, with a schema of the appearance fields only (`fastPrompt`, `fastSchema` in `image-analysis.server.ts`). Its parts are drawn as they arrive.
+- **Full read:** unchanged (gpt-5.4 at effort low, the whole schema). It provides observations, model guesses, visible text and the final appearance. Where it differs from what the fast read drew, Studio shows "Adjusted after full read".
+- **Failures:** if the fast read fails, the full read's own parts are drawn as they arrive. If the full read fails, the analysis fails, and the drawn parts stay.
+- **Counting:** the whole thing counts as **one analysis** for the per-minute limit, the session limit, the per-IP cap and the daily cap. `two-path-read.test.ts` checks that two analyses make four calls and still use only two of the daily cap.
+- **Settings:** `IMAGE_FAST_READ=off` turns the fast read off; `IMAGE_FAST_MODEL` and `IMAGE_FAST_REASONING_EFFORT` change it.
+- **Replays:** a recording keeps both streams (`fast.chunks`, `stream.chunks`) and the precheck (`precheck.kind`, `ms`, tokens). "Load local fixture" plays both, merged by time.
+
+### Live run on real-photo-1 (2026-11-05, 5176, one analysis)
+
+Browser times from the Analyze click (upload page and Studio, 2D):
+
+| Event                        | Time      | Before (step 0) |
+| ---------------------------- | --------- | --------------- |
+| Studio opens                 | 3.6 s     | about 2 s       |
+| **First part drawn**         | **5.6 s** | about 11 s      |
+| All visible parts drawn      | 6.5 s     | about 11.5 s    |
+| Read finished (match drawer) | 22.6 s    | about 21 s      |
+
+On the server, measured from when the two reads were sent: the fast read's first text came at 2.3 s and the case closed at 2.6 s, with all six categories by 3.6 s. The full read's first text came at 8.6 s and the case closed at 8.8 s; the read finished at 19.3 s.
+
+- **Appearance:** the fast and full reads gave **identical** appearance fields (0 differences), so no "Adjusted after full read" notice. The full read's appearance also matches the step 0 recording exactly. Guesses: Gigabyte RTX AERO, Lian Li Galahad II LCD, Lian Li UNI FAN.
+- **Precheck:** `pc_build`, **2.87 s** on the server, all of it before Studio opens. This is why Studio now opens at 3.6 s instead of about 2 s.
+
+**Tokens and cost.** Estimated at $2.50 per 1M input and $15 per 1M output for gpt-5.4, and $0.40 / $1.60 for gpt-4.1-mini (the rates behind the earlier "about $0.03"). Check the OpenAI usage page for the billed amounts.
+
+| Call                    | Input tokens | Output tokens          | Cost (est.)             |
+| ----------------------- | ------------ | ---------------------- | ----------------------- |
+| Precheck (gpt-4.1-mini) | 2529         | 7                      | $0.001                  |
+| Moderation              | –            | –                      | free                    |
+| Fast read (effort none) | 3266         | 139                    | $0.010                  |
+| Full read (effort low)  | 4112         | 1517 (incl. reasoning) | $0.033                  |
+| **Total**               |              |                        | **about $0.044** (+33%) |
+
+### The precheck on a drawn non-PC photo
+
+A mug on a wooden desk, drawn with a canvas in code (`local-replays/drawn-cup-on-desk.jpg`, local only), was refused with `NOT_A_PC` on the upload page. The 422 arrived 2.3 s after the request; it cost about $0.001 (precheck only).
+
+### The precheck's own wait
+
+The precheck is now the largest part of the wait before Studio opens (2.9 s of 3.6 s). Ways to shorten it, not done:
+
+- Send it a small copy (for example 512 px); its input is almost all image tokens.
+- Use a smaller model (gpt-4.1-nano).
+- Start the two reads while it runs and cancel them on `not_pc`. This is fastest, but a refused photo then costs part of a read, and moderation would no longer run before the read.

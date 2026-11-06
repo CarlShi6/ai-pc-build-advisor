@@ -113,6 +113,12 @@ export type ImageAnalyzer = (input: {
   onStarted?: () => void;
   /** Each appearance category as soon as it has been read in full (see analysis-stream.ts). */
   onPart?: (part: StreamedPart) => void;
+  /** What the precheck found (image-precheck.server.ts); dev replays keep it. */
+  precheck?: {
+    kind: string;
+    ms: number;
+    usage: { inputTokens: number; outputTokens: number } | null;
+  };
 }) => Promise<ImageAnalysisResult>;
 
 export const observationJsonSchema = {

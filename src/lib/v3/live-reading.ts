@@ -142,7 +142,10 @@ export async function beginReading(
       emit();
       return;
     }
-    if (event.type === "part") {
+    if (event.type === "started") {
+      if (event.photo === "unclear" && draft.imageContext)
+        writeDraft({ ...draft, imageContext: { ...draft.imageContext, photoUnclear: true } });
+    } else if (event.type === "part") {
       writeDraft(applyStreamedPart(draft, event));
       if (!state.found.includes(event.category)) {
         update({ found: [...state.found, event.category] });

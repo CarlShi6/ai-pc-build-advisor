@@ -251,3 +251,16 @@ test("reading a photo again goes through the same limits as Analyze", async ({ p
   await page.reload();
   await expect(page.getByRole("alert", { name: "Reading was interrupted" })).toHaveCount(0);
 });
+
+test("an unclear photo is read, and Studio says the results may be off", async ({ page }) => {
+  await streamAnalysis(page, [
+    { type: "started", photo: "unclear" },
+    { type: "part", category: "case", value: look.case },
+    { type: "done", result },
+  ]);
+  const note = page.getByRole("note", { name: "Photo quality" });
+  await expect(note).toContainText("isn't very clear");
+  // It stays with the draft after the read.
+  await page.reload();
+  await expect(page.getByRole("note", { name: "Photo quality" })).toBeVisible();
+});

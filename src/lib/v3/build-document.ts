@@ -66,6 +66,8 @@ export interface ImageBuildContext {
   appearanceCorrections?: AppearanceCorrection[];
   /** Set while the photo is being read; a draft that still has it after a reload was interrupted. */
   reading?: true;
+  /** The precheck could not tell what the photo shows; Studio says the results may be off. */
+  photoUnclear?: true;
   reviews: Partial<Record<VisibleCatalogCategory, CandidateReview>>;
   visualPriorities: VisualPriority[];
   plannedSelections: Partial<

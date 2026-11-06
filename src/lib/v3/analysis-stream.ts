@@ -24,7 +24,8 @@ export type StreamedPart<C extends StreamedCategory = StreamedCategory> = {
 };
 
 export type AnalysisStreamEvent =
-  | { type: "started" }
+  /** `photo: "unclear"`: the precheck could not tell what the photo shows; it is read anyway. */
+  | { type: "started"; photo?: "unclear" }
   | StreamedPart
   | { type: "done"; result: ImageAnalysisResult }
   | { type: "error"; code: string; message: string };

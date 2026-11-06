@@ -40,6 +40,10 @@ export function getServerConfig() {
     imageAnalysisIpDailyCap: process.env.IMAGE_ANALYSIS_IP_DAILY_CAP,
     // Kill switch: "true" (or 1/on/yes) stops photo analysis before anything is read or sent.
     imageAnalysisPaused: /^(1|true|on|yes)$/i.test(process.env.IMAGE_ANALYSIS_PAUSED?.trim() ?? ""),
+    // The fast read that draws the parts first (image-analysis.server.ts); "off" turns it off.
+    imageFastRead: !/^(0|false|off|no)$/i.test(process.env.IMAGE_FAST_READ?.trim() ?? ""),
+    imageFastModel: process.env.IMAGE_FAST_MODEL || "gpt-5.4",
+    imageFastReasoningEffort: process.env.IMAGE_FAST_REASONING_EFFORT || "none",
     // The cheap model that checks a photo shows a PC before the full read (low image detail).
     imagePrecheckModel: process.env.IMAGE_PRECHECK_MODEL || "gpt-4.1-mini",
     // Cloudflare Turnstile secret; when set, Analyze needs a passed human check.

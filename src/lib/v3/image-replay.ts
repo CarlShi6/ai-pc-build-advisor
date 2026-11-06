@@ -1,7 +1,12 @@
 import { createImageAnalysisResult, type ImageAnalysisResult } from "@/lib/v3/image-contract";
 import type { ImageMime } from "@/lib/v3/image-input";
 import { anyKnown } from "@/lib/v3/appearance-params";
-import { createPartScanner, streamedCategories, type StreamedPart } from "@/lib/v3/analysis-stream";
+import {
+  createPartScanner,
+  streamedCategories,
+  type AnalysisStreamEvent,
+  type StreamedPart,
+} from "@/lib/v3/analysis-stream";
 import type { ReadingSource } from "@/lib/v3/live-reading";
 
 /**
@@ -24,6 +29,21 @@ export interface ImageReplay {
   raw: unknown;
   /** Streamed reads: each text chunk with its time since the request (ms), to replay the pace. */
   stream?: { chunks: { ms: number; text: string }[] };
+  /** The fast appearance-only read that ran alongside (image-analysis.server.ts), when it did. */
+  fast?: {
+    model: string;
+    reasoningEffort?: string | null;
+    usage?: { inputTokens: number; outputTokens: number } | null;
+    raw?: unknown;
+    chunks?: { ms: number; text: string }[];
+    error?: string;
+  };
+  /** The precheck before the reads: the photo's kind, its time and the check's tokens. */
+  precheck?: {
+    kind: string;
+    ms: number;
+    usage: { inputTokens: number; outputTokens: number } | null;
+  };
 }
 
 /** Lowercase hex SHA-256 of a file's original bytes: the replay key. */
@@ -99,7 +119,11 @@ export function resultSource(result: ImageAnalysisResult, speed = 1): ReadingSou
   };
 }
 
-/** Plays a recorded stream at its recorded pace (or faster), through the same part scanner. */
+/**
+ * Plays a recorded stream at its recorded pace (or faster), through the same part scanner. A
+ * recording with a fast read plays both, merged by time: the fast read draws the parts, and the
+ * full read's parts are drawn only for categories the fast read did not give (as on the server).
+ */
 export function replaySource(replay: ImageReplay, speed = 1): ReadingSource {
   const result = () =>
     createImageAnalysisResult(
@@ -110,14 +134,35 @@ export function replaySource(replay: ImageReplay, speed = 1): ReadingSource {
     );
   const chunks = replay.stream?.chunks;
   if (!chunks?.length) return (onEvent, signal) => resultSource(result(), speed)(onEvent, signal);
+  const fastChunks = replay.fast?.chunks ?? [];
+  const timeline = [
+    ...fastChunks.map((chunk) => ({ ...chunk, fast: true })),
+    ...chunks.map((chunk) => ({ ...chunk, fast: false })),
+  ].sort((a, b) => a.ms - b.ms);
   return async (onEvent, signal) => {
-    onEvent({ type: "started" });
-    const feed = createPartScanner(onEvent);
+    onEvent({ type: "started", ...(replay.precheck?.kind === "unclear" && { photo: "unclear" }) });
+    const drawn = new Set<string>();
+    const waiting = new Map<string, StreamedPart>();
+    const draw = (event: AnalysisStreamEvent) => {
+      if (event.type !== "part" || drawn.has(event.category)) return;
+      drawn.add(event.category);
+      onEvent(event);
+    };
+    let fastLeft = fastChunks.length;
+    const feedFast = createPartScanner(draw);
+    const feedFull = createPartScanner((part) => {
+      if (fastLeft > 0) waiting.set(part.category, part);
+      else draw(part);
+    });
     const start = performance.now();
-    for (const chunk of chunks) {
+    for (const chunk of timeline) {
       const due = chunk.ms / speed - (performance.now() - start);
       if (due > 0) await wait(due, signal);
-      feed(chunk.text);
+      if (!chunk.fast) feedFull(chunk.text);
+      else {
+        feedFast(chunk.text);
+        if (--fastLeft === 0) for (const part of waiting.values()) draw(part);
+      }
     }
     onEvent({ type: "done", result: result() });
   };
