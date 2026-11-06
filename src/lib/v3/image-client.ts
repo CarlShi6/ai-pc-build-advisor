@@ -71,6 +71,38 @@ export async function prepareImageForAnalysis(file: File): Promise<Blob> {
   }
 }
 
+/** Long edge of the small copy the photo-kind check reads (image-precheck.server.ts). */
+const PREVIEW_EDGE = 512;
+
+/**
+ * A 512 px copy of the prepared image for the server's quick "is it a PC?" check, which then
+ * reads far fewer image tokens. null when the browser cannot make one; the check then uses the
+ * prepared image itself.
+ */
+async function previewOf(image: Blob): Promise<Blob | null> {
+  try {
+    const bitmap = await createImageBitmap(image);
+    try {
+      const scale = Math.min(1, PREVIEW_EDGE / Math.max(bitmap.width, bitmap.height));
+      const canvas = document.createElement("canvas");
+      canvas.width = Math.max(16, Math.round(bitmap.width * scale));
+      canvas.height = Math.max(16, Math.round(bitmap.height * scale));
+      const context = canvas.getContext("2d");
+      if (!context) return null;
+      context.fillStyle = "#ffffff";
+      context.fillRect(0, 0, canvas.width, canvas.height);
+      context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+      return await new Promise<Blob | null>((resolve) =>
+        canvas.toBlob(resolve, "image/jpeg", 0.85),
+      );
+    } finally {
+      bitmap.close();
+    }
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Starts a streamed analysis. Every check before the provider accepts the photo (limits, daily
  * cap, human check, configuration) answers here as an ImageClientError, so the upload page can
@@ -84,17 +116,26 @@ export async function openImageAnalysisStream(
   /** Cloudflare Turnstile token, when the human check is configured. */
   turnstileToken?: string,
 ): Promise<ReadingSource> {
+  // The photo and its small copy in one request; without a copy, the photo alone as before.
+  const preview = await previewOf(image);
+  let body: Blob | FormData = image;
+  if (preview) {
+    body = new FormData();
+    body.append("image", image, "image");
+    body.append("preview", preview, "preview");
+  }
   let response: Response;
   try {
     response = await fetch("/api/image-analyses", {
       method: "POST",
       headers: {
-        "content-type": image.type,
+        // FormData sets its own multipart type with the boundary.
+        ...(!preview && { "content-type": image.type }),
         accept: NDJSON,
         ...(replayKey && { "x-aipc-replay-key": replayKey }),
         ...(turnstileToken && { "x-turnstile-token": turnstileToken }),
       },
-      body: image,
+      body,
       cache: "no-store",
       signal,
     });

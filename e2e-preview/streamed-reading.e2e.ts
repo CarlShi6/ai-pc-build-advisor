@@ -66,10 +66,10 @@ test("the worker streams each part as it is read, then the result", async ({ pag
   // and the result comes later still: nothing was held back until the end.
   expect(at("motherboard") - at("started")).toBeLessThan(1_000);
   expect(at("done") - at("motherboard")).toBeGreaterThan(800);
-  // Moderation and the kind check (run together) both finished before the two reads began.
+  // Moderation first; then the kind check (on the small copy) and both reads together.
   const calls: string[] = await (await request.get(`${FAKE_PROVIDER}/calls`)).json();
-  expect(calls.slice(0, 2).sort()).toEqual(["moderation", "pc-check"]);
-  expect(calls.slice(2).sort()).toEqual(["fast", "read"]);
+  expect(calls[0]).toBe("moderation");
+  expect(calls.slice(1).sort()).toEqual(["fast", "pc-check", "read"]);
 });
 
 test("Analyze opens Studio, which fills in part by part", async ({ page }) => {

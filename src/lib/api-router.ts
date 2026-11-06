@@ -22,7 +22,7 @@ import { getRetailPriceProvider } from "@/lib/pricing/current-offer-service.serv
 import { BEST_BUY_DISCLOSURE } from "@/lib/pricing/best-buy-provider.server";
 import { seedParts } from "@/data/seedParts";
 import { normalizeRecommendedBuildInput, ValidationError } from "@/lib/validation";
-import { readBoundedImage, ImageInputError } from "@/lib/v3/image-input";
+import { readBoundedImages, ImageInputError } from "@/lib/v3/image-input";
 import { analyzeReferenceImage, ImageAnalysisError } from "@/lib/v3/image-analysis.server";
 import type { ImageAnalyzer } from "@/lib/v3/image-contract";
 import { encodeEvent, NDJSON, type AnalysisStreamEvent } from "@/lib/v3/analysis-stream";
@@ -226,7 +226,7 @@ export async function handleInternalApiRequest(
           },
           { status: 503, headers: { "cache-control": "no-store", "retry-after": "3600" } },
         );
-      const image = await readBoundedImage(request);
+      const { image, preview } = await readBoundedImages(request);
       const actor = await store.getActor(request);
       const { key, setCookie } = imageSessionKey(request, actor.userId);
       const headers: Record<string, string> = { "cache-control": "no-store" };
@@ -274,11 +274,21 @@ export async function handleInternalApiRequest(
         if (!(await capStore.reserve(day, dailyCapOf(config.imageAnalysisDailyCap))))
           throw new DailyCapError("DAILY_CAP_REACHED");
         releaseDay = () => capStore.release(day);
-        // Moderation and the "is it a PC?" check, before anything streams (image-precheck.server.ts).
-        const precheck =
+        // Moderation first, on the photo itself (image-precheck.server.ts).
+        const prechecks =
           dependencies.imagePrecheck ??
           (dependencies.imageAnalyzer ? undefined : precheckReferenceImage);
-        const checked = (await precheck?.(image)) ?? null;
+        const moderation = (await prechecks?.moderate(image)) ?? null;
+        // Then the photo's kind, on the small copy, at the same time as the reads. Studio does not
+        // open and no part is sent until it passes; on not_pc the reads are cancelled at once.
+        const cancel = new AbortController();
+        const kindStartedAt = Date.now();
+        const kindCheck = (
+          prechecks ? prechecks.classify(preview ?? image) : Promise.resolve(null)
+        ).catch((error: unknown) => {
+          cancel.abort();
+          throw error;
+        });
         // Dev only: the client names the original photo so the response can be saved as a replay.
         const replayKey = import.meta.env.DEV
           ? (request.headers.get("x-aipc-replay-key") ?? undefined)
@@ -287,29 +297,77 @@ export async function handleInternalApiRequest(
         const input = {
           ...image,
           ...(isReplayKey(replayKey) && { replayKey }),
-          ...(checked && { precheck: checked }),
+          signal: cancel.signal,
+          precheck: kindCheck
+            .then((kind) =>
+              moderation || kind
+                ? {
+                    kind: kind?.kind ?? "unchecked",
+                    moderationMs: moderation?.ms ?? null,
+                    kindMs: kind?.ms ?? null,
+                    usage: kind?.usage ?? null,
+                    usedPreview: !!preview,
+                  }
+                : null,
+            )
+            // A refused photo keeps its timings in the dev record of the cancelled reads.
+            .catch((error: unknown) =>
+              error instanceof ImageAnalysisError && error.code === "NOT_A_PC"
+                ? {
+                    kind: "not_pc",
+                    moderationMs: moderation?.ms ?? null,
+                    kindMs: Date.now() - kindStartedAt,
+                    usage: null,
+                    usedPreview: !!preview,
+                  }
+                : null,
+            ),
         };
-        if (!request.headers.get("accept")?.includes(NDJSON))
-          return jsonResponse(await analyzer(input), { headers });
-        // Streamed: every check above, and any error before the provider accepts the request,
-        // answers with its own status; after that, parts, the result and errors are events.
+        if (!request.headers.get("accept")?.includes(NDJSON)) {
+          const [result] = await Promise.all([analyzer(input), kindCheck]);
+          return jsonResponse(result, { headers });
+        }
+        // Streamed: every check above, and any error before the provider accepts the request or
+        // before the kind check passes, answers with its own status; after that, parts, the
+        // result and errors are events.
         const { readable, writable } = new TransformStream<string, string>();
         const writer = writable.getWriter();
         // A closed tab ends the stream; its failed writes are not errors.
         const send = (event: AnalysisStreamEvent) =>
           void writer.write(encodeEvent(event)).catch(() => undefined);
         let isStarted = false;
+        let unclear = false;
         let markStarted = () => {};
         const started = new Promise<void>((resolve) => (markStarted = resolve));
         const start = () => {
-          if (!isStarted)
-            send({ type: "started", ...(checked?.kind === "unclear" && { photo: "unclear" }) });
+          if (!isStarted) send({ type: "started", ...(unclear && { photo: "unclear" }) });
           isStarted = true;
           markStarted();
         };
-        const work = analyzer({ ...input, onStarted: start, onPart: send });
+        // Held until the kind check passes.
+        let passed = false;
+        let accepted = false;
+        const held: AnalysisStreamEvent[] = [];
+        const gate = kindCheck.then((kind) => {
+          unclear = kind?.kind === "unclear";
+          passed = true;
+          if (accepted || held.length) start();
+          for (const event of held.splice(0)) send(event);
+          return kind;
+        });
+        const work = analyzer({
+          ...input,
+          onStarted: () => {
+            accepted = true;
+            if (passed) start();
+          },
+          onPart: (part) => {
+            if (passed) send(part);
+            else held.push(part);
+          },
+        });
         // A fake analyzer may finish without calling onStarted; its errors still come first.
-        await Promise.race([started, work]);
+        await Promise.all([Promise.race([started, work]), gate]);
         start();
         void work
           .then((result) => send({ type: "done", result }))

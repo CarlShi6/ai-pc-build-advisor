@@ -182,9 +182,13 @@ export function stripImageMetadata(bytes: Uint8Array, mime: ImageMime) {
   return output;
 }
 
-export async function readBoundedImage(request: Request) {
+/** The small copy for the photo-kind check: at most this long edge and size (image-client.ts). */
+export const PREVIEW_MAX_EDGE = 640;
+export const PREVIEW_MAX_BYTES = 512 * 1024;
+
+async function readBoundedBytes(request: Request, maxBytes: number) {
   const declared = Number(request.headers.get("content-length"));
-  if (Number.isFinite(declared) && declared > MAX_IMAGE_BYTES)
+  if (Number.isFinite(declared) && declared > maxBytes)
     throw new ImageInputError("Choose an image under 10 MB.", 413, "IMAGE_TOO_LARGE");
   const reader = request.body?.getReader();
   if (!reader) throw new ImageInputError("An image is required.");
@@ -194,7 +198,7 @@ export async function readBoundedImage(request: Request) {
     const { done, value } = await reader.read();
     if (done) break;
     length += value.byteLength;
-    if (length > MAX_IMAGE_BYTES) {
+    if (length > maxBytes) {
       await reader.cancel();
       throw new ImageInputError("Choose an image under 10 MB.", 413, "IMAGE_TOO_LARGE");
     }
@@ -206,5 +210,48 @@ export async function readBoundedImage(request: Request) {
     bytes.set(chunk, offset);
     offset += chunk.byteLength;
   }
-  return { bytes, ...inspectImage(bytes, request.headers.get("content-type") ?? "") };
+  return bytes;
+}
+
+async function fileBytes(form: FormData, name: string) {
+  const file = form.get(name);
+  if (!file || typeof file === "string") return null;
+  return { bytes: new Uint8Array(await file.arrayBuffer()), type: file.type };
+}
+
+/**
+ * The photo to analyze, and optionally a small copy of it for the photo-kind check. The body is
+ * either the image itself, or multipart form data with `image` and `preview` (the browser sends
+ * both). Either way the whole body is read with the size cap before anything is parsed.
+ */
+export async function readBoundedImages(request: Request) {
+  const type = request.headers.get("content-type") ?? "";
+  const body = await readBoundedBytes(request, MAX_IMAGE_BYTES + PREVIEW_MAX_BYTES + 64 * 1024);
+  if (!type.startsWith("multipart/form-data")) {
+    if (body.byteLength > MAX_IMAGE_BYTES)
+      throw new ImageInputError("Choose an image under 10 MB.", 413, "IMAGE_TOO_LARGE");
+    return { image: { bytes: body, ...inspectImage(body, type) }, preview: null };
+  }
+  let form: FormData;
+  try {
+    form = await new Response(body, { headers: { "content-type": type } }).formData();
+  } catch {
+    throw new ImageInputError("An image is required.");
+  }
+  const main = await fileBytes(form, "image");
+  if (!main) throw new ImageInputError("An image is required.");
+  if (main.bytes.byteLength > MAX_IMAGE_BYTES)
+    throw new ImageInputError("Choose an image under 10 MB.", 413, "IMAGE_TOO_LARGE");
+  const image = { bytes: main.bytes, ...inspectImage(main.bytes, main.type) };
+  const small = await fileBytes(form, "preview");
+  let preview: typeof image | null = null;
+  if (small && small.bytes.byteLength <= PREVIEW_MAX_BYTES) {
+    try {
+      const checked = { bytes: small.bytes, ...inspectImage(small.bytes, small.type) };
+      if (Math.max(checked.width, checked.height) <= PREVIEW_MAX_EDGE) preview = checked;
+    } catch {
+      // A bad small copy is ignored; the kind check then uses the photo itself.
+    }
+  }
+  return { image, preview };
 }

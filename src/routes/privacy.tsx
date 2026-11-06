@@ -52,15 +52,15 @@ function PrivacyPage() {
           <h2 id="privacy-provider">What the analysis provider receives</h2>
           <ul>
             <li>
-              Before the full read, the resized copy goes through two quick checks at OpenAI: its
-              moderation model, which refuses unsafe images, and a small model that only sorts the
-              photo as a PC build, PC parts, not a PC, or unclear. Moderation refusals and photos
-              that are not a PC are not read.
+              First, OpenAI's moderation model checks the resized copy and refuses unsafe images,
+              which are then not read.
             </li>
             <li>
-              The resized copy and our fixed instructions then go to OpenAI's API in two requests at
-              once: a quick one for the look, so parts appear sooner, and the full read. No name,
-              email, account or file name is sent with them.
+              Then, at the same time: a small model sorts a 512-pixel copy as a PC build, PC parts,
+              not a PC, or unclear, and the resized copy with our fixed instructions goes to
+              OpenAI's API in two requests (a quick one for the look, so parts appear sooner, and
+              the full read). If the photo is not a PC, both reads are stopped at once and what they
+              returned is discarded. No name, email, account or file name is sent with any of them.
             </li>
             <li>
               The request is sent with OpenAI's response storage turned off. OpenAI's own API data

@@ -1,5 +1,6 @@
 import OpenAI from "openai";
 import type { ReasoningEffort } from "openai/resources/shared";
+import type { ResponseCreateParamsBase } from "openai/resources/responses/responses";
 import { Buffer } from "node:buffer";
 import { getServerConfig } from "@/lib/config.server";
 import {
@@ -87,15 +88,18 @@ export function providerFailure(error: unknown, timedOut: boolean): ImageAnalysi
 /** Reasoning models (o-series, gpt-5) reject a temperature setting. */
 const acceptsTemperature = (model: string) => !/^(o[0-9]|gpt-5)/.test(model);
 
-/** Dev only: saves the raw provider response as a local replay (see image-replay.ts). */
-async function saveReplay(replay: ImageReplay) {
+/** Dev only: writes a JSON file into IMAGE_REPLAY_DIR (gitignored local-replays). */
+async function writeLocal(name: string, data: unknown) {
   const dir = process.env.IMAGE_REPLAY_DIR;
   if (!dir) return;
   const { mkdir, writeFile } = await import("node:fs/promises");
   const { join } = await import("node:path");
   await mkdir(dir, { recursive: true });
-  await writeFile(join(dir, `${replay.key}.json`), JSON.stringify(replay, null, 2));
+  await writeFile(join(dir, name), JSON.stringify(data, null, 2));
 }
+
+/** Dev only: saves the raw provider response as a local replay (see image-replay.ts). */
+const saveReplay = (replay: ImageReplay) => writeLocal(`${replay.key}.json`, replay);
 
 /**
  * The fast read: the same photo, the look only, no reasoning. It draws Studio's parts within a few
@@ -175,6 +179,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
   onStarted,
   onPart,
   precheck,
+  signal,
 }) => {
   const config = getServerConfig();
   const apiKey = config.openAiApiKey || config.aiProviderApiKey;
@@ -195,6 +200,15 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
   const timer = setTimeout(() => deadline.abort(), acceptsTemperature(model) ? 30_000 : 75_000);
   const fastDeadline = new AbortController();
   const fastTimer = setTimeout(() => fastDeadline.abort(), 30_000);
+  // The photo's kind check said not_pc: both reads stop at once, and what arrived is dropped.
+  const cancel = () => {
+    deadline.abort();
+    fastDeadline.abort();
+  };
+  signal?.addEventListener("abort", cancel, { once: true });
+  if (signal?.aborted) cancel();
+  // Dev only: what a cancelled analysis cost, for the record (see the catch below).
+  let reportCancelled: (() => Promise<void>) | null = null;
   try {
     const cleanBytes = stripImageMetadata(bytes, mime);
     const imageUrl = `data:${mime};base64,${Buffer.from(cleanBytes).toString("base64")}`;
@@ -204,40 +218,86 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
       ...(config.imageAiBaseUrl && { baseURL: config.imageAiBaseUrl }),
     });
     const startedAt = Date.now();
-    const request = (
+    const paramsFor = (
       which: { model: string; effort: ReasoningEffort; maxTokens: number; reasoningMax: number },
       system: string,
       name: string,
       schema: Record<string, unknown>,
-      signal: AbortSignal,
-    ) =>
-      client.responses.create(
+    ): ResponseCreateParamsBase => ({
+      model: which.model,
+      // Same photo, same answer as far as the model allows; reasoning models take no temperature.
+      ...(acceptsTemperature(which.model) && { temperature: 0 }),
+      store: false,
+      stream: true,
+      // A reasoning model spends part of its output budget thinking; give it room.
+      max_output_tokens: acceptsTemperature(which.model) ? which.maxTokens : which.reasoningMax,
+      ...(!acceptsTemperature(which.model) && { reasoning: { effort: which.effort } }),
+      input: [
+        { role: "system", content: system },
         {
-          model: which.model,
-          // Same photo, same answer as far as the model allows; reasoning models take no temperature.
-          ...(acceptsTemperature(which.model) && { temperature: 0 }),
-          store: false,
-          stream: true,
-          // A reasoning model spends part of its output budget thinking; give it room.
-          max_output_tokens: acceptsTemperature(which.model) ? which.maxTokens : which.reasoningMax,
-          ...(!acceptsTemperature(which.model) && { reasoning: { effort: which.effort } }),
-          input: [
-            { role: "system", content: system },
+          role: "user",
+          content: [
             {
-              role: "user",
-              content: [
-                {
-                  type: "input_text",
-                  text: "Analyze visible PC appearance only. Return evidence and uncertainty.",
-                },
-                { type: "input_image", image_url: imageUrl, detail: "high" },
-              ],
+              type: "input_text",
+              text: "Analyze visible PC appearance only. Return evidence and uncertainty.",
             },
+            { type: "input_image", image_url: imageUrl, detail: "high" },
           ],
-          text: { format: { type: "json_schema", name, strict: true, schema } },
         },
-        { signal },
-      );
+      ],
+      text: { format: { type: "json_schema", name, strict: true, schema } },
+    });
+    const fastParams = paramsFor(
+      { model: fastModel, effort: fastEffort, maxTokens: 1200, reasoningMax: 3000 },
+      fastPrompt,
+      "pc_appearance",
+      fastSchema,
+    );
+    const fullParams = paramsFor(
+      { model, effort: reasoningEffort, maxTokens: 2400, reasoningMax: 8000 },
+      systemPrompt,
+      "pc_visual_observations",
+      observationJsonSchema,
+    );
+    const request = (params: typeof fullParams, readSignal: AbortSignal) =>
+      client.responses.create({ ...params, stream: true }, { signal: readSignal });
+    // Text that reached us from each read, for the cancelled-read record.
+    const received = { fast: 0, full: 0 };
+    const acceptedAt: { fast: number | null; full: number | null } = { fast: null, full: null };
+    reportCancelled = async () => {
+      const count = (params: typeof fullParams) =>
+        client.responses.inputTokens
+          .count({
+            model: params.model,
+            input: params.input,
+            text: params.text,
+            reasoning: params.reasoning,
+          })
+          .then((answer) => answer.input_tokens)
+          .catch(() => null);
+      const [fastInput, fullInput] = await Promise.all([
+        config.imageFastRead ? count(fastParams) : null,
+        count(fullParams),
+      ]);
+      await writeLocal(`${replayKey}.cancelled.json`, {
+        key: replayKey,
+        cancelledAt: new Date().toISOString(),
+        cancelledAfterMs: Date.now() - startedAt,
+        precheck: precheck ? await precheck.catch(() => null) : null,
+        fast: config.imageFastRead
+          ? {
+              acceptedAfterMs: acceptedAt.fast,
+              textCharsReceived: received.fast,
+              inputTokens: fastInput,
+            }
+          : null,
+        full: {
+          acceptedAfterMs: acceptedAt.full,
+          textCharsReceived: received.full,
+          inputTokens: fullInput,
+        },
+      });
+    };
 
     // Parts go to Studio once per category: from the fast read while it is alive, else the full.
     const drawn = new Set<string>();
@@ -256,16 +316,14 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
     };
 
     const fast = config.imageFastRead
-      ? request(
-          { model: fastModel, effort: fastEffort, maxTokens: 1200, reasoningMax: 3000 },
-          fastPrompt,
-          "pc_appearance",
-          fastSchema,
-          fastDeadline.signal,
-        )
+      ? request(fastParams, fastDeadline.signal)
           .then((stream) => {
+            acceptedAt.fast = Date.now() - startedAt;
             const feed = createPartScanner(draw);
-            return readStream(stream, startedAt, record, feed);
+            return readStream(stream, startedAt, record, (delta) => {
+              received.fast += delta.length;
+              feed(delta);
+            });
           })
           .then((read) => {
             // A fast read that ended without a category leaves it to the full read.
@@ -280,19 +338,17 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
           })
       : null;
 
-    const stream = await request(
-      { model, effort: reasoningEffort, maxTokens: 2400, reasoningMax: 8000 },
-      systemPrompt,
-      "pc_visual_observations",
-      observationJsonSchema,
-      deadline.signal,
-    );
+    const stream = await request(fullParams, deadline.signal);
+    acceptedAt.full = Date.now() - startedAt;
     onStarted?.();
     const fullFeed = createPartScanner((part) => {
       if (fastAlive) fromFull.set(part.category, part);
       else draw(part);
     });
-    const full = await readStream(stream, startedAt, record, fullFeed);
+    const full = await readStream(stream, startedAt, record, (delta) => {
+      received.full += delta.length;
+      fullFeed(delta);
+    });
     const fastRead = fast ? await fast : null;
     if (!full.text)
       throw new ImageAnalysisError(
@@ -344,7 +400,7 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
                   }
                 : { model: fastModel, reasoningEffort: fastEffort, error: fastRead.error },
           }),
-          ...(precheck && { precheck }),
+          ...(precheck && { precheck: (await precheck.catch(() => null)) ?? undefined }),
         }).catch(() => undefined);
       }
       return result;
@@ -357,6 +413,10 @@ export const analyzeReferenceImage: ImageAnalyzer = async ({
     }
   } catch (error) {
     fastDeadline.abort();
+    if (signal?.aborted) {
+      if (record && reportCancelled) void reportCancelled().catch(() => undefined);
+      throw new ImageAnalysisError("The read was cancelled.", 499, "CANCELLED");
+    }
     if (error instanceof ImageAnalysisError) throw error;
     throw providerFailure(error, deadline.signal.aborted);
   } finally {

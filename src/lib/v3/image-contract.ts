@@ -99,6 +99,17 @@ export interface ImageAnalysisResult {
   visibleText?: VisibleText[];
 }
 
+/** The prechecks' outcome, as dev replays keep it. */
+export type PrecheckRecord = {
+  kind: string;
+  /** Moderation's time, on the photo itself. */
+  moderationMs: number | null;
+  /** The kind check's time, on the 512 px copy when the browser sent one. */
+  kindMs: number | null;
+  usage: { inputTokens: number; outputTokens: number } | null;
+  usedPreview: boolean;
+};
+
 export type ImageAnalyzer = (input: {
   bytes: Uint8Array;
   mime: ImageMime;
@@ -113,12 +124,10 @@ export type ImageAnalyzer = (input: {
   onStarted?: () => void;
   /** Each appearance category as soon as it has been read in full (see analysis-stream.ts). */
   onPart?: (part: StreamedPart) => void;
-  /** What the precheck found (image-precheck.server.ts); dev replays keep it. */
-  precheck?: {
-    kind: string;
-    ms: number;
-    usage: { inputTokens: number; outputTokens: number } | null;
-  };
+  /** Cancels both reads (the photo's kind check said not_pc). */
+  signal?: AbortSignal;
+  /** What the prechecks found, once the kind check is done (image-precheck.server.ts); dev replays keep it. */
+  precheck?: Promise<PrecheckRecord | null>;
 }) => Promise<ImageAnalysisResult>;
 
 export const observationJsonSchema = {

@@ -212,7 +212,7 @@ describe("the fast and full reads", () => {
           body: png,
         }),
         {
-          imagePrecheck: async () => null,
+          imagePrecheck: { moderate: async () => null, classify: async () => null },
           imageLimiter: new ImageSessionLimiter([]),
           imageDailyCap: cap,
           workerBindings: null,
@@ -243,7 +243,7 @@ describe("replaying a recording of both reads", () => {
       raw: full,
       stream: { chunks: chunked(JSON.stringify(full), 400) },
       fast: { model: "gpt-5.4", chunks: chunked(JSON.stringify({ appearance: fastLook }), 10) },
-      precheck: { kind: "unclear", ms: 1, usage: null },
+      precheck: { kind: "unclear", moderationMs: 1, kindMs: 1, usage: null, usedPreview: true },
     };
     const events: AnalysisStreamEvent[] = [];
     await replaySource(replay, 20)((event) => events.push(event), new AbortController().signal);

@@ -85,53 +85,65 @@ describe("checks before the photo is read", () => {
     vi.stubEnv("IMAGE_PRECHECK_MODEL", "");
   };
 
-  it("runs moderation and the cheap kind check, and lets a PC photo through", async () => {
+  const checks = (answer: Parameters<typeof fakeProvider>[0]) => {
+    const provider = fakeProvider(answer);
+    return { ...createImagePrecheck({ fetch: provider.fetch }), calls: provider.calls };
+  };
+
+  it("runs moderation and the cheap kind check, each timed, and lets a PC photo through", async () => {
     configure();
-    const provider = fakeProvider({});
-    const result = await createImagePrecheck({ fetch: provider.fetch })(image);
-    expect(provider.calls.sort()).toEqual(["check:gpt-4.1-mini", "moderation"]);
-    expect(result).toMatchObject({ kind: "pc_build" });
-    expect(result!.ms).toBeGreaterThanOrEqual(0);
+    const check = checks({});
+    expect(await check.moderate(image)).toMatchObject({ ms: expect.any(Number) });
+    const result = await check.classify(image);
+    expect(check.calls).toEqual(["moderation", "check:gpt-4.1-mini"]);
+    expect(result).toMatchObject({ kind: "pc_build", ms: expect.any(Number) });
   });
 
   it("reads PC parts and unclear photos; only not_pc is refused", async () => {
     configure();
     for (const kind of ["pc_part", "unclear"])
-      expect(
-        await createImagePrecheck({ fetch: fakeProvider({ kind }).fetch })(image),
-      ).toMatchObject({ kind });
+      expect(await checks({ kind }).classify(image)).toMatchObject({ kind });
   });
 
   it("refuses a flagged photo and a photo that is not a PC", async () => {
     configure();
-    await expect(
-      createImagePrecheck({ fetch: fakeProvider({ flagged: true }).fetch })(image),
-    ).rejects.toMatchObject({ code: "CONTENT_BLOCKED", status: 422 });
-    await expect(
-      createImagePrecheck({ fetch: fakeProvider({ kind: "not_pc" }).fetch })(image),
-    ).rejects.toMatchObject({ code: "NOT_A_PC", status: 422 });
+    await expect(checks({ flagged: true }).moderate(image)).rejects.toMatchObject({
+      code: "CONTENT_BLOCKED",
+      status: 422,
+    });
+    await expect(checks({ kind: "not_pc" }).classify(image)).rejects.toMatchObject({
+      code: "NOT_A_PC",
+      status: 422,
+    });
   });
 
   it("fails closed when a check cannot run or answers nonsense", async () => {
     configure();
-    await expect(
-      createImagePrecheck({ fetch: fakeProvider({ status: 500 }).fetch })(image),
-    ).rejects.toMatchObject({ code: "ANALYSIS_FAILED" });
-    await expect(
-      createImagePrecheck({ fetch: fakeProvider({ status: 429 }).fetch })(image),
-    ).rejects.toMatchObject({ code: "RATE_LIMITED" });
-    await expect(
-      createImagePrecheck({ fetch: fakeProvider({ kind: "yes" }).fetch })(image),
-    ).rejects.toMatchObject({ code: "PRECHECK_FAILED" });
+    await expect(checks({ status: 500 }).moderate(image)).rejects.toMatchObject({
+      code: "ANALYSIS_FAILED",
+    });
+    await expect(checks({ status: 429 }).classify(image)).rejects.toMatchObject({
+      code: "RATE_LIMITED",
+    });
+    await expect(checks({ kind: "yes" }).classify(image)).rejects.toMatchObject({
+      code: "PRECHECK_FAILED",
+    });
   });
 
   it("leaves an unconfigured provider to the read, which answers with its own code", async () => {
     vi.stubEnv("AI_PROVIDER", "openai");
     vi.stubEnv("OPENAI_API_KEY", "");
     vi.stubEnv("AI_PROVIDER_API_KEY", "");
-    const provider = fakeProvider({});
-    expect(await createImagePrecheck({ fetch: provider.fetch })(image)).toBeNull();
-    expect(provider.calls).toEqual([]);
+    const check = checks({});
+    expect(await check.moderate(image)).toBeNull();
+    expect(await check.classify(image)).toBeNull();
+    expect(check.calls).toEqual([]);
+  });
+
+  const limits = () => ({
+    imageLimiter: new ImageSessionLimiter(),
+    imageDailyCap: new MemoryDailyCap(),
+    workerBindings: null,
   });
 
   it("tells Studio an unclear photo is being read anyway, in the started event", async () => {
@@ -140,31 +152,87 @@ describe("checks before the photo is read", () => {
         onStarted?.();
         return result();
       },
-      imagePrecheck: async () => ({ kind: "unclear", ms: 5, usage: null }),
-      imageLimiter: new ImageSessionLimiter(),
-      imageDailyCap: new MemoryDailyCap(),
-      workerBindings: null,
+      imagePrecheck: {
+        moderate: async () => ({ ms: 1 }),
+        classify: async () => ({ kind: "unclear", ms: 5, usage: null }),
+      },
+      ...limits(),
     }))!;
     const events: AnalysisStreamEvent[] = [];
     await readEvents(response.body!, (event) => events.push(event));
     expect(events[0]).toEqual({ type: "started", photo: "unclear" });
   });
 
-  it("answers a refused photo with its status before any stream, and the analyzer never runs", async () => {
+  it("a flagged photo is refused before either read starts", async () => {
     const analyzer = vi.fn<ImageAnalyzer>(async () => result());
     const response = (await handleInternalApiRequest(imageRequest(), {
       imageAnalyzer: analyzer,
-      imagePrecheck: async () => {
+      imagePrecheck: {
+        moderate: async () => {
+          throw new ImagePrecheckError("CONTENT_BLOCKED");
+        },
+        classify: async () => ({ kind: "pc_build", ms: 1, usage: null }),
+      },
+      ...limits(),
+    }))!;
+    expect(response.status).toBe(422);
+    expect((await response.json()).error.code).toBe("CONTENT_BLOCKED");
+    expect(analyzer).not.toHaveBeenCalled();
+  });
+
+  it("on not_pc, cancels the reads already running and answers 422 before any stream", async () => {
+    let cancelled = false;
+    const sent: string[] = [];
+    let refuse = () => {};
+    const response = (await handleInternalApiRequest(imageRequest(), {
+      imageAnalyzer: async ({ signal, onStarted, onPart }) => {
+        // The reads start and even produce a part while the kind check is still running.
+        onStarted?.();
+        onPart?.({ type: "part", category: "case", value: {} as never });
+        sent.push("part");
+        refuse();
+        await new Promise((resolve) => signal!.addEventListener("abort", resolve));
+        cancelled = true;
         throw new ImagePrecheckError("NOT_A_PC");
       },
-      imageLimiter: new ImageSessionLimiter(),
-      imageDailyCap: new MemoryDailyCap(),
-      workerBindings: null,
+      imagePrecheck: {
+        moderate: async () => ({ ms: 1 }),
+        classify: () =>
+          new Promise((_, reject) => {
+            refuse = () => reject(new ImagePrecheckError("NOT_A_PC"));
+          }),
+      },
+      ...limits(),
     }))!;
     expect(response.status).toBe(422);
     expect(response.headers.get("content-type")).toContain("application/json");
     expect((await response.json()).error.code).toBe("NOT_A_PC");
-    expect(analyzer).not.toHaveBeenCalled();
+    expect(sent).toEqual(["part"]);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(cancelled).toBe(true);
+  });
+
+  it("still counts a not_pc photo against the daily cap", async () => {
+    const cap = new MemoryDailyCap();
+    vi.stubEnv("IMAGE_ANALYSIS_DAILY_CAP", "1");
+    const send = () =>
+      handleInternalApiRequest(imageRequest(), {
+        imageAnalyzer: async ({ signal }) => {
+          await new Promise((resolve) => signal!.addEventListener("abort", resolve));
+          throw new ImagePrecheckError("NOT_A_PC");
+        },
+        imagePrecheck: {
+          moderate: async () => ({ ms: 1 }),
+          classify: async () => {
+            throw new ImagePrecheckError("NOT_A_PC");
+          },
+        },
+        imageLimiter: new ImageSessionLimiter(),
+        imageDailyCap: cap,
+        workerBindings: null,
+      }).then(async (response) => (await response!.json()).error.code);
+    expect(await send()).toBe("NOT_A_PC");
+    expect(await send()).toBe("DAILY_CAP_REACHED");
   });
 });
 
@@ -219,5 +287,63 @@ describe("launch limits on Analyze", () => {
     expect(key).toMatch(/^2026-11-05\|ip:[0-9a-f]{32}$/);
     expect(key).not.toContain("203.0.113.7");
     expect(await ipDayKey("2026-11-06", "203.0.113.7")).not.toBe(key.replace("11-05", "11-06"));
+  });
+});
+
+describe("the small copy for the kind check", () => {
+  /** A PNG header with the given size, enough for the server's checks. */
+  const pngOf = (size: number) => {
+    const bytes = new Uint8Array(33);
+    bytes.set([
+      0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13, 0x49, 0x48, 0x44, 0x52,
+    ]);
+    new DataView(bytes.buffer).setUint32(16, size);
+    new DataView(bytes.buffer).setUint32(20, size);
+    return new Blob([bytes], { type: "image/png" });
+  };
+  const analyze = async (preview: Blob | null) => {
+    const form = new FormData();
+    form.append("image", pngOf(1600), "image");
+    if (preview) form.append("preview", preview, "preview");
+    const seen: Record<string, number> = {};
+    const response = (await handleInternalApiRequest(
+      new Request("http://localhost/api/image-analyses", {
+        method: "POST",
+        headers: { accept: NDJSON },
+        body: form,
+      }),
+      {
+        imageAnalyzer: async ({ width, onStarted }) => {
+          seen.read = width;
+          onStarted?.();
+          return result();
+        },
+        imagePrecheck: {
+          moderate: async ({ bytes }) => {
+            seen.moderation = new DataView(bytes.buffer, bytes.byteOffset).getUint32(16);
+            return { ms: 1 };
+          },
+          classify: async ({ bytes }) => {
+            seen.kind = new DataView(bytes.buffer, bytes.byteOffset).getUint32(16);
+            return { kind: "pc_build", ms: 1, usage: null };
+          },
+        },
+        imageLimiter: new ImageSessionLimiter(),
+        imageDailyCap: new MemoryDailyCap(),
+        workerBindings: null,
+      },
+    ))!;
+    expect(response.status).toBe(200);
+    await response.text();
+    return seen;
+  };
+
+  it("checks the kind on the 512 px copy, and moderates and reads the photo itself", async () => {
+    expect(await analyze(pngOf(512))).toEqual({ moderation: 1600, kind: 512, read: 1600 });
+  });
+
+  it("uses the photo when the copy is missing or too large", async () => {
+    expect((await analyze(null)).kind).toBe(1600);
+    expect((await analyze(pngOf(1200))).kind).toBe(1600);
   });
 });

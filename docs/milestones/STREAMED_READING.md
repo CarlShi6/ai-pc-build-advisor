@@ -144,3 +144,48 @@ The precheck is now the largest part of the wait before Studio opens (2.9 s of 3
 - Send it a small copy (for example 512 px); its input is almost all image tokens.
 - Use a smaller model (gpt-4.1-nano).
 - Start the two reads while it runs and cancel them on `not_pc`. This is fastest, but a refused photo then costs part of a read, and moderation would no longer run before the read.
+
+## Faster precheck (2026-11-05, second round)
+
+**Order now:**
+
+1. Content moderation runs alone, on the resized photo.
+2. When it passes, three requests start at once: the photo-kind check, the fast read and the full read.
+3. Studio opens, and parts are sent, only once the kind check passes. On `not_pc` the router cancels both reads (an AbortSignal into `analyzeReferenceImage`), drops whatever they sent, and answers 422 `NOT_A_PC` on the upload page. The refused photo still counts against the session, IP and daily caps.
+
+**The small copy.** The browser now sends the photo and a 512 px copy in one multipart request (`image`, `preview`; `image-client.ts`, `readBoundedImages` in `image-input.ts`). Only the kind check reads the copy. A body with just the image still works (the smoke script, older clients); the kind check then reads the photo itself. A copy that is too large (over 640 px or 512 KB) or broken is ignored.
+
+**Moderation stays on the full photo.** Two reasons:
+
+- **The reads must be checked, not a stand-in.** The copy comes from the browser, so a crafted request could pair a harmless copy with a different photo. Moderating the copy would let the reads see an image that was never moderated. The kind check only steers cost, so a mismatched copy only wastes the sender's own allowance.
+- **Detail.** At 512 px small regions lose detail, so a smaller image is a weaker check. The full photo costs moderation nothing extra (it is free), and it took 0.66 s here.
+
+### Live runs (5176, one each)
+
+|                                  | real-photo-1                                         | Drawn mug (not a PC)                                                                                |
+| -------------------------------- | ---------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Result                           | Read (`pc_build`)                                    | Refused, `NOT_A_PC` on the upload page                                                              |
+| Moderation (server, full photo)  | **0.66 s**                                           | about 0.6 s (derived: 2.8 s total minus the 2.1 s check; refusals did not record it yet, now fixed) |
+| Kind check (server, 512 px copy) | **1.12 s**, 488 input tokens (was 2529 at full size) | about 2.1 s, from start to the reads being cancelled                                                |
+| Answer on the upload page        | Studio opened at **1.87 s** (was 3.6 s)              | 422 at 2.8 s (was 2.3 s)                                                                            |
+| First part drawn                 | **2.46 s** (was 5.6 s)                               | –                                                                                                   |
+| All visible parts drawn          | 3.49 s                                               | –                                                                                                   |
+| Read finished                    | 16.0 s                                               | –                                                                                                   |
+
+Times on the upload page and in Studio are from the Analyze click. The full read reasoned for less time on this run (its first text came at 4.6 s, against 8.6 s in the previous run); that is run-to-run variation, and it does not change when the first part appears.
+
+**real-photo-1 recording** (the new default replay; the previous one is `.tworead-1105.json`):
+
+- The fast and full appearance fields are identical, so no "Adjusted after full read" notice. They also match step 0 exactly.
+- The guesses changed again (Lian Li UNI FAN SL-INF, Galahad II LCD 360, Colorful iGame Neptune): the usual run-to-run variation.
+- Tokens: kind check 488 / 7, fast read 3266 / 139, full read 4112 / 1359.
+- Estimated cost: $0.0002 + $0.010 + $0.031 = **about $0.041** (was $0.044; same rates as before).
+
+**What the refused mug wasted.** From `local-replays/37fcd365….cancelled.json`, recorded in dev:
+
+- **Fast read:** accepted at 1.45 s, no text received when cancelled at 2.09 s; its input was 2308 tokens (counted afterwards with the input-token count endpoint).
+- **Full read:** accepted at 1.60 s, no text received; its input was 3154 tokens.
+- **Kind check:** about 500 tokens (its usage is not returned for a refusal).
+- **Total wasted: about 5462 input tokens and no output text.** If OpenAI bills the input of a cancelled stream in full, that is about $0.014 (the full read may also have spent up to half a second of reasoning tokens). The old order spent about $0.001 on a refused photo. The OpenAI usage page shows the billed figure.
+
+So a PC photo now opens Studio about 1.7 s sooner and draws its first part about 3 s sooner, while a non-PC photo costs about $0.014 more (if billed in full) and is refused about 0.5 s later.

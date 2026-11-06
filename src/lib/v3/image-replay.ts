@@ -1,4 +1,8 @@
-import { createImageAnalysisResult, type ImageAnalysisResult } from "@/lib/v3/image-contract";
+import {
+  createImageAnalysisResult,
+  type ImageAnalysisResult,
+  type PrecheckRecord,
+} from "@/lib/v3/image-contract";
 import type { ImageMime } from "@/lib/v3/image-input";
 import { anyKnown } from "@/lib/v3/appearance-params";
 import {
@@ -39,11 +43,7 @@ export interface ImageReplay {
     error?: string;
   };
   /** The precheck before the reads: the photo's kind, its time and the check's tokens. */
-  precheck?: {
-    kind: string;
-    ms: number;
-    usage: { inputTokens: number; outputTokens: number } | null;
-  };
+  precheck?: PrecheckRecord;
 }
 
 /** Lowercase hex SHA-256 of a file's original bytes: the replay key. */
