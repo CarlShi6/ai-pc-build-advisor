@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import { expect, test, type Page } from "@playwright/test";
+import { manufacturerSearch } from "../src/lib/v3/model-guess";
 import { openMatchDrawer, readIntoStudio, selectedCount } from "./helpers";
 
 // Step B: the AI's model guesses and the text it read, shown as guesses. They never choose a
@@ -21,6 +22,10 @@ const replay =
 const gpuGuess = replay?.raw?.modelGuesses?.find(
   (guess: { category: string }) => guess.category === "gpu",
 );
+/** Text the reading found on the GPU (it differs between recordings). */
+const gpuText = replay?.raw?.visibleText?.find(
+  (item: { category: string }) => item.category === "gpu",
+)?.text;
 
 /** Reads the photo into Studio and opens the match drawer. */
 async function loadFixture(page: Page, file: string) {
@@ -31,7 +36,10 @@ async function loadFixture(page: Page, file: string) {
 test("real photo: a GPU guess from visible text, not in the catalog, stays a guess", async ({
   page,
 }) => {
-  test.skip(!gpuGuess, "No gpt-5.4 replay with model guesses for real-photo-1 on this machine.");
+  test.skip(
+    !gpuGuess || !gpuText,
+    "No gpt-5.4 replay with model guesses for real-photo-1 on this machine.",
+  );
   test.setTimeout(90_000);
   let aiCalls = 0;
   page.on("request", (request) => {
@@ -43,14 +51,12 @@ test("real photo: a GPU guess from visible text, not in the catalog, stays a gue
   const gpu = guesses.locator('li[data-guess-category="gpu"]');
   await expect(gpu.locator("strong")).toHaveText(`AI guess: ${label} · not in catalog`);
   await expect(gpu).toContainText("from visible text");
-  await expect(gpu.getByRole("link")).toHaveAttribute(
-    "href",
-    /google\.com\/search\?q=site%3Agigabyte\.com/,
-  );
+  // The maker's site when the brand is known, otherwise a plain search; the guess varies by run.
+  await expect(gpu.getByRole("link")).toHaveAttribute("href", manufacturerSearch(gpuGuess).url);
   await expect(gpu.getByRole("link")).toHaveAttribute("target", "_blank");
   // The text it read is listed on its own, as a reading that may be wrong.
   await expect(guesses).toContainText("VISIBLE TEXT · AI READ, MAY BE MISREAD");
-  await expect(guesses.getByRole("list", { name: "Visible text" })).toContainText("AERO");
+  await expect(guesses.getByRole("list", { name: "Visible text" })).toContainText(gpuText);
   // Nothing chosen, and no GPU card highlighted from it.
   await expect(page.locator(".v3-candidate-card.chosen")).toHaveCount(0);
   await expect(
@@ -76,7 +82,7 @@ test("real photo: a GPU guess from visible text, not in the catalog, stays a gue
   await expect(find.getByRole("region", { name: "AI model guesses" })).toContainText(
     `AI guess: ${label} · not in catalog`,
   );
-  await expect(find).toContainText("AERO");
+  await expect(find).toContainText(gpuText);
   expect(aiCalls).toBe(0);
 });
 

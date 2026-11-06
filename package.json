@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "test:e2e:preview": "playwright test --config playwright.preview.config.ts",
     "smoke": "node scripts/smoke.mjs",
-    "measure:cpu": "node scripts/measure-cpu.mjs"
+    "measure:cpu": "node scripts/measure-cpu.mjs",
+    "deploy:check": "node scripts/deploy-check.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

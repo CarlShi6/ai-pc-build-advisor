@@ -30,4 +30,7 @@
       "simple": { "limit": 3, "period": 60 },
     },
   ],
+  // Workers Logs: the Worker's console output and request outcomes, kept in the dashboard
+  // (Worker → Observability). The app logs errors only, never photos or addresses.
+  "observability": { "enabled": true },
 }

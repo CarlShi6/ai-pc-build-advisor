@@ -14,7 +14,8 @@ Stage 2 (deployment prep) started 2026-10-28, after Step C. This file collects w
 | 6   | Pre-v3 routes return 404 in production; no Stripe                                                                                         | prepared (code, tests)           |
 | 7   | Privacy page (photo never stored, metadata stripped, what the provider receives, retention)                                               | prepared (/privacy)              |
 | 8   | E2E against a local production preview build                                                                                              | prepared (4 tests pass locally)  |
-| 9   | Set the OpenAI monthly limit (the user, in the OpenAI dashboard)                                                                          | user                             |
+| 9   | Set the OpenAI monthly limit (the user, in the OpenAI dashboard)                                                                          | user (`DEPLOY_CHECKLIST.md` a)   |
+| 10  | Step-by-step deploy checklist and `npm run deploy:check`                                                                                  | prepared (2026-11-06, below)     |
 
 ## Stage 2 preparation (2026-10-28)
 
@@ -32,12 +33,14 @@ Everything below is prepared and tested locally only. Nothing was deployed and n
 
 ### Cloudflare Workers runbook (for the user)
 
+The step-by-step version, with what to click and what success looks like, is `docs/DEPLOY_CHECKLIST.md` (2026-11-06). Follow that one; this list is the summary.
+
 1. `npx wrangler login`.
 2. `npx wrangler d1 create aipc-image-cap`; paste the printed `database_id` into `wrangler.jsonc` (it is `REPLACE_WITH_D1_DATABASE_ID` now, so a deploy fails until this is done).
 3. Turnstile (optional but listed for Stage 2): create a widget in the Cloudflare dashboard for the Worker's hostname. Build with `VITE_TURNSTILE_SITE_KEY=<site key>` in the environment; the site key is public.
 4. Secrets, never in `vars` and never `VITE_`: `npx wrangler secret put OPENAI_API_KEY` and, with Turnstile, `npx wrangler secret put TURNSTILE_SECRET_KEY`.
-5. `npm run build`, then `npm run test:e2e:preview` (needs wrangler; `WRANGLER` can name a local copy).
-6. `npx wrangler deploy` from the repository root (it follows `.wrangler/deploy/config.json` to the generated config).
+5. `npm run deploy:check` (builds, runs the preview E2E and checks configuration, secrets and routes; see "Deploy check" below).
+6. `npx wrangler deploy --var IMAGE_ANALYSIS_PAUSED:true` the first time, then `--var IMAGE_ANALYSIS_PAUSED:false` after the smoke test, from the repository root (it follows `.wrangler/deploy/config.json` to the generated config).
 7. Set the OpenAI monthly budget limit (item 9).
 8. Smoke test on the deployed URL: `npm run smoke -- https://<your-host>` (no AI cost). Then analyze one photo in the browser (with Turnstile on, `--analyze` from the script is refused as expected), and save a build in My Builds.
 9. Kill switch: see "Launch safety" below.
@@ -117,7 +120,7 @@ Prepared and tested locally only; nothing deployed. The PRD appendix the request
 | Content moderation      | First, alone, on the photo the reads will see (never the browser's small copy): `omni-moderation-latest` (free). Flagged answers 422 `CONTENT_BLOCKED` and no read starts. About 0.7 s.                                                                                                                                                                                                             | `image-precheck.server.ts`                            |
 | Security headers        | CSP (self, Google Fonts and Turnstile only; no framing, plugins or base changes), HSTS, nosniff, `X-Frame-Options: DENY`, Referrer-Policy, Permissions-Policy, COOP. On Worker responses (CSP and HSTS in production only) and on static files through `public/_headers`.                                                                                                                           | `security-headers.ts`, `server.ts`, `public/_headers` |
 | Outbound link allowlist | Links open only https pages on the listed manufacturer and retailer domains (plus Google search and OpenAI's policy page), with `noopener noreferrer nofollow`. Anything else is plain text. A test checks that every catalog link is covered.                                                                                                                                                      | `external-links.ts`                                   |
-| /terms                  | Terms of use, linked from the footer next to Privacy. The operator's name, contact and governing law are left for the operator to add.                                                                                                                                                                                                                                                              | `routes/terms.tsx`                                    |
+| /terms                  | Terms of use, linked from the footer next to Privacy: operator Jiahao Shi, contact carlshi617@gmail.com, California law (2026-11-06).                                                                                                                                                                                                                                                               | `routes/terms.tsx`                                    |
 | CPU time measurement    | `npm run measure:cpu` (results below).                                                                                                                                                                                                                                                                                                                                                              | `scripts/measure-cpu.mjs`                             |
 | Smoke test              | `npm run smoke -- <url>`: pages, headers, 404s and the APIs, with no AI cost. `--analyze <photo>` adds one real read (one paid call).                                                                                                                                                                                                                                                               | `scripts/smoke.mjs`                                   |
 
@@ -140,3 +143,23 @@ workerd's sampling profiler counts time spent waiting on a fetch as busy, so the
 | Photo, the real recording's 1116 chunks              | **about 164 ms**                                               |
 
 In Node, parsing that real stream (OpenAI SDK plus the part scanner) takes about 12 ms; the rest is workerd's per-chunk work, which Cloudflare may count differently. **A photo read does not fit the Workers Free plan's 10 ms CPU limit; use Workers Paid** (30 s default limit), where it is far inside. After deploying, check the Worker → Metrics → CPU time.
+
+## Deploy check (2026-11-06)
+
+`npm run deploy:check` (`scripts/deploy-check.mjs`) runs right before `npx wrangler deploy`, in the same shell, so its build (with that shell's `VITE_TURNSTILE_SITE_KEY`) is the one deployed. It stops at the first failing stage and exits 1.
+
+| Stage            | Checks                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ---------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1. Configuration | `wrangler.jsonc` has no placeholder and a real D1 `database_id`; `AI_PROVIDER=openai`, daily cap 30, per-IP cap 10, `IMAGE_FAST_READ` unset or on, and no secret in `vars`; the same defaults in the code; a contact email on /terms; no secret-looking `VITE_*` variable. Reports whether this build has Turnstile.                                                                                                        |
+| 2. Secrets       | `wrangler secret list` has `OPENAI_API_KEY`; `TURNSTILE_SECRET_KEY` is present exactly when the build has a site key (a secret without a site key would refuse every photo). Lists legacy Stripe, Supabase and Best Buy secrets as safe to delete.                                                                                                                                                                          |
+| 3. Build         | `npm run build`; the generated `.output/server/wrangler.json` passes the stage 1 checks, has Workers Logs on, and `.wrangler/deploy/config.json` points at it.                                                                                                                                                                                                                                                              |
+| 4. Preview E2E   | `npm run test:e2e:preview`.                                                                                                                                                                                                                                                                                                                                                                                                 |
+| 5. Routes        | The built worker on `wrangler dev --local` (port 8791, no provider key, cap 0). Every page in `routeTree.gen.ts` (`/start/$mode` for each mode) and every API in `api-router.ts` is requested and printed as "Going live (v3)" or "Hidden in production". v3 pages must answer 200 and v3 APIs anything but 404; pre-v3 pages, pre-v3 APIs and unknown paths must answer 404. The split comes from `production-surface.ts`. |
+
+`--skip-secrets` runs everything except stage 2 (before `wrangler login`) and then exits 2, never "ready".
+
+Local run on 2026-11-06, with a dummy D1 id put in for the run and removed afterwards, and `--skip-secrets`: stages 1, 3, 4 (9 preview tests) and 5 passed. 12 routes go live (9 pages, 3 APIs) and 34 answer 404 (8 pre-v3 pages, 24 pre-v3 APIs, 2 unknown paths). Stage 2's logic was checked with a stand-in for `wrangler secret list`. With the real `wrangler.jsonc` it fails at stage 1 on `REPLACE_WITH_D1_DATABASE_ID`, as it should until the user creates the database.
+
+**Logs.** `wrangler.jsonc` turns on Workers Logs (`observability.enabled`): Worker → Observability in the dashboard, or `npx wrangler tail --format pretty` live. The app logs errors only.
+
+**/terms contact.** carlshi617@gmail.com, as a mailto link (2026-11-06); the user may replace it.

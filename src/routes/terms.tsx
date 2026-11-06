@@ -13,9 +13,9 @@ export const Route = createFileRoute("/terms")({
 });
 
 // Like /privacy, every statement describes what the app does; change it with the code.
-// CONTACT_EMAIL is a placeholder the operator replaces before launch.
+// The operator can change CONTACT_EMAIL at any time; deploy:check refuses a placeholder.
 const OPERATOR = "AIPC (AI PC Build Advisor), operated by Jiahao Shi";
-const CONTACT_EMAIL = "CONTACT_EMAIL";
+const CONTACT_EMAIL = "carlshi617@gmail.com";
 function TermsPage() {
   return (
     <V3Shell>
@@ -105,7 +105,11 @@ function TermsPage() {
           <ul>
             <li>{OPERATOR}.</li>
             <li>
-              Questions about these terms: <span data-contact>{CONTACT_EMAIL}</span>.
+              Questions about these terms:{" "}
+              <a data-contact href={`mailto:${CONTACT_EMAIL}`}>
+                {CONTACT_EMAIL}
+              </a>
+              .
             </li>
             <li>These terms are governed by the laws of the State of California, USA.</li>
           </ul>
