@@ -40,3 +40,6 @@ local-replays/
 *.njsproj
 *.sln
 *.sw?
+
+# Portfolio drawer screenshot: shows text the AI read from a third-party photo
+docs/portfolio/04-match-drawer.png
