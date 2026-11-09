@@ -60,6 +60,15 @@ export const systemPrompt = [
 /** A provider call that failed, as the error the client is shown (timedOut: our deadline hit). */
 export function providerFailure(error: unknown, timedOut: boolean): ImageAnalysisError {
   const status = typeof error === "object" && error && "status" in error ? Number(error.status) : 0;
+  const code = typeof error === "object" && error && "code" in error ? error.code : null;
+  // The OpenAI account is out of credit (429 insufficient_quota): a retry cannot help until the
+  // operator tops it up, so it reads like the daily cap's pause, never as an error.
+  if (code === "insufficient_quota")
+    return new ImageAnalysisError(
+      "Photo reading is paused for now. It will be back soon; meanwhile you can describe your PC or build it by hand.",
+      503,
+      "PROVIDER_QUOTA_EXHAUSTED",
+    );
   if (status === 429)
     return new ImageAnalysisError(
       "Image analysis is rate limited. Please retry later.",

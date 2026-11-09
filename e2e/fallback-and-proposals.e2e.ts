@@ -31,6 +31,36 @@ test("image analysis unavailable falls back to a manual draft", async ({ page })
   await expect(selectedCount(page)).toHaveText("0 / 8");
 });
 
+// The OpenAI account out of credit: the same pause as the daily cap, never a generic error.
+test("an AI account out of credit shows the pause and leads to Describe", async ({ page }) => {
+  await page.route("**/api/image-analyses", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({
+        error: {
+          code: "PROVIDER_QUOTA_EXHAUSTED",
+          message:
+            "Photo reading is paused for now. It will be back soon; meanwhile you can describe your PC or build it by hand.",
+        },
+      }),
+    }),
+  );
+  await openReady(page, "/start/image");
+  await page.locator("input[type=file]").setInputFiles(fixtureImage);
+  await page.getByRole("button", { name: "Analyze image" }).click();
+  const unavailable = page.getByRole("status", { name: "Photo reading unavailable" });
+  await expect(unavailable).toContainText("Photo reading is paused for now.");
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  // A retry cannot help, so it is hidden; Describe is the main way on.
+  await expect(page.getByRole("button", { name: /Retry analysis|Analyze image/ })).toHaveCount(0);
+  await expect(unavailable.getByRole("link", { name: "Describe your dream PC" })).toHaveClass(
+    /v3-primary/,
+  );
+  await unavailable.getByRole("link", { name: "Describe your dream PC" }).click();
+  await expect(page).toHaveURL(/\/start\/describe$/);
+});
+
 // PRD §19.3 #5 and #6: cancel changes nothing; the 2D view is fully usable for edits.
 test("cancel leaves the build unchanged; confirm in 2D view updates the build", async ({
   page,

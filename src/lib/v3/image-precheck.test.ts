@@ -3,6 +3,7 @@ import { handleInternalApiRequest } from "@/lib/api-router";
 import { createImageAnalysisResult, type ImageAnalyzer } from "@/lib/v3/image-contract";
 import { NDJSON, readEvents, type AnalysisStreamEvent } from "@/lib/v3/analysis-stream";
 import { createImagePrecheck, ImagePrecheckError } from "@/lib/v3/image-precheck.server";
+import { ImageAnalysisError, providerFailure } from "@/lib/v3/image-analysis.server";
 import { ipDayKey, MemoryDailyCap, utcDay } from "@/lib/v3/image-daily-cap.server";
 import { ImageSessionLimiter } from "@/lib/v3/image-rate-limit.server";
 
@@ -29,12 +30,28 @@ const result = () =>
   );
 
 /** The provider as the OpenAI SDK sees it: moderation and the yes/no check, recorded in order. */
-function fakeProvider(answer: { flagged?: boolean; kind?: unknown; status?: number }) {
+function fakeProvider(answer: {
+  flagged?: boolean;
+  kind?: unknown;
+  status?: number;
+  outOfCredit?: boolean;
+}) {
   const calls: string[] = [];
   const fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const url = String(input);
     const body = JSON.parse(String(init?.body ?? "{}"));
     calls.push(url.endsWith("/moderations") ? "moderation" : `check:${body.model}`);
+    if (answer.outOfCredit)
+      return new Response(
+        JSON.stringify({
+          error: {
+            message: "You exceeded your current quota.",
+            type: "insufficient_quota",
+            code: "insufficient_quota",
+          },
+        }),
+        { status: 429, headers: { "content-type": "application/json" } },
+      );
     if (answer.status) return new Response("{}", { status: answer.status });
     if (url.endsWith("/moderations"))
       return Response.json({
@@ -130,6 +147,22 @@ describe("checks before the photo is read", () => {
     });
   });
 
+  it("an OpenAI account out of credit reads as a pause, not a rate limit", async () => {
+    configure();
+    for (const run of [
+      (provider: ReturnType<typeof checks>) => provider.moderate(image),
+      (provider: ReturnType<typeof checks>) => provider.classify(image),
+    ])
+      await expect(run(checks({ outOfCredit: true }))).rejects.toMatchObject({
+        code: "PROVIDER_QUOTA_EXHAUSTED",
+        status: 503,
+      });
+    // An ordinary 429 is still a rate limit.
+    await expect(checks({ status: 429 }).classify(image)).rejects.toMatchObject({
+      code: "RATE_LIMITED",
+    });
+  });
+
   it("leaves an unconfigured provider to the read, which answers with its own code", async () => {
     vi.stubEnv("AI_PROVIDER", "openai");
     vi.stubEnv("OPENAI_API_KEY", "");
@@ -210,6 +243,29 @@ describe("checks before the photo is read", () => {
     expect(sent).toEqual(["part"]);
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(cancelled).toBe(true);
+  });
+
+  it("out of credit during the kind check: the reads are cancelled and the answer is the pause", async () => {
+    const response = (await handleInternalApiRequest(imageRequest(), {
+      // As the real reads do: a cancelled read ends with its own CANCELLED error.
+      imageAnalyzer: async ({ signal }) => {
+        await new Promise((resolve) => signal!.addEventListener("abort", resolve));
+        throw new ImageAnalysisError("The read was cancelled.", 499, "CANCELLED");
+      },
+      imagePrecheck: {
+        moderate: async () => ({ ms: 1 }),
+        classify: async () => {
+          throw providerFailure(
+            Object.assign(new Error("quota"), { status: 429, code: "insufficient_quota" }),
+            false,
+          );
+        },
+      },
+      ...limits(),
+    }))!;
+    expect(response.status).toBe(503);
+    expect(response.headers.get("content-type")).toContain("application/json");
+    expect((await response.json()).error.code).toBe("PROVIDER_QUOTA_EXHAUSTED");
   });
 
   it("still counts a not_pc photo against the daily cap", async () => {

@@ -270,13 +270,14 @@ npx wrangler tail --format pretty
 
 ### 常见现象
 
-| 现象                                | 多半是                                             | 看哪里                                                                              |
-| ----------------------------------- | -------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| 上传后显示 "unavailable"            | 暂停开关开着、OpenAI key 无效或没余额、D1 绑定缺失 | `wrangler tail` 里的错误码；OpenAI Usage / Billing                                  |
-| "Photo reading is paused for today" | 当天 30 次全局上限用完（UTC 0 点重置）             | 正常；要放宽改 `wrangler.jsonc` 的 `IMAGE_ANALYSIS_DAILY_CAP` 后重新 check + deploy |
-| 同一个人第 11 次被拒                | 每 IP 每天 10 次                                   | 正常                                                                                |
-| Turnstile 一直转圈或失败            | Turnstile 的 Hostname 和实际域名不一致             | Turnstile → 你的 widget → Hostnames                                                 |
-| 读图中途 "Reading was interrupted"  | 页面被刷新或网络断开                               | 用户可以点 "Read the photo again"                                                   |
+| 现象                                | 多半是                                                                                                            | 看哪里                                                                              |
+| ----------------------------------- | ----------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| 上传后显示 "unavailable"            | 暂停开关开着、OpenAI key 无效或没余额、D1 绑定缺失                                                                | `wrangler tail` 里的错误码；OpenAI Usage / Billing                                  |
+| "Photo reading is paused for now"   | OpenAI 余额用完（`insufficient_quota`，代码 `PROVIDER_QUOTA_EXHAUSTED`）：和每日上限一样的暂停提示，引导 Describe | OpenAI → Billing 充值后立刻恢复，不用重新部署                                       |
+| "Photo reading is paused for today" | 当天 30 次全局上限用完（UTC 0 点重置）                                                                            | 正常；要放宽改 `wrangler.jsonc` 的 `IMAGE_ANALYSIS_DAILY_CAP` 后重新 check + deploy |
+| 同一个人第 11 次被拒                | 每 IP 每天 10 次                                                                                                  | 正常                                                                                |
+| Turnstile 一直转圈或失败            | Turnstile 的 Hostname 和实际域名不一致                                                                            | Turnstile → 你的 widget → Hostnames                                                 |
+| 读图中途 "Reading was interrupted"  | 页面被刷新或网络断开                                                                                              | 用户可以点 "Read the photo again"                                                   |
 
 ---
 

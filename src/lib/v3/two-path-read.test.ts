@@ -30,7 +30,7 @@ const full = {
   visibleText: [],
 };
 
-type Behaviour = { delayMs: number; fail?: boolean; text: string };
+type Behaviour = { delayMs: number; fail?: boolean; outOfCredit?: boolean; text: string };
 let behaviour: { fast: Behaviour; full: Behaviour };
 let calls: string[] = [];
 let server: http.Server;
@@ -48,6 +48,16 @@ beforeAll(async () => {
     calls.push(fast ? "fast" : "full");
     const plan = fast ? behaviour.fast : behaviour.full;
     if (plan.fail) return void res.writeHead(500, { "content-type": "application/json" }).end("{}");
+    if (plan.outOfCredit)
+      return void res.writeHead(429, { "content-type": "application/json" }).end(
+        JSON.stringify({
+          error: {
+            message: "You exceeded your current quota.",
+            type: "insufficient_quota",
+            code: "insufficient_quota",
+          },
+        }),
+      );
     res.writeHead(200, { "content-type": "text/event-stream" });
     const response = { id: "r", object: "response", status: "in_progress", output: [] };
     sse(res, { type: "response.created", sequence_number: 0, response });
@@ -183,6 +193,15 @@ describe("the fast and full reads", () => {
       full: { delayMs: 0, fail: true, text: "" },
     };
     await expect(read()).rejects.toMatchObject({ code: "ANALYSIS_FAILED" });
+  });
+
+  it("an account out of credit ends the analysis with the pause code", async () => {
+    configure();
+    behaviour = {
+      fast: { delayMs: 0, outOfCredit: true, text: "" },
+      full: { delayMs: 0, outOfCredit: true, text: "" },
+    };
+    await expect(read()).rejects.toMatchObject({ code: "PROVIDER_QUOTA_EXHAUSTED", status: 503 });
   });
 
   it("makes one call when the fast read is turned off", async () => {

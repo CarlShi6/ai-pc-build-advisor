@@ -24,6 +24,7 @@ export const unavailableCodes: Record<string, "off" | "later"> = {
   DAILY_CAP_REACHED: "off",
   DAILY_CAP_UNAVAILABLE: "off",
   IP_DAILY_CAP_REACHED: "off",
+  PROVIDER_QUOTA_EXHAUSTED: "off",
   SESSION_RATE_LIMITED: "later",
   RATE_LIMITED: "later",
 };
