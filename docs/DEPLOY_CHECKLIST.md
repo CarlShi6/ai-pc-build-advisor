@@ -6,13 +6,14 @@
 
 **三条规矩，整个过程都适用：**
 
-- key 只粘贴到 `npx wrangler secret put` 的提示里，不要放进任何文件、聊天或命令参数。
+- key 只粘贴到 `npx.cmd wrangler secret put` 的提示里，不要放进任何文件、聊天或命令参数。
 - 所有命令都在项目根目录运行：
 
   ```powershell
   cd "C:\Users\carls\Documents\ChatGPT\AI装机助手\ai-pc-build-advisor"
   ```
 
+- 用 `npx.cmd` 和 `npm.cmd`，不用 `npx` / `npm`：这台电脑的 PowerShell 禁止运行 `.ps1` 脚本，`npx` 会报 `running scripts is disabled on this system`（2026-11-09 部署时遇到）。
 - 设置 `$env:...` 的那几步和后面的 `deploy:check`、`wrangler deploy` 要在**同一个** PowerShell 窗口里做（环境变量只在当前窗口有效）。
 
 ---
@@ -20,7 +21,7 @@
 ## 0. 准备
 
 1. 确认 Node 可用：`node --version`，应显示 v20 或更高。
-2. 确认依赖已装：`npm install`，最后应显示 `found 0 vulnerabilities` 或类似的完成信息，没有 `ERR!`。
+2. 确认依赖已装：`npm.cmd install`，最后应显示 `found 0 vulnerabilities` 或类似的完成信息，没有 `ERR!`。
 3. 确认代码是最新提交：`git status`，应显示 `nothing to commit, working tree clean`（`docs/portfolio/` 未跟踪可以忽略）。
 
 ---
@@ -57,7 +58,7 @@
 ### b.2 wrangler login
 
 ```powershell
-npx wrangler login
+npx.cmd wrangler login
 ```
 
 - 第一次运行如果问 `Need to install the following packages: wrangler@... Ok to proceed? (y)`，输入 `y`。
@@ -67,7 +68,7 @@ npx wrangler login
 然后确认账号：
 
 ```powershell
-npx wrangler whoami
+npx.cmd wrangler whoami
 ```
 
 成功时会显示你的邮箱和 Account Name / Account ID。如果列出多个账号，后面的命令会问你用哪个，选同一个。
@@ -75,10 +76,11 @@ npx wrangler whoami
 ### b.3 创建 D1 并替换 ID
 
 ```powershell
-npx wrangler d1 create aipc-image-cap
+npx.cmd wrangler d1 create aipc-image-cap
 ```
 
 - 如果问 `Would you like Wrangler to add it on your behalf to your Wrangler configuration file?`，选 **No**，下一步手动改。
+  - 选了 Yes 也能补救（2026-11-09 就是这样）：它会另加一个名叫 `aipc_image_cap`、带 `"remote": true` 的绑定，并把文件改成 tab 缩进。要删掉那条，只保留 `IMAGE_CAP_DB`，并且不要 `remote`（否则本地开发和测试会读写线上数据库）。
 - 成功：输出 `Successfully created DB 'aipc-image-cap'`，还有一段配置，其中有一行 `"database_id": "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"`。
 - 打开 `wrangler.jsonc`，把 `"database_id": "REPLACE_WITH_D1_DATABASE_ID"` 换成上面那串 ID，保存。
   - 这个 ID 不是秘密，可以提交进 git：`git commit -am "set D1 database id"`。
@@ -90,7 +92,7 @@ npx wrangler d1 create aipc-image-cap
 如果想现在就确认 D1 能用（可选）：
 
 ```powershell
-npx wrangler d1 execute aipc-image-cap --remote --command "CREATE TABLE IF NOT EXISTS image_analysis_daily (day TEXT PRIMARY KEY, count INTEGER NOT NULL)"
+npx.cmd wrangler d1 execute aipc-image-cap --remote --command "CREATE TABLE IF NOT EXISTS image_analysis_daily (day TEXT PRIMARY KEY, count INTEGER NOT NULL)"
 ```
 
 成功：输出里有 `"success": true`（或 `Executed 1 command`）。
@@ -120,7 +122,7 @@ npx wrangler d1 execute aipc-image-cap --remote --command "CREATE TABLE IF NOT E
 每条命令都会提示 `Enter a secret value:`，粘贴后回车（屏幕上不显示）。
 
 ```powershell
-npx wrangler secret put OPENAI_API_KEY
+npx.cmd wrangler secret put OPENAI_API_KEY
 ```
 
 - 如果问 `There doesn't seem to be a Worker called "ai-pc-build-advisor". Do you want to create a new Worker with that name and add secrets to it?`，选 **Y**。
@@ -130,18 +132,18 @@ npx wrangler secret put OPENAI_API_KEY
 启用了 Turnstile 的话（粘贴 b.5 的 Secret Key）：
 
 ```powershell
-npx wrangler secret put TURNSTILE_SECRET_KEY
+npx.cmd wrangler secret put TURNSTILE_SECRET_KEY
 ```
 
 确认：
 
 ```powershell
-npx wrangler secret list
+npx.cmd wrangler secret list
 ```
 
 应列出 `OPENAI_API_KEY`（和 `TURNSTILE_SECRET_KEY`）。只显示名字，不显示值。
 
-- 如果还列出 `STRIPE_*`、`SUPABASE_*`、`BEST_BUY_*` 等旧 secret，v3 不会读它们，可以删：`npx wrangler secret delete <名字>`。
+- 如果还列出 `STRIPE_*`、`SUPABASE_*`、`BEST_BUY_*` 等旧 secret，v3 不会读它们，可以删：`npx.cmd wrangler secret delete <名字>`。
 
 只有这两个是 secret。其他设置（上限、`AI_PROVIDER` 等）都在 `wrangler.jsonc` 的 `vars` 里，不要用 `secret put` 放它们，也不要设任何 `VITE_` 开头的 key。
 
@@ -152,7 +154,7 @@ npx wrangler secret list
 1. 部署前检查（同一个窗口，b.5 设过 `$env:VITE_TURNSTILE_SITE_KEY` 的话它会被打进这次构建）：
 
    ```powershell
-   npm run deploy:check
+   npm.cmd run deploy:check
    ```
 
    它会依次检查：配置、secrets、构建、预览 E2E、路由，大约 3–5 分钟。
@@ -162,7 +164,7 @@ npx wrangler secret list
 2. 部署，并打开暂停开关：
 
    ```powershell
-   npx wrangler deploy --var IMAGE_ANALYSIS_PAUSED:true
+   npx.cmd wrangler deploy --var IMAGE_ANALYSIS_PAUSED:true
    ```
 
    - 第一次可能问是否注册 workers.dev 子域，按提示确认。
@@ -172,7 +174,7 @@ npx wrangler secret list
 3. 冒烟测试（不花 AI 费用）：
 
    ```powershell
-   npm run smoke -- https://ai-pc-build-advisor.<你的子域>.workers.dev
+   npm.cmd run smoke -- https://ai-pc-build-advisor.<你的子域>.workers.dev
    ```
 
    成功的样子：
@@ -192,7 +194,7 @@ npx wrangler secret list
 1. 关掉暂停，重新部署（同一个窗口，不用重新构建，`deploy:check` 的构建还在）：
 
    ```powershell
-   npx wrangler deploy --var IMAGE_ANALYSIS_PAUSED:false
+   npx.cmd wrangler deploy --var IMAGE_ANALYSIS_PAUSED:false
    ```
 
    成功：同 c.2，生成新的 Version ID。
@@ -200,7 +202,7 @@ npx wrangler secret list
 2. 用**你自己的**一张电脑照片（会产生一次 AI 调用，约 $0.04，计入当天上限）：
 
    ```powershell
-   npm run smoke -- https://ai-pc-build-advisor.<你的子域>.workers.dev --analyze "C:\路径\你的照片.jpg"
+   npm.cmd run smoke -- https://ai-pc-build-advisor.<你的子域>.workers.dev --analyze "C:\路径\你的照片.jpg"
    ```
 
    - **没开 Turnstile**：成功时最后一项是 `PASS  POST /api/image-analyses reads ... · started@1.9s case@2.5s ... done@16.0s`，最后一行是 `18/18 passed`。
@@ -224,7 +226,7 @@ Dashboard → **Workers & Pages** → `ai-pc-build-advisor` → **Settings** →
 命令行等效（需要本地还有这次的构建）：
 
 ```powershell
-npx wrangler deploy --var IMAGE_ANALYSIS_PAUSED:true
+npx.cmd wrangler deploy --var IMAGE_ANALYSIS_PAUSED:true
 ```
 
 注意：之后每次 `wrangler deploy` 都会用 `wrangler.jsonc` 加命令里的 `--var` 覆盖 Dashboard 里改过的变量，所以重新部署时记得带上你要的 `--var IMAGE_ANALYSIS_PAUSED:...`。
@@ -232,24 +234,24 @@ npx wrangler deploy --var IMAGE_ANALYSIS_PAUSED:true
 ### 怀疑 key 泄露或费用异常
 
 1. OpenAI → **API keys** → 找到 `aipc-worker` → **Revoke**。读图会立刻失败，页面显示 "unavailable"，其他页面照常。
-2. 新建一个 key，`npx wrangler secret put OPENAI_API_KEY` 重新上传（上传会立刻生效）。
+2. 新建一个 key，`npx.cmd wrangler secret put OPENAI_API_KEY` 重新上传（上传会立刻生效）。
 
 ### 回滚到上一个版本
 
 ```powershell
-npx wrangler deployments list
+npx.cmd wrangler deployments list
 ```
 
 这会列出最近的部署和各自的 Version ID。回滚到上一个版本：
 
 ```powershell
-npx wrangler rollback
+npx.cmd wrangler rollback
 ```
 
 它会问回滚原因，再确认 `y`。要回到指定版本：
 
 ```powershell
-npx wrangler rollback <Version ID>
+npx.cmd wrangler rollback <Version ID>
 ```
 
 - 成功：`Successfully rolled back to version ...`。
@@ -261,7 +263,7 @@ npx wrangler rollback <Version ID>
 实时日志（开着就会持续显示，Ctrl+C 停止）：
 
 ```powershell
-npx wrangler tail --format pretty
+npx.cmd wrangler tail --format pretty
 ```
 
 每个请求会显示一行（方法、路径、状态）和代码里的 `console.error`。应用只记录错误，不记录照片、IP 或 key。
