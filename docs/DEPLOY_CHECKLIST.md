@@ -314,6 +314,6 @@ npm.cmd run smoke -- https://aipcbuildadvisor.com
 ### 说明
 
 - **HSTS**：网站发送 `Strict-Transport-Security: max-age=31536000; includeSubDomains`。浏览器访问过根域名后，一年内会对 `aipcbuildadvisor.com` 的**所有子域**强制使用 HTTPS。子域都在 Cloudflare 上，HTTPS 是自动的，所以没有问题；以后不要在这个域名下放只支持 HTTP 的服务。没有加 preload，这个设置可以撤销。
-- **workers.dev 地址**保留不关。它和正式域名是同一个 Worker，同样的上限和计数，可以当备用地址。
+- **workers.dev 地址必须一直可用**：它已经写在发出去的简历上（2026-11-09）。加自定义域名不会影响它。不要关掉 Worker → Domains 里 Production 那条 workers.dev 的开关，不要给 Worker 改名（名字就是网址的一部分），也不要删除这个 Worker。它和正式域名是同一个 Worker，共用上限和计数。
 - **Turnstile**：以后开启时，Hostname 要填 `aipcbuildadvisor.com`、`www.aipcbuildadvisor.com` 和 workers.dev 地址三个。
 - **撤销**：在 Worker → Domains 里删掉这两个 Custom Domain，域名就回到原来的状态，Worker 本身不受影响。
