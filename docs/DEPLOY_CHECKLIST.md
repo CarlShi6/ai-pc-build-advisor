@@ -283,11 +283,37 @@ npx.cmd wrangler tail --format pretty
 
 ---
 
-## f. 自定义域名（待定）
+## f. 自定义域名：aipcbuildadvisor.com
 
-先空着。等你告诉我：
+决定（2026-11-09）：个人网站不在这个域名上，所以 AIPC 直接用根域名 `aipcbuildadvisor.com`，`www.aipcbuildadvisor.com` 也指向同一个 Worker。域名的 DNS 已经在 Cloudflare（Domains 里显示 Active），不用改注册商设置。代码里没有写死任何网址，所以不用改代码，也不用重新部署。
 
-- 域名在哪家注册商；
-- 你的个人网站是不是在同一个域名上。
+### f.1 看现有的 DNS 记录（只看）
 
-之后我再补这一节：DNS 怎么接入 Cloudflare、Worker 的 Custom Domain 或 Route 怎么设、Turnstile 要加的 Hostname，以及 HSTS 对子域的影响。
+Dashboard → **Domains** → `aipcbuildadvisor.com` → **DNS** → **Records**。
+
+- 如果根域名（Name 是 `aipcbuildadvisor.com` 或 `@`）或 `www` 已经有 A、AAAA 或 CNAME 记录，下一步加 Custom Domain 会报 "already has externally managed DNS records"。确认它们没用以后，先删掉这些记录。
+- MX、TXT 记录（邮件、验证用）不要动。
+
+### f.2 把域名加到 Worker 上
+
+Dashboard → **Workers & Pages** → `ai-pc-build-advisor` → **Domains** → **Add Domain**：
+
+1. 输入 `aipcbuildadvisor.com` → **Add domain**。
+2. 再点 **Add Domain**，输入 `www.aipcbuildadvisor.com` → **Add domain**。
+
+成功：Custom Domains 列表里出现这两条，类型都是 Custom Domain。Cloudflare 会自动建 DNS 记录和 HTTPS 证书，证书一般几分钟内生效（状态从 Initializing / Pending 变成 Active）。
+
+### f.3 检查（不花 AI 费用）
+
+```powershell
+npm.cmd run smoke -- https://aipcbuildadvisor.com
+```
+
+成功：`17/17 passed`。`www.aipcbuildadvisor.com` 也应该能在浏览器里打开同一个网站。
+
+### 说明
+
+- **HSTS**：网站发送 `Strict-Transport-Security: max-age=31536000; includeSubDomains`。浏览器访问过根域名后，一年内会对 `aipcbuildadvisor.com` 的**所有子域**强制使用 HTTPS。子域都在 Cloudflare 上，HTTPS 是自动的，所以没有问题；以后不要在这个域名下放只支持 HTTP 的服务。没有加 preload，这个设置可以撤销。
+- **workers.dev 地址**保留不关。它和正式域名是同一个 Worker，同样的上限和计数，可以当备用地址。
+- **Turnstile**：以后开启时，Hostname 要填 `aipcbuildadvisor.com`、`www.aipcbuildadvisor.com` 和 workers.dev 地址三个。
+- **撤销**：在 Worker → Domains 里删掉这两个 Custom Domain，域名就回到原来的状态，Worker 本身不受影响。
